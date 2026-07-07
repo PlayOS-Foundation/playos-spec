@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://playos.org/schemas/permission-registry.schema.json",
+  "title": "PlayOS Permission Registry",
+  "description": "Draft stub schema for the PlayOS permission registry. To be defined alongside RFC-0005.",
+  "type": "object",
+  "required": ["schemaVersion", "permissions"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "examples": ["0.1.0"]
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "risk"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Permission identifier.",
+            "examples": ["network.access", "storage.external", "location.read"]
+          },
+          "summary": {
+            "type": "string",
+            "description": "Short description of what the permission grants."
+          },
+          "risk": {
+            "type": "string",
+            "enum": ["low", "medium", "high"]
+          },
+          "userConsent": {
+            "type": "boolean",
+            "description": "Whether explicit user consent is required."
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}

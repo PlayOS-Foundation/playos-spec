@@ -1,0 +1,22 @@
+[book]
+authors = ["PlayOS Foundation"]
+language = "en"
+title = "The PlayOS Book"
+description = "The official PlayOS Platform Specification, architecture, RFCs, and developer documentation."
+src = "src"
+
+[rust]
+edition = "2021"
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/PlayOS-Foundation/playos-spec"
+edit-url-template = "https://github.com/PlayOS-Foundation/playos-spec/edit/main/book/{path}"
+
+[output.html.fold]
+enable = true
+level = 1
+
+[output.html.search]
+enable = true

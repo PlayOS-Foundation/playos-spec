@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://playos.org/schemas/device-profile.schema.json",
+  "title": "PlayOS Device Profile",
+  "description": "Draft stub schema for a PlayOS device profile. To be defined by RFC-0006.",
+  "type": "object",
+  "required": ["schemaVersion", "id", "name", "targetType"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "description": "Version of the device profile schema this file conforms to.",
+      "examples": ["0.1.0"]
+    },
+    "id": {
+      "type": "string",
+      "description": "Unique device profile identifier.",
+      "examples": ["rog-ally", "generic-linux-pc", "orange-pi"]
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable device name."
+    },
+    "targetType": {
+      "type": "string",
+      "description": "Whether the device runs the full runtime or is an SDK target.",
+      "enum": ["runtime-device", "sdk-target"]
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "Capabilities provided by this device.",
+      "items": { "type": "string" }
+    },
+    "backends": {
+      "type": "object",
+      "description": "Platform backends used to implement capabilities on this device.",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "additionalProperties": true
+}

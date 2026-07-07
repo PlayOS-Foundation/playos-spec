@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://playos.org/schemas/capability-registry.schema.json",
+  "title": "PlayOS Capability Registry",
+  "description": "Draft stub schema for the PlayOS capability registry. To be defined by RFC-0003.",
+  "type": "object",
+  "required": ["schemaVersion", "capabilities"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "examples": ["0.1.0"]
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Capability identifier.",
+            "examples": ["input.touch", "cloud.saves", "system.overlay"]
+          },
+          "summary": {
+            "type": "string",
+            "description": "Short description of the capability."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["required", "optional", "vendor", "deprecated"]
+          },
+          "group": {
+            "type": "string",
+            "description": "Capability group this belongs to."
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}

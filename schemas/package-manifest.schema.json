@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://playos.org/schemas/package-manifest.schema.json",
+  "title": "PlayOS Package Manifest",
+  "description": "Draft stub schema for a PlayOS application package manifest. To be defined by RFC-0005.",
+  "type": "object",
+  "required": ["schemaVersion", "id", "name", "version"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "description": "Version of the manifest schema this file conforms to.",
+      "examples": ["0.1.0"]
+    },
+    "id": {
+      "type": "string",
+      "description": "Reverse-DNS unique package identifier.",
+      "pattern": "^[a-z0-9]+(\\.[a-z0-9-]+)+$",
+      "examples": ["org.playos.samples.hello"]
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable application name."
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version of the package.",
+      "examples": ["1.0.0"]
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "Capabilities this package requires or optionally uses.",
+      "items": { "type": "string" }
+    },
+    "permissions": {
+      "type": "array",
+      "description": "Permissions requested by this package.",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": true
+}

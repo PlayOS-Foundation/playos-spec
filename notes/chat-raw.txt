@@ -1,0 +1,5589 @@
+Yes, Raylib in DRM mode is still GPU accelerated, provided your Linux graphics stack is configured correctly.
+
+The important distinction is:
+
+X11/Wayland
+    ↓
+OpenGL
+    ↓
+Mesa/AMD/NVIDIA Driver
+    ↓
+GPU
+
+vs
+
+DRM/KMS
+    ↓
+EGL/OpenGL
+    ↓
+Mesa/AMD/NVIDIA Driver
+    ↓
+GPU
+
+DRM mode removes the window manager and display server, not the GPU.
+
+What happens in Raylib DRM mode?
+
+Raylib's DRM platform uses:
+
+DRM/KMS
+GBM
+EGL
+OpenGL ES
+
+or depending on the implementation:
+
+DRM/KMS
+EGL
+OpenGL
+
+The rendering still occurs on the GPU.
+
+Advantages
+
+For a GameOS shell, DRM can actually be faster because:
+
+No KDE/GNOME overhead
+No compositor
+No desktop effects
+Direct page flips to the display
+
+This is very similar to how:
+
+Steam Deck Game Mode
+ChimeraOS
+RetroPie
+Batocera
+Console UIs
+
+operate.
+
+Limitations
+
+You lose desktop services:
+
+Windows
+Drag-and-drop
+Wayland protocols
+Desktop notifications
+Desktop compositing
+
+You must implement things yourself:
+
+Controller navigation
+Virtual keyboard
+Overlay UI
+Brightness control
+Power management
+Suspend/resume handling
+For a ROG Ally
+
+With AMD graphics and Mesa drivers:
+
+glxinfo | grep renderer
+
+should show something like:
+
+AMD Radeon 780M
+
+If it shows:
+
+llvmpipe
+
+then you're using software rendering and not the GPU.
+
+Would I use DRM for your GameOS?
+
+Given your goal of building a PSP/XMB-style GameOS in Raylib:
+
+Yes.
+
+A typical architecture would be:
+
+Linux
+ └─ systemd
+     └─ GameOS
+          └─ Raylib DRM frontend
+               ├─ Steam
+               ├─ RetroArch
+               ├─ Heroic
+               └─ Native games
+
+This gives you a true console-like experience, similar to what Sony, Valve, and Nintendo do, rather than just another desktop application.
+
+For the ROG Ally specifically, the AMD 780M iGPU is more than capable of rendering a Raylib-based shell at 1080p/120Hz in DRM mode with negligible GPU usage. The UI itself would likely consume well under 1% of GPU resources, leaving almost everything available for games.
+
+Absolutely. In fact, Steam Deck Game Mode is essentially a console experience built on top of Gamescope.
+
+Users never see:
+
+KDE
+Wayland
+Linux desktop
+Terminal
+Window manager
+
+They see:
+
+Power On
+   ↓
+Steam Deck UI
+   ↓
+Select Game
+   ↓
+Play
+
+which is exactly the console experience.
+
+Think of Gamescope as firmware, not a desktop
+
+Many developers think:
+
+Gamescope = Window Manager
+
+but for a handheld GameOS, it's more like:
+
+Gamescope = Display Engine
+
+Your architecture could be:
+
+Boot
+ ↓
+systemd
+ ↓
+gamescope
+ ↓
+GameOS (your Raylib frontend)
+
+The user only ever sees:
+
+Your Logo
+ ↓
+Your XMB
+ ↓
+Your Settings
+ ↓
+Your Game Library
+ ↓
+Games
+What happens when launching a game?
+
+Your frontend:
+
+system("steam steam://rungameid/1234");
+
+or
+
+system("retroarch rom.nes");
+
+or
+
+fork/exec game
+
+Gamescope handles the transition.
+
+The user experiences:
+
+GameOS
+ ↓
+Game
+ ↓
+GameOS
+
+just like:
+
+PS5
+ ↓
+Spider-Man
+ ↓
+PS5 UI
+Why Gamescope is actually better
+
+Suppose you build pure DRM:
+
+Raylib DRM
+
+Now you must implement:
+
+Game switching
+Resolution changes
+FPS limiter
+HDR
+VRR
+Screenshots
+Overlay
+Performance monitor
+Suspend/resume
+
+Valve has already solved all of that in Gamescope.
+
+What I would do for your GameOS
+
+Given your Raylib/XMB background:
+
+Linux
+ ↓
+systemd
+ ↓
+gamescope
+ ↓
+GameOS (Raylib)
+      ↓
+   Launcher
+      ↓
+ Steam
+ Heroic
+ RetroArch
+ Native Games
+
+Then completely hide:
+
+KDE
+Desktop Mode
+Taskbar
+Mouse cursor
+
+Add a secret recovery shortcut such as:
+
+L1 + R1 + START
+
+to open a maintenance shell or desktop.
+
+From the user's perspective it becomes a dedicated console, even though Gamescope is running underneath.
+
+This is actually closer to how commercial consoles are built than a pure DRM frontend. The console UI is usually just another application sitting on top of a lower-level display system that manages graphics, power, and game switching.
+
+I’ll treat “game switching” as suspend/stop current game, return to shell, launch another, and optionally resume. I’ll separate true bare-metal DRM from “minimal compositor” options.
+
+Thought for 6s
+
+Yes, but not really as a single ready-made “game switching framework” for pure DRM. You would usually compose it from lower-level Linux pieces.
+
+For a bare-metal Raylib DRM GameOS, I would use:
+
+Your Raylib DRM shell
+ ├─ Game/process manager: your C++ code
+ ├─ Input: evdev / libinput
+ ├─ Seat/device access: systemd-logind or libseat
+ ├─ Launch control: fork/exec, posix_spawn, systemd-run, or D-Bus
+ ├─ Game pause/stop: signals / cgroups
+ └─ Optional isolation: systemd scopes or containers
+
+The key libraries/tools:
+
+Need	Use
+DRM/KMS ownership	Raylib PLATFORM_DRM, or raw libdrm
+Seat/device permissions	libseat or systemd-logind; libseat exists specifically to abstract seat management for user shells/compositors.
+Input	libinput or direct /dev/input/event*
+Process launching	fork/exec, posix_spawn, or systemd-run --scope
+Tracking/killing games	waitpid, process groups, cgroups
+Hardware planes/composition	libliftoff, if you go beyond Raylib; it manages KMS planes and is used by Gamescope on Steam Deck devices.
+Build a tiny compositor instead	wlroots; it abstracts DRM/KMS, libinput, Wayland, X11, and headless backends.
+
+For actual game switching, the simplest model is:
+
+GameOS shell visible
+ ↓
+User selects game
+ ↓
+Shell fades out / releases display if needed
+ ↓
+Launch game as child process
+ ↓
+Wait for game exit
+ ↓
+Return to shell
+
+But with pure DRM, only one program can comfortably own the display at a time. So if your Raylib shell owns DRM and then you launch a native game that also wants display ownership, you need to either:
+
+Terminate or suspend your shell rendering while the game runs, then reacquire DRM after exit.
+Run the game under a compositor such as Gamescope/Weston.
+Make your shell the compositor, which is much harder.
+
+For a practical C++ implementation, I would start with this:
+
+Raylib DRM shell
+ ├─ Launch game using systemd-run --user --scope
+ ├─ Put game in its own process group
+ ├─ Monitor process exit
+ ├─ On HOME button:
+ │    ├─ SIGSTOP game
+ │    ├─ show shell
+ │    └─ SIGCONT game when resuming
+ └─ On switch game:
+      ├─ SIGTERM old game
+      └─ launch new game
+
+However, true console-style instant switching/resume is hard without a compositor or OS-level suspend/checkpointing. Linux can stop a process with SIGSTOP, but GPU/display/audio state is not always cleanly resumable for every game.
+
+My recommendation:
+
+Best bare-metal/simple:
+Raylib DRM shell + process manager + systemd scopes
+
+Best robust console-like:
+Raylib frontend + Gamescope
+
+Best custom advanced:
+Build a small wlroots compositor and make your Raylib UI part of it
+
+So: there is no “SDL for game switching” equivalent. The closest serious building blocks are systemd scopes/cgroups + libseat/libinput + optionally wlroots or Gamescope.
+
+Yes. TinyWL is the canonical "hello world" Wayland compositor built using wlroots. It was created specifically as a learning example for developers who want to build their own compositor. The README describes it as the "minimum viable product" Wayland compositor and recommends it as the best starting point.
+
+It is intentionally very small—roughly a thousand lines of C (depending on the wlroots version)—so you can understand the entire codebase.
+
+It already demonstrates:
+
+Initializing wlroots
+Creating a DRM/backend
+Handling outputs (monitors)
+Handling keyboards and mice
+Creating Wayland surfaces
+Rendering windows
+Managing focus
+Running either directly on a TTY or nested inside another Wayland/X11 session for development.
+
+For your GameOS, I would evolve TinyWL in stages:
+
+Stage 1
+TinyWL
+ ├── Launch applications
+ ├── Fullscreen only
+ └── Controller support
+
+Stage 2
+GameOS Compositor
+ ├── Game launcher IPC
+ ├── Home button
+ ├── Game switching
+ ├── Overlay
+ └── XWayland support
+
+Stage 3
+Console OS
+ ├── Raylib XMB shell
+ ├── Steam support
+ ├── RetroArch support
+ ├── Heroic support
+ ├── Performance HUD
+ ├── Suspend/resume
+ └── Brightness/volume management
+Why I think this is a great fit for you
+
+Knowing your previous projects, you've already built:
+
+a GameOS state machine
+a PSP-style XMB
+a Raylib UI
+a launcher architecture
+C++ systems
+
+You don't want to spend the next year writing:
+
+DRM code
+input handling
+output hotplug
+monitor management
+rendering synchronization
+
+TinyWL/wlroots gives you those pieces so you can focus on what differentiates your GameOS.
+
+One change I'd make
+
+I would write the compositor in C++, not C.
+
+Although wlroots is a C library, it works perfectly well from C++. You can wrap wlroots objects in RAII classes and use your preferred architecture:
+
+class Compositor
+{
+    OutputManager outputs;
+    InputManager input;
+    SceneManager scene;
+    Launcher launcher;
+    IPCServer ipc;
+};
+
+That fits much better with the way you've been designing your GameOS.
+
+I actually think this is the most interesting direction for your project. Rather than making another launcher that runs on Linux, you'd be building your own console shell—something architecturally much closer to SteamOS, the Steam Deck UI, or even Sony's XMB than to a desktop application. A custom compositor gives you control over the entire user experience while still leveraging the mature infrastructure that wlroots provides.
+
+I’ll treat this as an Arch-based “prototype first, image later” route: install Arch on the ROG Ally, capture the exact package/config set, then turn it into a reproducible ISO/image.
+
+Thought for 4s
+
+Yes. With Arch, the path is very clean:
+
+1. Install normal Arch on ROG Ally
+2. Make hardware work
+3. Record every package + config
+4. Package your GameOS components
+5. Build custom Arch ISO/image with archiso
+6. Later create your own repo + installer
+
+Arch has an official ISO-building system called archiso; it is used to create install media, live ISOs, bootstrap images, and netboot artifacts. You customize profiles, package lists, and files, then build with mkarchiso.
+
+How I would structure it
+Stage A — Prototype on real Arch
+
+Install Arch on the ROG Ally using either manual install or archinstall, which is the official guided installer/helper.
+
+Then install only what we need:
+
+pacman -S linux linux-firmware mesa vulkan-radeon \
+  wlroots wayland libinput libdrm seatd \
+  pipewire wireplumber bluez networkmanager \
+  cmake ninja gcc git
+
+Add later:
+
+pacman -S steam gamescope retroarch
+Stage B — Freeze the working system
+
+Export package list:
+
+pacman -Qqe > packages.x86_64
+
+Track config files in Git:
+
+/etc/systemd/system/gameos.service
+/etc/seatd/
+/etc/udev/rules.d/
+/etc/mkinitcpio.conf
+/etc/pacman.conf
+Stage C — Package your own software
+
+Create Arch packages for:
+
+gameos-compositor
+gameos-shell
+gameos-services
+gameos-settings
+gameos-wallpapers/themes
+
+Arch packages are built from PKGBUILD files using makepkg.
+
+Example:
+
+gameos-compositor-0.1.0-1-x86_64.pkg.tar.zst
+gameos-shell-0.1.0-1-x86_64.pkg.tar.zst
+Stage D — Create your own ISO
+
+Use archiso:
+
+pacman -S archiso
+cp -r /usr/share/archiso/configs/releng gameos-iso
+
+Then edit:
+
+gameos-iso/packages.x86_64
+gameos-iso/airootfs/etc/systemd/system/
+gameos-iso/airootfs/etc/udev/rules.d/
+gameos-iso/profiledef.sh
+
+Build:
+
+mkarchiso -v gameos-iso
+
+Result:
+
+GameOS-2026.06.27-x86_64.iso
+Final target
+
+Eventually your distro boots like:
+
+UEFI
+ ↓
+Arch-based GameOS
+ ↓
+systemd
+ ↓
+seatd
+ ↓
+gameos-compositor
+ ↓
+Raylib GameOS shell
+
+Not:
+
+Arch
+ ↓
+login manager
+ ↓
+KDE/GNOME
+Best approach
+
+Start as Arch + scripts, then evolve into Arch + packages, then finally custom archiso.
+
+That keeps it reproducible and avoids “it works only on my ROG Ally.”
+
+Thought for a couple of seconds
+
+Yes — this is a strong idea.
+
+Think of it as:
+
+Raylib = rendering + app/game framework
+GameOS SDK = hardware + system access layer
+GameOS Shell = console UI
+GameOS = Linux distro/runtime
+
+Your SDK could expose one unified API:
+
+GameOS::Input::GetController(0);
+GameOS::Power::GetBatteryLevel();
+GameOS::Display::SetBrightness(70);
+GameOS::Audio::SetVolume(50);
+GameOS::System::Suspend();
+GameOS::Launcher::RunGame(gameId);
+
+Then developers build Raylib apps/games without caring if they run on:
+
+Desktop PC
+ROG Ally
+Legion Go
+Steam Deck-like device
+Mini PC console
+
+The important design is: do not modify Raylib too much. Keep Raylib clean, and build your ecosystem around it:
+
+gameos-sdk
+ ├─ input abstraction
+ ├─ controller profiles
+ ├─ touchscreen
+ ├─ battery/power
+ ├─ brightness
+ ├─ audio
+ ├─ Wi-Fi/Bluetooth
+ ├─ launcher API
+ ├─ save-data paths
+ └─ overlay/system menu
+
+For input, create a higher-level model:
+
+enum class GameOSButton {
+    A, B, X, Y,
+    DPadUp, DPadDown, DPadLeft, DPadRight,
+    L1, R1, L2, R2,
+    Start, Select,
+    Home, QuickSettings
+};
+
+Then map each device:
+
+ROG Ally mapping
+Steam Deck mapping
+Xbox controller mapping
+DualSense mapping
+Keyboard mapping
+Touchscreen mapping
+
+So Raylib games can simply ask:
+
+if (GameOS::Input::Pressed(GameOSButton::A)) {
+    StartGame();
+}
+
+This is exactly where your ecosystem can be valuable. Raylib gives you the simple graphics/game layer; your SDK gives it a console platform layer.
+
+I would start with three projects:
+
+gameos-sdk        C/C++ library
+gameos-shell      Raylib frontend using the SDK
+gameos-compositor wlroots compositor/runtime
+
+First milestone:
+
+Raylib shell runs on Arch
+ROG Ally controls work
+Touchscreen works
+A/B navigation works
+Home button opens system menu
+One test game launches and returns
+
+That would prove the whole concept.
+
+And we should provide like an sdk for anyone who wants to develop a game for our GameOS
+
+Yes I like that the only think that needs to be initialized so we show Ui shoukd be GPu.. what about sound?
+
+Yes — for the first visible UI, you only need:
+
+Kernel
+GPU / DRM / KMS
+input enough for navigation
+GameOS compositor
+Raylib shell
+
+Sound should not block boot to UI.
+
+Best approach:
+
+Boot to UI first
+ ↓
+Start PipeWire/WirePlumber in parallel
+ ↓
+When audio becomes ready, enable UI sounds
+ ↓
+If not ready, UI remains silent but usable
+
+For the ROG Ally, I would use PipeWire + WirePlumber, but make your shell tolerant:
+
+if (GameOS::Audio::IsReady()) {
+    GameOS::Audio::PlayUiSound("select.wav");
+}
+
+So audio becomes a background service, not a boot dependency.
+
+Boot priority
+Critical path:
+GPU → input → shell
+
+Background:
+audio
+Wi-Fi
+Bluetooth
+battery monitor
+library scan
+updates
+RGB
+cloud sync
+For console feel
+
+The shell should appear immediately, even if:
+
+Sound: initializing...
+Wi-Fi: connecting...
+Bluetooth: scanning...
+Library: refreshing...
+
+Then you update indicators live.
+
+For UI sounds, you can either:
+
+Start silent until PipeWire is ready.
+Use a tiny fallback ALSA beep/sound system.
+Skip fallback and rely only on PipeWire.
+
+I would choose PipeWire only, async. Keep it clean.
+
+So how can start creating this new minimal arch Linux distro
+
+I actually think Orange Pi could become one of the most important platforms for GameOS.
+
+Not because it competes with the ROG Ally, but because it gives you a low-cost reference console.
+
+For example, an Orange Pi 5 / 5 Plus / 5 Ultra (RK3588) has:
+
+ARM Cortex-A76/A55 CPU
+Mali-G610 GPU
+Vulkan 1.2 and OpenGL ES 3.2 support
+NVMe support
+HDMI 2.1
+USB controllers
+Bluetooth/Wi-Fi
+GPIO expansion for custom handhelds
+
+That is plenty for:
+
+Raylib
+2D games
+Lightweight 3D games
+Emulators
+A complete GameOS shell
+This changes the vision
+
+Instead of thinking:
+
+GameOS = Linux distro
+
+Think:
+
+GameOS = Platform
+
+that runs on:
+
+x86_64
+ ├── ROG Ally
+ ├── Legion Go
+ ├── Desktop PC
+ └── Mini PC
+
+ARM64
+ ├── Orange Pi
+ ├── Raspberry Pi
+ ├── Rock 5B
+ └── Future handhelds
+Your SDK becomes the key
+
+The developer writes:
+
+GameOS::Input::Pressed(Button::A);
+
+not
+
+SDL_GameControllerGetButton(...)
+
+or
+
+libinput...
+
+or
+
+evdev...
+
+Your SDK hides the hardware.
+
+Exactly the same for:
+
+GameOS::Audio
+GameOS::Storage
+GameOS::Battery
+GameOS::Touch
+GameOS::Power
+GameOS::Overlay
+
+The game doesn't know if it's running on:
+
+Orange Pi
+Steam Deck
+ROG Ally
+Desktop
+
+It just calls the SDK.
+
+Even better...
+
+I would define GameOS Certified Hardware.
+
+Imagine this logo:
+
+✓ GameOS Certified
+
+Meaning:
+
+boots GameOS
+controller works
+audio works
+suspend works
+SDK fully supported
+
+Exactly how Valve certifies Steam Deck compatibility.
+
+Long-term architecture
+
+This is how I would build it:
+
+                 GameOS SDK
+                      ▲
+                      │
+          Raylib + GameOS APIs
+                      ▲
+                      │
+              GameOS Runtime
+                      ▲
+                      │
+        wlroots + Linux Services
+                      ▲
+                      │
+      Linux Kernel + Device Drivers
+                      ▲
+      ┌───────────────┼───────────────┐
+      │               │               │
+   x86_64          ARM64          Future
+  ROG Ally      Orange Pi 5     Other SBCs
+
+Notice something interesting...
+
+The OS becomes almost secondary.
+
+The SDK becomes the product.
+
+That's what Unity did.
+
+That's what Unreal did.
+
+That's what Nintendo does internally.
+
+The SDK defines the platform.
+I genuinely think you're onto something, but I'd make one important adjustment to the vision.
+
+Don't think of it as "building another Linux distro."
+
+Think of it as building an open console platform.
+
+The Linux distribution is just an implementation detail.
+
+The vision I'd pursue
+                    GameOS
+                        │
+        ┌───────────────┴───────────────┐
+        │                               │
+     Runtime                        Developer SDK
+        │                               │
+        ├── Input                       ├── C API
+        ├── Graphics                    ├── C++
+        ├── Audio                       ├── C#
+        ├── Storage                     ├── Rust
+        ├── Power                       └── Python bindings
+        ├── Networking
+        └── Overlay
+
+Then everything revolves around Raylib.
+
+Why Raylib?
+
+Because it shares the same philosophy you seem to value:
+
+Small
+Fast
+Easy to learn
+Cross-platform
+Open source
+Written in C
+Great for indie developers
+
+Imagine if someone could write:
+
+#include <raylib.h>
+#include <gameos/gameos.h>
+
+int main()
+{
+    GameOSInit();
+
+    while (!WindowShouldClose())
+    {
+        GameOSUpdate();
+
+        if (GameOSButtonPressed(GAMEOS_BUTTON_HOME))
+            GameOSShowOverlay();
+
+        BeginDrawing();
+        ...
+        EndDrawing();
+    }
+}
+
+That's a much nicer developer experience than asking them to understand evdev, libinput, PipeWire, Wayland, udev, systemd, and the rest of the Linux stack.
+
+I would also build a "GameOS Studio"
+
+Not an IDE, but a toolkit.
+
+GameOS Studio
+
+✓ New Project
+✓ Package Game
+✓ Run on PC
+✓ Deploy to ROG Ally
+✓ Deploy to Orange Pi
+✓ Debug
+✓ Performance Profiler
+✓ Asset Pipeline
+
+Now you've gone from making an operating system to providing a complete platform.
+
+And one thing I think could become your "killer feature"
+
+You already mentioned boot speed.
+
+I'd go further.
+
+Every GameOS application should feel like a console title.
+
+For example:
+
+Press Home.
+Instant overlay.
+Suspend game.
+Change controller.
+Screenshot.
+Record video.
+Change brightness.
+Resume game.
+
+The developer writes nothing.
+
+The SDK handles it.
+
+Just like Nintendo Switch and Xbox.
+
+If I were naming the repositories
+
+I'd structure them like this:
+
+gameos/
+├── kernel-profile
+├── runtime
+├── compositor
+├── shell
+├── sdk
+├── tools
+├── package-manager
+├── docs
+├── samples
+└── certification
+
+Notice something missing?
+
+There is no "launcher."
+
+Because by then, you're no longer building a launcher.
+
+You're building a platform.
+
+My suggestion for the next few months
+
+I wouldn't write a single line of compositor code yet.
+
+I'd start by writing a GameOS Vision & Architecture document—perhaps 30–50 pages.
+
+It would answer questions like:
+
+What is GameOS?
+What is the SDK?
+What APIs do we expose?
+What is the application lifecycle?
+How are games packaged?
+How are updates delivered?
+How does suspend/resume work?
+What hardware is officially supported?
+How does certification work?
+
+That document becomes the blueprint for everything that follows.
+
+From our conversations over the last few weeks, I also see a pattern: you naturally think in terms of platforms rather than individual applications. You did it with your payment architecture, and you're doing it again here.
+
+I think that's the right instinct.
+
+The OS will evolve over time. The SDK and developer experience are what can make people choose your platform.
+
+And I'd be happy to help you design it from day one—almost like writing the equivalent of the original PlayStation SDK or Nintendo SDK, but modern, open, and built around Raylib. I think that would be a fascinating project.
+
+Can u prepare in MD format the Architectuall Document?
+Absolutely. Below is a first-draft architecture document that we can evolve into the official GameOS specification.
+
+# GameOS Architecture Vision
+
+**Version:** 0.1 (Draft)
+**Status:** Vision Document
+
+---
+
+# 1. Executive Summary
+
+GameOS is an open-source, console-oriented operating system and SDK built around **Raylib**.
+
+Its goal is **not** to compete directly with Windows or SteamOS.
+
+Its goal is to provide:
+
+* A console-like user experience
+* A unified SDK for game developers
+* A consistent hardware abstraction layer
+* Fast boot and instant resume
+* A modern open platform for handhelds, PCs and future embedded gaming devices.
+
+The operating system should disappear into the background.
+
+Developers should build games—not Linux applications.
+
+---
+
+# 2. Vision
+
+A developer should be able to write:
+
+```cpp
+#include <raylib.h>
+#include <gameos/gameos.h>
+```
+
+compile once,
+
+and deploy to:
+
+* GameOS Desktop
+* ROG Ally
+* Legion Go
+* Orange Pi
+* Future handhelds
+* Future certified devices
+
+without changing game code.
+
+---
+
+# 3. Core Principles
+
+## Simplicity
+
+Small APIs.
+
+Minimal dependencies.
+
+Fast development.
+
+Inspired by Raylib philosophy.
+
+---
+
+## Console First
+
+Everything is controller-first.
+
+Keyboard and mouse are optional.
+
+Touchscreen is first-class.
+
+---
+
+## Performance
+
+No desktop environment.
+
+Minimal compositor.
+
+Fast startup.
+
+Low memory footprint.
+
+---
+
+## Open
+
+Everything is documented.
+
+Everything is scriptable.
+
+Everything can be replaced.
+
+---
+
+## Cross Platform
+
+GameOS SDK should compile on:
+
+* Windows
+* Linux
+* macOS
+
+allowing development everywhere.
+
+---
+
+# 4. System Architecture
+
+```
+                Applications
+                     │
+        ┌────────────┴────────────┐
+        │                         │
+     Raylib                  GameOS SDK
+        │                         │
+        └────────────┬────────────┘
+                     │
+             GameOS Runtime
+                     │
+          GameOS Compositor
+                     │
+        wlroots / Linux Services
+                     │
+             Linux Kernel
+                     │
+        Hardware Drivers
+```
+
+---
+
+# 5. Components
+
+## GameOS Shell
+
+Responsibilities
+
+* Home Screen
+* Game Library
+* Settings
+* Downloads
+* Notifications
+* Power Menu
+
+Technology
+
+* Raylib
+
+---
+
+## GameOS Compositor
+
+Responsibilities
+
+* Display Management
+* Input Routing
+* Surface Management
+* Fullscreen Applications
+* Overlay
+* Game Switching
+
+Technology
+
+* wlroots
+
+---
+
+## GameOS SDK
+
+Responsibilities
+
+Provide stable APIs for developers.
+
+Examples
+
+```
+GameOS::Input
+GameOS::Audio
+GameOS::Power
+GameOS::Storage
+GameOS::Display
+GameOS::Overlay
+GameOS::System
+```
+
+---
+
+## Runtime
+
+Responsible for
+
+* Game lifecycle
+* Save paths
+* User profiles
+* Overlay services
+* Package launching
+* Permissions
+
+---
+
+# 6. SDK Modules
+
+## Input
+
+Supports
+
+* Gamepads
+* Keyboard
+* Mouse
+* Touchscreen
+* Motion Sensors (future)
+* Vendor Buttons
+
+Example
+
+```cpp
+GameOS::Input::Pressed(Button::A);
+```
+
+---
+
+## Audio
+
+Supports
+
+* Master Volume
+* Music
+* Effects
+* Output Device
+
+---
+
+## Display
+
+Supports
+
+* Brightness
+* Resolution
+* Refresh Rate
+* HDR (future)
+
+---
+
+## Power
+
+Supports
+
+* Battery
+* Charging
+* Suspend
+* Resume
+* Shutdown
+* Reboot
+
+---
+
+## Storage
+
+Supports
+
+* Save Data
+* Config Files
+* Screenshots
+* Replays
+
+---
+
+## Networking
+
+Supports
+
+* Online Status
+* Downloads
+* Cloud Saves (future)
+
+---
+
+## Overlay
+
+Supports
+
+* Home Menu
+* Achievements
+* Friends (future)
+* Performance HUD
+
+---
+
+# 7. Game Lifecycle
+
+```
+Install
+↓
+
+Launch
+
+↓
+
+Running
+
+↓
+
+Paused
+
+↓
+
+Suspended
+
+↓
+
+Resume
+
+↓
+
+Exit
+
+↓
+
+Return to Shell
+```
+
+---
+
+# 8. Package Format
+
+Each application contains
+
+```
+game.pkg
+
+manifest.json
+
+icon.png
+
+banner.png
+
+game executable
+
+assets/
+```
+
+Example
+
+```json
+{
+    "id":"com.company.game",
+    "title":"My Game",
+    "version":"1.0",
+    "entry":"game",
+    "icon":"icon.png",
+    "input":["gamepad","touch"]
+}
+```
+
+---
+
+# 9. Device Profiles
+
+GameOS should separate hardware support using profiles.
+
+Examples
+
+```
+ROG Ally
+
+Legion Go
+
+Orange Pi
+
+Generic Desktop
+
+Steam Deck (future)
+
+PS4 Linux (experimental)
+```
+
+Each profile defines
+
+* Controller Mapping
+* Brightness
+* Battery
+* TDP
+* Fan Control
+* Special Buttons
+
+---
+
+# 10. Boot Sequence
+
+```
+Power
+
+↓
+
+UEFI
+
+↓
+
+Linux Kernel
+
+↓
+
+systemd
+
+↓
+
+seatd
+
+↓
+
+GameOS Compositor
+
+↓
+
+GameOS Shell
+```
+
+Target
+
+User sees UI in under 10 seconds.
+
+Future goal
+
+Under 5 seconds.
+
+---
+
+# 11. Repository Structure
+
+```
+gameos
+
+├── sdk
+
+├── shell
+
+├── compositor
+
+├── runtime
+
+├── packages
+
+├── services
+
+├── installer
+
+├── docs
+
+├── samples
+
+└── tools
+```
+
+---
+
+# 12. Supported Platforms
+
+### Phase 1
+
+* ROG Ally
+
+---
+
+### Phase 2
+
+* Generic x86_64 PCs
+
+---
+
+### Phase 3
+
+* Legion Go
+
+---
+
+### Phase 4
+
+* Orange Pi
+
+---
+
+### Phase 5
+
+* Additional ARM devices
+
+---
+
+# 13. Long-Term Vision
+
+GameOS becomes an open gaming platform.
+
+Developers write games using Raylib + GameOS SDK.
+
+Users receive a fast, console-like experience.
+
+Hardware vendors can certify devices.
+
+GameOS becomes:
+
+* an operating system,
+* a runtime,
+* an SDK,
+* a package ecosystem,
+* and a developer platform.
+
+---
+
+# 14. Development Roadmap
+
+## Milestone 1
+
+* Arch-based prototype
+* Boot to compositor
+* Raylib shell
+* Controller support
+* Touchscreen support
+
+---
+
+## Milestone 2
+
+* Game launcher
+* Package format
+* SDK v0.1
+
+---
+
+## Milestone 3
+
+* Overlay
+* Suspend/Resume
+* Audio
+* Power management
+
+---
+
+## Milestone 4
+
+* Cross-platform SDK
+* Developer tools
+* Sample games
+
+---
+
+## Milestone 5
+
+* Custom GameOS ISO
+* Package repository
+* Certified hardware program
+
+---
+
+# Mission Statement
+
+> Build the world's simplest and most enjoyable open console platform—powered by Raylib, designed for developers, and optimized for players.
+
+Thought for 6s
+
+Yes — the SDK can support PS Vita, but only the SDK/app layer, not the OS/runtime/compositor layer.
+
+Think of it like this:
+
+GameOS Full Platform
+  ├─ GameOS Linux OS        ❌ not on PS Vita
+  ├─ wlroots compositor     ❌ not on PS Vita
+  ├─ system services        ❌ not on PS Vita
+  ├─ Raylib app framework   ✅ possible
+  └─ GameOS SDK subset      ✅ possible
+
+The Vita already has its own OS. You would ship a homebrew game/app, usually as a .vpk, built with VitaSDK. There are existing Raylib ports for PS Vita, including raylib4PlayStation for Vita/PS4 and other Vita-specific ports; some newer Vita work uses vitaGL as the graphics backend.
+
+So the model becomes:
+
+Same Raylib game code
++
+GameOS SDK portable subset
++
+PS Vita backend
+=
+Vita homebrew build
+
+The SDK would need backend layers:
+
+GameOS SDK
+ ├─ backend_linux_gameos
+ ├─ backend_windows_dev
+ ├─ backend_macos_dev
+ ├─ backend_orangepi_linux
+ └─ backend_psvita_homebrew
+
+On Vita, the SDK could support:
+
+✅ input: buttons, sticks, touch
+✅ storage: save/config paths
+✅ display size / safe area
+✅ audio wrapper
+✅ app lifecycle basics
+✅ achievements/local metadata later
+
+❌ suspend/resume OS control
+❌ compositor overlay
+❌ launching other games
+❌ package manager
+❌ system brightness/TDP/fan
+
+So yes: a Vita target makes sense as a GameOS SDK compatibility target, not as a full GameOS device.
+
+Best naming:
+
+GameOS Runtime Devices:
+- ROG Ally
+- x86 PC
+- Orange Pi
+
+GameOS SDK Targets:
+- Windows
+- Linux
+- macOS
+- PS Vita
+- PS4 Linux/homebrew maybe
+- Web maybe
+
+That is powerful: developers could build a Raylib game with your SDK and target both GameOS handhelds and retro/homebrew consoles from the same API style.
+
+I like that… have it mind when we will develop Architecture and Vision Full fledged
+Memory updated
+Thought for a couple of seconds
+
+Got it — we’ll include this as a core architecture principle:
+
+GameOS Runtime Devices vs GameOS SDK Targets.
+
+That gives the platform much bigger reach without forcing every device to run the full OS.
+
+And how will we turn our vision into a profitable business?
+Thought for 5s
+
+I actually think about this differently than most open-source operating systems.
+
+Don't sell the OS. Build the ecosystem.
+
+From our previous discussions, I know you've already thought about a backend where developers can upload packaged games and users can download them. I think that becomes a key part of the business, not an add-on.
+
+Here's how I would think about it.
+
+Phase 1 — Build the community
+
+Everything is free.
+
+GameOS
+GameOS SDK
+GameOS Shell
+Documentation
+Examples
+Tools
+
+Your objective is not revenue.
+
+Your objective is:
+
+Get 100 developers building on GameOS.
+
+Without developers, there is no platform.
+
+Given the vision we've been building, I would not join an existing foundation immediately.
+
+I would do it in three stages.
+
+Stage 1 — Company-led (Years 0–2)
+
+Initially, you need to move quickly.
+
+Create a company (or develop it under your existing company) that owns the early engineering effort.
+
+During this stage:
+
+Define the architecture
+Build the SDK
+Build the runtime
+Build the first hardware support
+Build the developer community
+
+Trying to set up a foundation too early often slows decision-making.
+
+Stage 2 — Create the GameOS Foundation (Years 2–4)
+
+Once there is a real community and external contributors, create an independent GameOS Foundation.
+
+The foundation should own:
+
+The GameOS SDK specification
+The GameOS API
+The GameOS certification program
+Documentation
+Developer conferences
+Community governance
+
+The company would continue to build commercial products:
+
+GameOS Hub
+Marketplace
+Cloud services
+OEM editions
+Enterprise support
+
+This is similar in spirit to how several successful open-source ecosystems separate governance from commercial offerings.
+
+Stage 3 — Multi-vendor governance
+
+Eventually, if hardware vendors adopt GameOS, invite them to participate.
+
+Imagine members like:
+
+Handheld manufacturers
+SBC manufacturers
+Indie studios
+Emulator developers
+Raylib contributors
+Community representatives
+
+The goal is that GameOS becomes bigger than any single company.
+
+What about existing foundations?
+Linux Foundation
+
+Pros
+
+Huge credibility
+Excellent legal and governance support
+
+Cons
+
+Probably too large and heavyweight for an early-stage project.
+Your project could easily become just one of many.
+
+I would consider this only if GameOS became a major industry platform.
+
+FreeDesktop.org ecosystem
+
+This is where projects like Wayland, Mesa, and wlroots live.
+
+Pros
+
+Technically aligned with your Linux runtime.
+Strong graphics ecosystem.
+
+Cons
+
+It doesn't solve your broader SDK, marketplace, and developer ecosystem goals.
+Software Freedom Conservancy
+
+A good choice if your only goal is to steward an open-source project.
+
+However, your vision includes:
+
+SDK
+Runtime
+Marketplace
+OEM relationships
+Certification
+
+That's much broader than simply maintaining software.
+
+My recommendation
+
+I would build this:
+
+                GameOS Foundation
+                       │
+        ┌──────────────┴──────────────┐
+        │                             │
+Open Source                      Commercial Company
+        │                             │
+SDK Spec                       Marketplace
+Runtime API                    Cloud Services
+Certification                  OEM Licensing
+Documentation                  Support
+Reference Code                 GameOS Hub
+
+The foundation guarantees that:
+
+The SDK remains open.
+The runtime APIs stay stable.
+Developers aren't locked into a single vendor.
+
+The commercial company earns revenue from services built around that ecosystem.
+
+One thing I would add
+
+I think GameOS should publish an Open Platform Promise from day one.
+
+Something like:
+
+"Games built against the GameOS SDK will continue to run on future GameOS versions, and the core SDK will remain open and royalty-free."
+
+That promise gives developers confidence that they are investing in a stable platform rather than a moving target.
+
+One additional idea
+
+As we've refined the vision, I think GameOS should eventually have two brands:
+
+GameOS — the operating system and runtime.
+GameOS SDK — the cross-platform developer platform.
+
+The SDK should be usable even without installing GameOS. A developer on Windows, macOS, Linux, or a supported homebrew platform like PS Vita should still be able to use the same APIs where they make sense.
+
+I think that's one of the strongest aspects of your vision because it dramatically lowers the barrier to adoption. Developers can start using the SDK today, and if they later target a full GameOS device, they automatically gain the additional platform capabilities. That's a much easier adoption path than requiring everyone to switch operating systems first.
+
+Yes. In fact, I think that becomes the centerpiece of the business, but I would deliberately avoid making it the first thing you build.
+
+I'd envision something like this:
+
+                 GameOS Ecosystem
+
+          +-----------------------+
+          |     GameOS SDK        |
+          +-----------------------+
+                     |
+        +------------+------------+
+        |                         |
+   Raylib Games             GameOS Runtime
+        |                         |
+        +------------+------------+
+                     |
+             GameOS Marketplace
+                     |
+        +------------+------------+
+        |                         |
+   Developers               Players
+
+The key difference from Steam is that your SDK and your packaging format become the platform.
+
+Imagine the developer workflow
+
+A developer creates a Raylib game.
+
+When they're ready to release:
+
+gameos package
+
+Output:
+
+MyGame.gpk
+
+(or whatever package format you define)
+
+Then:
+
+gameos publish
+
+The package is uploaded to GameOS Hub.
+
+No complicated installer.
+
+No registry.
+
+No dependency headaches.
+
+Then the player
+
+The player sees:
+
+GameOS Store
+
+Featured
+New Releases
+Top Rated
+Free Games
+Installed
+Updates
+
+Selects a game.
+
+Presses Install.
+
+Done.
+
+Exactly like:
+
+Nintendo eShop
+Xbox Store
+PlayStation Store
+
+but for your platform.
+
+The package itself
+
+I'd make it self-contained.
+
+MyGame.gpk
+
+├── manifest.json
+├── executable
+├── assets/
+├── icon.png
+├── screenshots/
+└── signature
+
+Very similar to Android APKs or Flatpaks in spirit, but optimized for GameOS.
+
+What excites me more
+
+I actually think the marketplace shouldn't just sell games.
+
+It should become the ecosystem.
+
+For example:
+
+Games
+
+Applications
+
+Themes
+
+Controller Profiles
+
+Mods
+
+Emulators
+
+Developer Tools
+
+Asset Packs
+
+SDK Samples
+
+Imagine downloading:
+
+a PSP theme
+a Switch-style theme
+new controller mappings
+shaders
+icon packs
+
+from exactly the same marketplace.
+
+Even bigger vision
+
+Suppose somebody develops:
+
+RetroAchievements Client
+Discord Client
+Spotify Client
+OBS Remote
+Moonlight
+
+Those become GameOS applications.
+
+Now GameOS isn't just a gaming OS.
+
+It's becoming a console platform.
+
+Revenue
+
+Here's how I'd structure it.
+
+Free
+SDK
+Documentation
+Publishing
+Open-source runtime
+Marketplace
+
+Small commission on paid games.
+
+Lower than Steam.
+
+Maybe 10%.
+
+Maybe even 5% initially.
+
+The lower rate could become a differentiator for indie developers.
+
+Subscription (optional)
+
+Developers can pay for:
+
+Crash analytics
+Cloud saves
+Build pipelines
+Multiplayer relay
+Beta channels
+CDN hosting
+Enterprise
+
+OEMs:
+
+White-labelled GameOS
+Their own store
+Their branding
+One idea I think is genuinely different
+
+Most stores are OS-first.
+
+Windows has Microsoft Store.
+
+SteamOS has Steam.
+
+Android has Google Play.
+
+I think GameOS should be SDK-first.
+
+Meaning:
+
+A Windows developer using the GameOS SDK could publish directly to the GameOS Marketplace without ever owning a GameOS device.
+
+That's a huge difference.
+
+It lowers the barrier to entry enormously.
+Yes — and for GameOS, I think self-hostable by design should be a core principle.
+
+Architecture:
+
+GameOS Cloud Stack
+ ├─ Marketplace API
+ ├─ Developer Portal
+ ├─ Player Accounts
+ ├─ Game Package Storage
+ ├─ Updates/Patches
+ ├─ Cloud Saves
+ ├─ High Scores / Leaderboards
+ ├─ Achievements
+ ├─ Crash Reports
+ └─ Analytics
+
+Self-hostable stack example:
+
+API/backend        .NET / Go / Node
+Database           PostgreSQL
+Object storage     MinIO / S3-compatible
+Cache/queues       Redis
+Search             Meilisearch / OpenSearch
+CDN optional        Cloudflare / Nginx caching
+Auth               Keycloak / Authentik
+Monitoring         Prometheus + Grafana
+Logs               Loki / Seq
+
+Best design:
+
+GameOS Hub
+ ├─ Official hosted cloud
+ └─ Self-hosted edition
+
+So communities, schools, indie studios, or hardware vendors can run their own store:
+
+Official GameOS Store
+Community Store
+School Store
+OEM Store
+Private Family Store
+Developer Test Store
+
+For game packages:
+
+Developer uploads .gpk
+ ↓
+Package stored in MinIO/S3
+ ↓
+Manifest stored in PostgreSQL
+ ↓
+Signature created
+ ↓
+Client downloads package
+ ↓
+GameOS verifies signature
+ ↓
+Install
+
+For cloud saves:
+
+Game calls GameOS::CloudSave::Sync()
+ ↓
+Local save compressed
+ ↓
+Uploaded to storage
+ ↓
+Metadata stored in PostgreSQL
+ ↓
+Other device downloads latest save
+
+For high scores:
+
+GameOS::Leaderboard::Submit("main", score);
+GameOS::Leaderboard::Top("main", 100);
+
+I would make the backend multi-tenant from day one:
+
+Tenant = Store / Community / OEM / Organization
+
+That gives you business models later:
+
+Free self-hosted
+Paid hosted GameOS Hub
+OEM private marketplace
+Developer analytics subscription
+Enterprise support
+
+Important: the client should support multiple stores:
+
+Store Sources
+ ├─ official.gameos.dev
+ ├─ community.example.org
+ └─ local.lan
+
+That is powerful because GameOS remains open, but you can still build a profitable hosted service around it.
+
+Let’s refine this niw that we have better POc of what we building GameOS Architecture v0.1
+
+I’ll refine it into a stronger v0.1 architecture that reflects the full platform direction: OS/runtime, SDK targets, marketplace/cloud, self-hosting, and business/ecosystem boundaries.
+
+Thought for a couple of seconds
+
+Yes — let’s upgrade it from “Linux distro idea” to open console platform architecture.
+# GameOS Architecture v0.1
+
+**Open Console Platform Built Around Raylib**
+
+## 1. Vision
+
+GameOS is an open console platform designed around Raylib, a lightweight GameOS SDK, and a minimal Linux-based runtime.
+
+The goal is not only to build an operating system, but to create a full ecosystem:
+
+* GameOS Runtime for supported devices
+* GameOS SDK for developers
+* GameOS Shell for players
+* GameOS Marketplace for distribution
+* GameOS Cloud for saves, scores, achievements and analytics
+* Self-hostable infrastructure for communities and OEMs
+
+GameOS should feel like a console, but remain open like Linux.
+
+---
+
+## 2. Core Idea
+
+```text
+Raylib = graphics/game framework
+GameOS SDK = platform abstraction
+GameOS Runtime = console operating environment
+GameOS Cloud = ecosystem services
+GameOS Marketplace = distribution layer
+```
+
+Developers should be able to write a Raylib game and use GameOS APIs without caring about the target device.
+
+```cpp
+#include <raylib.h>
+#include <gameos/gameos.h>
+```
+
+---
+
+## 3. Platform Layers
+
+```text
+Applications / Games
+        ↓
+Raylib + GameOS SDK
+        ↓
+GameOS Runtime Services
+        ↓
+GameOS Compositor
+        ↓
+Linux / wlroots / systemd / PipeWire / seatd
+        ↓
+Hardware
+```
+
+---
+
+## 4. Device Model
+
+GameOS has two target categories.
+
+### 4.1 GameOS Runtime Devices
+
+These run the full GameOS operating environment.
+
+Examples:
+
+* ROG Ally
+* Generic x86_64 PC
+* Mini gaming PC
+* Orange Pi / ARM64 board
+* Future handheld PCs
+
+Runtime devices include:
+
+* Custom Arch-based image
+* GameOS compositor
+* Raylib shell
+* GameOS services
+* Package installer
+* Marketplace client
+
+---
+
+### 4.2 GameOS SDK Targets
+
+These cannot run the full GameOS runtime, but can support a portable subset of the SDK.
+
+Examples:
+
+* Windows
+* macOS
+* Linux desktop
+* PS Vita homebrew
+* PS4 Linux/homebrew experiments
+* Web target later
+
+SDK targets support:
+
+* Input abstraction
+* Save paths
+* Game metadata
+* Display information
+* Audio helpers
+* Touch input where available
+
+They may not support:
+
+* GameOS compositor
+* System overlay
+* OS-level suspend/resume
+* Marketplace installation
+* Device-level power controls
+
+---
+
+## 5. GameOS SDK
+
+The SDK is the most important long-term asset.
+
+It should provide a stable, simple API over platform services.
+
+Initial modules:
+
+```text
+GameOS::Input
+GameOS::Storage
+GameOS::Display
+GameOS::Audio
+GameOS::Power
+GameOS::System
+GameOS::Overlay
+GameOS::CloudSave
+GameOS::Leaderboard
+GameOS::Achievements
+GameOS::Marketplace
+```
+
+Example:
+
+```cpp
+if (GameOS::Input::Pressed(GameOS::Button::A)) {
+    StartGame();
+}
+
+GameOS::CloudSave::Sync();
+
+GameOS::Leaderboard::Submit("main", score);
+```
+
+The SDK should use backend implementations:
+
+```text
+backend_linux_gameos
+backend_linux_desktop
+backend_windows
+backend_macos
+backend_psvita
+backend_orangepi
+```
+
+---
+
+## 6. Runtime Architecture
+
+The full runtime boots directly into the GameOS experience.
+
+```text
+UEFI / Bootloader
+        ↓
+Linux Kernel
+        ↓
+systemd
+        ↓
+seatd
+        ↓
+GameOS Compositor
+        ↓
+GameOS Shell
+```
+
+The critical boot path should include only:
+
+* GPU / DRM / KMS
+* basic input
+* compositor
+* shell
+
+Everything else should start asynchronously:
+
+* audio
+* Wi-Fi
+* Bluetooth
+* library scanning
+* cloud sync
+* updates
+* marketplace refresh
+
+Target boot goal:
+
+```text
+v0.1 target: UI visible under 10 seconds
+future target: UI visible under 5 seconds
+resume target: 1–2 seconds
+```
+
+---
+
+## 7. Compositor
+
+The compositor is based on wlroots.
+
+Responsibilities:
+
+* Own DRM/KMS
+* Manage fullscreen surfaces
+* Route input
+* Handle touch
+* Handle controller navigation
+* Support home button
+* Switch between shell and game
+* Support future overlay
+
+The shell itself can initially be a Raylib Wayland client.
+
+```text
+GameOS Compositor
+    ├── GameOS Shell
+    ├── Running Game
+    └── Overlay
+```
+
+---
+
+## 8. Shell
+
+The shell is the player-facing console UI.
+
+Built with Raylib.
+
+Main areas:
+
+* Home
+* Library
+* Store
+* Settings
+* Downloads
+* Power
+* Profile
+* Developer Mode
+
+The shell should never depend on desktop UI components.
+
+No KDE.
+
+No GNOME.
+
+No visible terminal.
+
+---
+
+## 9. Input Model
+
+GameOS should expose a unified input API.
+
+```cpp
+GameOS::Input::Pressed(GameOS::Button::A);
+GameOS::Input::Axis(GameOS::Axis::LeftX);
+GameOS::Input::TouchPoints();
+```
+
+Supported input types:
+
+* gamepad
+* keyboard
+* mouse
+* touchscreen
+* vendor buttons
+* future gyro/IMU
+
+Device profiles map hardware-specific controls to GameOS controls.
+
+Example:
+
+```text
+ROG Ally
+    Armoury button → Home
+    Command Center button → Quick Settings
+    built-in controls → Gamepad 0
+    touchscreen → Touch device
+```
+
+---
+
+## 10. Device Profiles
+
+Hardware support is profile-based.
+
+Example:
+
+```text
+/etc/gameos/device-profiles/rog-ally.toml
+/etc/gameos/device-profiles/generic-pc.toml
+/etc/gameos/device-profiles/orangepi5.toml
+```
+
+Profiles define:
+
+* controller mapping
+* display resolution
+* refresh rate
+* special buttons
+* touchscreen orientation
+* power features
+* fan/TDP support
+* brightness path
+* audio quirks
+
+---
+
+## 11. Package Format
+
+GameOS applications are distributed as signed packages.
+
+Example:
+
+```text
+MyGame.gpk
+    manifest.json
+    executable
+    assets/
+    icon.png
+    banner.png
+    screenshots/
+    signature
+```
+
+Manifest example:
+
+```json
+{
+  "id": "com.studio.mygame",
+  "title": "My Game",
+  "version": "1.0.0",
+  "entry": "mygame",
+  "sdk": "0.1",
+  "input": ["gamepad", "touch"],
+  "architecture": ["x86_64", "aarch64"],
+  "permissions": ["storage.save", "leaderboard.submit"]
+}
+```
+
+---
+
+## 12. Marketplace
+
+The GameOS Marketplace is the distribution layer.
+
+It should support:
+
+* free games
+* paid games
+* demos
+* updates
+* themes
+* apps
+* emulators
+* controller profiles
+* SDK samples
+* developer tools
+
+Developer workflow:
+
+```text
+gameos package
+gameos test
+gameos publish
+```
+
+Player workflow:
+
+```text
+Open Store
+Select Game
+Install
+Launch
+Update automatically
+```
+
+---
+
+## 13. Self-Hosted Cloud
+
+GameOS Cloud should be self-hostable by design.
+
+Core services:
+
+```text
+Marketplace API
+Developer Portal
+Player Accounts
+Package Storage
+Cloud Saves
+Leaderboards
+Achievements
+Crash Reports
+Analytics
+Update Service
+```
+
+Recommended infrastructure:
+
+```text
+Backend API: .NET / Go / Rust
+Database: PostgreSQL
+Object Storage: MinIO / S3-compatible
+Cache: Redis
+Search: Meilisearch / OpenSearch
+Auth: Keycloak / Authentik
+Monitoring: Prometheus + Grafana
+Logs: Loki / Seq
+```
+
+GameOS clients should support multiple stores:
+
+```text
+Official Store
+Community Store
+OEM Store
+Private Store
+Local LAN Store
+```
+
+---
+
+## 14. Business Model
+
+Do not sell the OS first.
+
+Build the ecosystem.
+
+Potential revenue streams:
+
+* hosted GameOS Hub
+* marketplace commission
+* cloud saves
+* analytics
+* crash reporting
+* developer subscriptions
+* OEM licensing
+* white-label GameOS builds
+* enterprise support
+* certification program
+
+The open-source layer drives adoption.
+
+The hosted services and ecosystem create revenue.
+
+---
+
+## 15. Governance
+
+Initial stage:
+
+```text
+Company-led development
+```
+
+Later stage:
+
+```text
+GameOS Foundation
+```
+
+Foundation owns:
+
+* SDK specification
+* API compatibility rules
+* certification rules
+* documentation standards
+* open platform promise
+
+Commercial company owns:
+
+* hosted marketplace
+* cloud services
+* OEM deals
+* support
+* enterprise tooling
+
+---
+
+## 16. Repository Structure
+
+```text
+gameos/
+    sdk/
+    shell/
+    compositor/
+    runtime/
+    services/
+    packages/
+    marketplace/
+    cloud/
+    tools/
+    docs/
+    samples/
+    device-profiles/
+    certification/
+```
+
+---
+
+## 17. First Milestone
+
+GameOS v0.1 should prove the full loop.
+
+Target:
+
+```text
+Arch-based minimal image
+boots on ROG Ally
+starts GameOS compositor
+launches Raylib shell
+ROG Ally controls work
+touchscreen works
+one test game launches
+Home button returns to shell
+basic package manifest works
+```
+
+No marketplace yet.
+
+No cloud yet.
+
+No store yet.
+
+Just prove the console loop.
+
+---
+
+## 18. Long-Term Mission
+
+GameOS should become:
+
+* an open console operating environment
+* a Raylib-first SDK
+* a cross-platform game runtime
+* a self-hostable marketplace ecosystem
+* a hardware certification platform
+
+Mission statement:
+
+Build the simplest open console platform for indie developers and players.
+Exactly. That should be a core design rule:
+
+New devices should be added by writing a backend/profile, not by rewriting the SDK.
+
+The architecture should look like this:
+
+Game code
+   ↓
+GameOS SDK public API
+   ↓
+Capability layer
+   ↓
+Platform backend
+   ↓
+Device profile
+   ↓
+Native OS / hardware
+
+Example:
+
+GameOS::Input::Pressed(Button::A);
+GameOS::Power::BatteryLevel();
+GameOS::Display::SetBrightness(80);
+
+Internally:
+
+ROG Ally backend      → Linux + evdev + sysfs + PipeWire
+Android backend       → Android NDK + InputManager + AudioTrack
+PS Vita backend       → VitaSDK
+Orange Pi backend     → Linux + evdev + DRM/KMS
+Windows backend       → Win32/XInput/WASAPI
+
+So we design around interfaces:
+
+class IInputBackend {
+public:
+    virtual void Update() = 0;
+    virtual bool Pressed(GameOSButton button) = 0;
+    virtual float Axis(GameOSAxis axis) = 0;
+};
+
+class IPowerBackend {
+public:
+    virtual bool HasBattery() = 0;
+    virtual int BatteryPercent() = 0;
+};
+
+class IDisplayBackend {
+public:
+    virtual DisplayInfo GetDisplayInfo() = 0;
+    virtual bool SetBrightness(int percent) = 0;
+};
+
+Then each platform implements only what it supports.
+
+class LinuxInputBackend : public IInputBackend {};
+class AndroidInputBackend : public IInputBackend {};
+class VitaInputBackend : public IInputBackend {};
+class WindowsInputBackend : public IInputBackend {};
+
+For devices, use profiles:
+
+[device]
+id = "rog-ally"
+name = "ASUS ROG Ally"
+
+[input]
+home_button = "asus_armoury"
+quick_settings_button = "asus_command_center"
+
+[display]
+default_width = 1920
+default_height = 1080
+refresh_rate = 120
+
+[capabilities]
+battery = true
+brightness = true
+tdp_control = true
+fan_control = true
+touch = true
+
+Then future support becomes:
+
+Add new device profile
+Add missing backend functions if needed
+Add tests
+Certify
+
+This is how we make it future-proof:
+
+Do not hardcode ROG Ally.
+Do not hardcode Linux.
+Do not hardcode x86.
+Do not assume every device has battery, touch, cloud, overlay, rumble, or brightness.
+Everything is capability-based.
+
+So a game asks:
+
+if (GameOS::Capabilities::Has(Capability::Touch)) {
+    auto touches = GameOS::Input::TouchPoints();
+}
+
+and not:
+
+#ifdef ANDROID
+
+That is the correct platform design.
+
+The way u described it sounds like we might even be able to abstract Raylib and not have a strict dependency on Raylib
+
+I do too. In fact, I think we've just identified what could become the fundamental architectural principle of GameOS.
+
+I'd write it as one of the first principles in the architecture document:
+
+GameOS is not a game engine. GameOS is a platform SDK.
+
+That single sentence changes everything.
+
+The three layers
+
+I'd define them like this:
+
++------------------------------------------------------+
+|                  Game Application                    |
++------------------------------------------------------+
+|       Raylib / SDL / Godot / Custom Engine           |
++------------------------------------------------------+
+|                  GameOS Platform SDK                 |
++------------------------------------------------------+
+|             GameOS Runtime / Native OS               |
++------------------------------------------------------+
+
+This is very similar to how modern console SDKs work.
+
+Nintendo doesn't tell you to use a specific rendering engine.
+
+Sony doesn't require Unreal.
+
+Microsoft doesn't require Unity.
+
+They expose a platform API.
+
+This also solves another problem
+
+Suppose in 5 years Raylib is no longer the best lightweight engine.
+
+Or suppose another engine becomes popular.
+
+GameOS doesn't care.
+
+Developers can write:
+
+GameOS::CloudSave::Sync();
+GameOS::Input::Pressed(Button::A);
+GameOS::Overlay::Open();
+
+whether they're using:
+
+Raylib
+SDL
+bgfx
+Ogre
+Godot Native
+Their own engine
+
+The SDK remains stable.
+
+But...
+
+I still think Raylib should be your reference engine.
+
+Meaning:
+
+All documentation uses Raylib.
+All tutorials use Raylib.
+All samples use Raylib.
+The shell itself uses Raylib.
+The official starter templates use Raylib.
+
+That makes the platform approachable without making it dependent on Raylib.
+
+Another idea
+
+I think we should define GameOS Profiles.
+
+For example:
+
+GameOS Core
+
+Contains:
+
+Input
+Storage
+Display info
+Audio
+Lifecycle
+
+Works everywhere.
+
+Then:
+
+GameOS Runtime
+
+Adds:
+
+Overlay
+Package manager
+Marketplace
+Home button
+Suspend/resume
+Achievements
+
+Only available on runtime devices.
+
+Then:
+
+GameOS Certified
+
+Adds:
+
+Fan control
+TDP
+Battery
+Brightness
+Vendor features
+
+Only available on certified hardware.
+
+Now the SDK becomes layered.
+
+One more thing...
+
+I actually think we should stop calling it simply SDK.
+
+I think it should have a proper identity.
+
+For example:
+
+GameOS Platform SDK
+
+or
+
+GameOS Platform API
+
+because that's really what we're designing.
+
+It's not just a collection of libraries.
+
+It's the specification of an entire platform.
+
+I have one suggestion that I think could become your biggest differentiator
+
+Let's make the GameOS Platform Specification the first-class artifact—not the implementation.
+
+That means we define things like:
+
+GameOS::Input::Pressed(Button::A)
+
+because that's the platform contract.
+
+Then we implement it on:
+
+ROG Ally
+Linux PC
+Orange Pi
+Android
+PS Vita
+Windows
+
+Later, if someone else wants to port the SDK to another platform, they don't need your permission. They implement the specification.
+
+That shifts GameOS from being "Nicholas's operating system" to being an open platform standard.
+
+Personally, I think that's a much bigger and more enduring vision. It means the platform can outlive any single implementation or company, while your own runtime, cloud services, marketplace, and tooling can still be the reference implementation and the commercial offering built around that standard.
+
+Yes. And I actually think this is the perfect time to do it.
+
+We've reached a point where the vision has fundamentally changed from where we started.
+
+Originally we were building:
+
+A Linux distribution for handheld gaming.
+
+Now we're building:
+
+An Open Console Platform Specification with a reference implementation.
+
+Those are very different things.
+
+I think we should reorganize the documentation completely.
+
+Instead of a single Architecture document, I'd create a proper specification.
+
+GameOS Platform Specification
+
+Volume 1
+========
+Vision & Principles
+
+Volume 2
+========
+Platform Architecture
+
+Volume 3
+========
+GameOS Platform API (SDK)
+
+Volume 4
+========
+Runtime Architecture
+
+Volume 5
+========
+Developer Experience
+
+Volume 6
+========
+Cloud & Marketplace
+
+Volume 7
+========
+Certification
+
+Volume 8
+========
+Device Porting Guide
+
+Notice something...
+
+The OS is only one volume.
+
+That wasn't true two days ago.
+
+I would rewrite the beginning completely.
+
+Instead of
+
+GameOS is an operating system...
+
+I'd write
+
+What is GameOS?
+
+GameOS is an open console platform specification and reference implementation designed to make developing console-style games simple, portable and open.
+
+GameOS consists of:
+
+Platform Specification
+Platform SDK
+Runtime
+Shell
+Marketplace
+Cloud Services
+Developer Tools
+Reference Hardware Support
+
+The operating system is simply one implementation of the specification.
+
+That sentence changes everything.
+
+I'd introduce a new concept.
+Specification First
+             Platform Specification
+                      │
+        ┌─────────────┼─────────────┐
+        │             │             │
+        ▼             ▼             ▼
+
+   GameOS SDK   Runtime API   Package Format
+
+Everything else derives from the specification.
+
+Another thing I'd change.
+
+Instead of saying
+
+GameOS SDK
+
+I'd define
+
+GameOS Platform API
+
+Then
+
+GameOS SDK
+
+is simply
+
+Headers
+Libraries
+Documentation
+Samples
+Build Tools
+
+That's exactly how Nintendo, Sony and Microsoft think.
+
+Then I would define the Platform Layers.
+Game
+ │
+ ├── Raylib
+ ├── SDL
+ ├── Godot
+ ├── Custom Engine
+ │
+ ▼
+
+GameOS Platform API
+
+ ▼
+
+Backend
+
+ ▼
+
+Runtime
+
+ ▼
+
+Operating System
+
+Notice...
+
+Raylib is now simply one engine.
+
+Exactly where it belongs.
+
+Then I'd introduce Capabilities.
+
+Instead of
+
+#ifdef ANDROID
+
+games do
+
+if(GameOS::Capabilities::SupportsCloudSave())
+
+or
+
+if(GameOS::Capabilities::SupportsTouch())
+
+This is huge.
+
+Then I'd introduce Profiles.
+Platform Profile
+
+Runtime Profile
+
+Device Profile
+
+Those are three completely different concepts.
+
+Finally...
+
+I think we should rename the repositories.
+
+Instead of
+
+gameos-sdk
+
+I'd do
+
+gameos-spec
+
+This becomes the heart of everything.
+
+Then
+
+gameos-platform-api
+
+Reference implementation.
+
+Then
+
+gameos-runtime
+
+Linux implementation.
+
+Then
+
+gameos-shell
+
+Raylib implementation.
+
+Then
+
+gameos-cloud
+
+Marketplace.
+
+Then
+
+gameos-tools
+
+Packaging.
+
+Then
+
+gameos-samples
+
+Developer examples.
+
+I think we've crossed an important threshold.
+
+When we started this conversation, I was helping you design a GameOS.
+
+Now I think we're designing an open console platform.
+
+That's a much bigger vision, and I genuinely think it's the right one.
+
+My recommendation
+
+Let's not just update the architecture document.
+
+Let's restart it as GameOS Platform Specification v1.0.
+
+We'll treat the current Architecture v0.1 as our brainstorming draft, and write a new, professional specification from the ground up based on everything we've discovered.
+
+I also suggest we add one more guiding principle at the very beginning:
+
+Everything in GameOS should be specified before it is implemented.
+
+That single rule will keep the platform coherent as it grows across runtimes, SDKs, devices, cloud services, and future contributors. I think it's the right foundation for the vision we've now developed.
+
+I agree let’s put together the GameOS Platform Specification v1.0.
+
+I think this is the right moment to make that shift.
+
+From now on, I would stop thinking of GameOS as a software project and start thinking of it as a platform specification, exactly like POSIX, Vulkan, OpenXR, or the Nintendo Switch SDK (conceptually, not legally).
+
+The specification becomes the "constitution" of GameOS. Everything else—SDKs, runtime, shell, cloud, marketplace—is simply an implementation of that specification.
+
+Below is the structure I would use.
+
+# GameOS Platform Specification v1.0
+
+## Building an Open Console Platform
+
+**Status:** Draft v1.0
+
+---
+
+# Preface
+
+GameOS is an open console platform specification.
+
+It defines a portable platform API, runtime model, packaging format and ecosystem for developing and distributing games.
+
+GameOS is **not** a game engine.
+
+GameOS is **not** a Linux distribution.
+
+GameOS is a platform specification with one or more reference implementations.
+
+---
+
+# Vision
+
+Our mission is to make developing console-quality games as simple as writing a Raylib application.
+
+Developers should write games—not operating systems.
+
+Players should enjoy a fast, controller-first console experience.
+
+Hardware manufacturers should be able to adopt the platform without reinventing software.
+
+---
+
+# Core Principles
+
+## 1. Specification First
+
+Everything is specified before it is implemented.
+
+The specification is the contract.
+
+Implementations may vary.
+
+---
+
+## 2. Engine Agnostic
+
+GameOS must never depend on a single game engine.
+
+Reference engine:
+
+* Raylib
+
+Supported engines may eventually include:
+
+* SDL
+* Godot
+* bgfx
+* Custom engines
+
+---
+
+## 3. Open Platform
+
+The specification is open.
+
+The SDK is open.
+
+Reference implementations are open source.
+
+---
+
+## 4. Console First
+
+Controller-first UX.
+
+Touch-first where appropriate.
+
+Keyboard and mouse are optional.
+
+---
+
+## 5. Portable
+
+Games should compile once and target multiple devices through backend implementations.
+
+---
+
+## 6. Capability Based
+
+Applications never check operating systems.
+
+Applications query platform capabilities.
+
+---
+
+## 7. Layered Architecture
+
+Every layer has one responsibility.
+
+Rendering is not platform services.
+
+Platform services are not operating system services.
+
+Operating systems are not hardware.
+
+---
+
+# Platform Architecture
+
+```text
+Game
+ │
+ ├── Raylib
+ ├── SDL
+ ├── Godot
+ └── Custom Engine
+
+        │
+
+GameOS Platform API
+
+        │
+
+Backend Implementation
+
+        │
+
+Runtime
+
+        │
+
+Operating System
+
+        │
+
+Hardware
+```
+
+---
+
+# Major Components
+
+## GameOS Platform Specification
+
+Defines the platform.
+
+Contains no code.
+
+Defines APIs.
+
+Defines package format.
+
+Defines lifecycle.
+
+Defines capabilities.
+
+Defines certification.
+
+---
+
+## GameOS Platform API
+
+Reference implementation of the specification.
+
+Provides:
+
+Input
+
+Storage
+
+Cloud
+
+Power
+
+Display
+
+Audio
+
+Overlay
+
+Lifecycle
+
+Marketplace
+
+Leaderboards
+
+Achievements
+
+Packaging
+
+---
+
+## GameOS Runtime
+
+Provides:
+
+Application lifecycle
+
+Package management
+
+Overlay
+
+Shell integration
+
+Permissions
+
+Player sessions
+
+Runtime services
+
+---
+
+## GameOS Shell
+
+Reference console UI.
+
+Built using Raylib.
+
+Controller first.
+
+Touch aware.
+
+No desktop dependencies.
+
+---
+
+## GameOS Cloud
+
+Self-hostable ecosystem.
+
+Marketplace
+
+Accounts
+
+Packages
+
+Cloud Saves
+
+Achievements
+
+Leaderboards
+
+Developer Portal
+
+Analytics
+
+Updates
+
+---
+
+# Target Categories
+
+## Runtime Devices
+
+Run the complete GameOS runtime.
+
+Examples:
+
+ROG Ally
+
+Generic Linux PC
+
+Orange Pi
+
+Future handhelds
+
+---
+
+## SDK Targets
+
+Run only the Platform API.
+
+Examples:
+
+Windows
+
+Linux Desktop
+
+macOS
+
+Android
+
+PS Vita
+
+Future platforms
+
+---
+
+# Capabilities
+
+Applications discover features instead of platforms.
+
+Examples:
+
+SupportsTouch
+
+SupportsBattery
+
+SupportsCloud
+
+SupportsMarketplace
+
+SupportsOverlay
+
+SupportsSuspend
+
+SupportsAchievements
+
+SupportsLeaderboards
+
+SupportsHDR
+
+SupportsGyroscope
+
+---
+
+# Device Profiles
+
+Every device is described through profiles.
+
+Profiles define:
+
+Input mapping
+
+Display
+
+Power
+
+Audio
+
+Vendor extensions
+
+Controller layout
+
+Touch behaviour
+
+---
+
+# Backend Model
+
+Each platform implements the Platform API.
+
+Examples:
+
+backend_linux
+
+backend_windows
+
+backend_android
+
+backend_psvita
+
+backend_orangepi
+
+---
+
+# Package Format
+
+Game packages are self-contained.
+
+Contain:
+
+Executable
+
+Assets
+
+Manifest
+
+Metadata
+
+Signature
+
+Version
+
+Permissions
+
+---
+
+# Cloud Philosophy
+
+Cloud is optional.
+
+Every cloud component must have a local implementation.
+
+Every hosted component must have a self-hosted implementation.
+
+---
+
+# Marketplace Philosophy
+
+The marketplace is a platform service.
+
+Not an operating system feature.
+
+Stores may be:
+
+Official
+
+Community
+
+OEM
+
+Private
+
+LAN
+
+---
+
+# Certification
+
+Three certification levels.
+
+Level 1
+
+Platform API Compatible
+
+Level 2
+
+Runtime Compatible
+
+Level 3
+
+GameOS Certified Hardware
+
+---
+
+# Governance
+
+The specification belongs to the GameOS Foundation.
+
+Reference implementations may be maintained by commercial organizations or the community.
+
+---
+
+# Repository Structure
+
+gameos-spec
+
+gameos-platform-api
+
+gameos-runtime
+
+gameos-shell
+
+gameos-cloud
+
+gameos-marketplace
+
+gameos-tools
+
+gameos-samples
+
+gameos-reference-devices
+
+---
+
+# Long-Term Vision
+
+The operating system is not the product.
+
+The SDK is not the product.
+
+The marketplace is not the product.
+
+The platform is the product.
+
+Everything else exists to strengthen the platform.
+
+---
+
+# Platform Promise
+
+A game written against the GameOS Platform API should continue to build and run on future compatible implementations without requiring platform-specific source changes.
+
+The specification evolves carefully, preserving compatibility wherever practical.
+
+---
+
+# Motto
+
+**Write Once. Play Anywhere. Own Everything.**
+I think we've reached the point where we should stop brainstorming and start engineering.
+
+If this were a startup, I would spend the next 4–6 weeks writing specifications, not code. It sounds counterintuitive, but it will save months of rework.
+
+Here's the roadmap I'd follow.
+
+Phase 0 – Define the platform (2–4 weeks)
+
+The deliverable is GameOS Platform Specification v1.0.
+
+I would split it into chapters:
+
+Vision & Philosophy
+Platform Architecture
+Platform API (the specification, not the implementation)
+Runtime Architecture
+Device Model & Capability System
+Package Format (.gpk)
+Cloud Architecture
+Marketplace Architecture
+Certification Program
+Developer Experience
+
+This becomes the contract that every implementation follows.
+
+Phase 1 – Create the repositories
+
+I'd create a GitHub organization immediately:
+
+gameos-spec
+gameos-platform-api
+gameos-runtime
+gameos-shell
+gameos-cloud
+gameos-marketplace
+gameos-tools
+gameos-samples
+gameos-reference-devices
+
+Notice there is no "gameos-linux" repository.
+
+Linux is just one runtime implementation.
+
+Phase 2 – Design the Platform API
+
+This is the most important technical work.
+
+For example:
+
+GameOS::Input
+GameOS::Storage
+GameOS::Audio
+GameOS::Display
+GameOS::Cloud
+GameOS::Marketplace
+GameOS::System
+GameOS::Lifecycle
+
+For every API we answer:
+
+What problem does it solve?
+Is it synchronous or asynchronous?
+Is it portable?
+What capability does it require?
+How does it fail?
+How is it tested?
+
+This API should remain stable for years.
+
+Phase 3 – Design the Capability System
+
+I think this will become one of GameOS's defining features.
+
+Instead of:
+
+#ifdef ANDROID
+
+developers write:
+
+if (GameOS::Capabilities::Has(Capability::Touch))
+
+or
+
+if (GameOS::Capabilities::Has(Capability::CloudSave))
+
+That makes adding new devices much easier.
+
+Phase 4 – Define the first proof-of-concept targets
+
+I'd officially adopt these:
+
+Runtime Devices
+ROG Ally
+Generic Linux PC
+Orange Pi 5
+SDK Targets
+Windows
+Android
+PS Vita
+
+Each proves a different part of the platform.
+
+Phase 5 – Build one vertical slice
+
+Only one.
+
+Not the whole OS.
+
+Just this:
+
+Boot
+    ↓
+Compositor
+    ↓
+Shell
+    ↓
+Launch Demo Game
+    ↓
+Exit
+    ↓
+Return to Shell
+
+That's your first end-to-end success.
+
+One thing I think we should do differently
+
+I don't think we should start in GitHub.
+
+I think we should start by creating GameOS Book.
+
+Almost like a language specification.
+
+Every chapter becomes the implementation backlog.
+
+For example:
+
+Book
+
+Chapter 1
+Vision
+
+Chapter 2
+Architecture
+
+Chapter 3
+Platform API
+
+Chapter 4
+Runtime
+
+Chapter 5
+Cloud
+
+Chapter 6
+Marketplace
+
+Chapter 7
+SDK
+
+Chapter 8
+Developer Guide
+
+Every class we write later should exist because the specification says it exists.
+
+My proposal
+
+I'd like us to treat this like we're founding a real platform.
+
+I suggest our immediate goal isn't writing code.
+
+It's producing GameOS Platform Specification v1.0 that's polished enough that, if you handed it to a team of 20 engineers, they could start implementing different pieces independently and still build a coherent platform.
+
+Once that specification is in place, coding becomes much more straightforward because every repository, every interface, and every feature has a clear purpose and contract.
+
+I genuinely think that's the highest-leverage next step. It's the foundation that everything else—runtime, SDK, shell, cloud, marketplace, and eventually the business—will build upon.
+
+GameOS book can leave on GitHub as the readme.md of the repo? Is there better place to host and organise the book?
+
+Is this good ? gameconsoleos.org
+
+It's not bad, but I actually think it's too long.
+
+A good project name/domain should be:
+
+Easy to say
+Easy to type
+Easy to remember
+Easy to mention in talks, videos, and articles
+
+gameconsoleos.org is descriptive, but it's 15+ characters before the .org, and people are likely to shorten or mistype it.
+
+I'd rank it around 6.5/10.
+
+I would look for something shorter
+
+If available, these would be stronger:
+
+gameos.dev          ⭐⭐⭐⭐⭐
+gameos.org          ⭐⭐⭐⭐⭐
+gameos.io           ⭐⭐⭐⭐☆
+gameos.foundation   ⭐⭐⭐⭐☆
+
+Or, if "GameOS" is already taken or could present trademark concerns, consider creating a unique platform name:
+
+playos.dev
+novaos.dev
+atlasos.dev
+auroraos.dev
+openconsole.dev
+
+Then "GameOS" can remain the architectural concept or internal codename while the public brand is distinctive.
+
+One thing we should do before buying anything
+
+I strongly recommend we perform a trademark search.
+
+"GameOS" is a very generic term. Even if a domain is available, someone may already own trademarks in software, gaming, or operating systems. It's much better to discover that now than after you've invested months of work into branding.
+
+My recommendation
+
+Before we register a domain, let's spend a little time on branding and choose a name that can live for the next 10–20 years.
+
+We should evaluate each candidate against a checklist:
+
+Short (ideally under 10 characters before the TLD)
+Memorable
+Easy to pronounce
+Available as a domain
+GitHub organization available
+No obvious trademark conflicts
+Suitable for both open-source and commercial use
+
+I think naming the platform is important enough that we should treat it like an engineering decision rather than just picking the first available domain. A strong, unique brand will make it much easier to build a community around the project.
+
+Got playos.dev !!!
+
+Yes — but I’d use both:
+
+RFC document = permanent design record
+GitHub Issue = workflow/task discussion
+
+Best pattern:
+
+playos-spec/
+├── rfcs/
+│   ├── 0001-platform-principles.md
+│   ├── 0002-capability-system.md
+│   ├── 0003-platform-api.md
+│   └── 0004-package-format.md
+└── adr/
+
+Then create a GitHub issue for each RFC:
+
+Issue: RFC-0002 Capability System
+Labels: rfc, spec, architecture, agent-ready
+Linked file: rfcs/0002-capability-system.md
+
+The RFC file is the source of truth.
+The issue is where agents and humans discuss, assign work, and track status.
+
+Good issue workflow:
+
+Draft
+ ↓
+Needs Review
+ ↓
+Accepted
+ ↓
+Implementation Ready
+ ↓
+Implemented
+ ↓
+Spec Updated
+
+For AI agents, create issue templates like:
+
+## Goal
+Write RFC-0002 defining the PlayOS Capability System.
+
+## Context
+Read:
+- AGENTS.md
+- book/src/01-vision.md
+- book/src/03-architecture.md
+
+## Output
+Update:
+- rfcs/0002-capability-system.md
+- book/src/04-capability-system.md if needed
+
+## Rules
+- Do not implement code.
+- Keep PlayOS engine-agnostic.
+- Use capability checks, not platform checks.
+
+Then Copilot Agent can take a very specific task.
+
+I’d also create labels:
+
+rfc
+spec
+docs
+agent-ready
+needs-review
+accepted
+implementation-ready
+runtime
+sdk
+cloud
+marketplace
+device-profile
+
+So yes: RFCs as Markdown files, GitHub Issues as the work queue.
+
+I would keep them very concise and professional. Think of these as the descriptions that appear under each GitHub repository.
+
+PlayOS Repository Descriptions
+playos-spec
+
+The official PlayOS Platform Specification, architecture, RFCs, and developer documentation. Defines the platform contract independently of any implementation.
+
+playos-platform-api
+
+Reference implementation of the PlayOS Platform API, providing engine-agnostic services such as input, storage, lifecycle, cloud, and platform capabilities.
+
+playos-runtime
+
+Reference runtime for PlayOS, responsible for application lifecycle, package execution, runtime services, and operating system integration.
+
+playos-shell
+
+The PlayOS reference console interface built with Raylib, delivering a controller-first user experience for launching and managing applications.
+
+playos-cloud
+
+Self-hostable cloud services for PlayOS, including accounts, cloud saves, achievements, leaderboards, analytics, and backend APIs.
+
+playos-marketplace
+
+Open marketplace platform for publishing, discovering, installing, and updating PlayOS applications, games, themes, and developer content.
+
+playos-tools
+
+Developer tools for PlayOS including packaging, project templates, build utilities, deployment, diagnostics, and SDK tooling.
+
+playos-samples
+
+Official sample applications, tutorials, and reference projects demonstrating best practices for developing with the PlayOS Platform API.
+
+playos-reference-devices
+
+Reference implementations, hardware profiles, platform backends, and bring-up guides for supported PlayOS devices and SDK targets.
+
+I have one suggestion that I think will make the project feel much more mature
+
+I'd also add a 10th repository:
+
+playos-foundation
+
+Public website, governance, roadmap, community guidelines, branding, and organizational resources for the PlayOS Foundation.
+
+This repository wouldn't contain code. Instead, it would contain:
+
+Foundation Charter
+Mission & Vision
+Governance Model
+Code of Conduct
+Community Guidelines
+Roadmap
+Branding Assets
+Press Kit
+Website source (if using a static site generator)
+
+That gives PlayOS a clear separation between the organization and the technology, which I think aligns well with the long-term vision we've been building.
+
+So I Have created the Repositories as per your recomendation: 
+Thought for 6s
+
+Yes. The best way is to make GitHub Issues the work queue and let Copilot work from well-scoped issues.
+
+GitHub Copilot coding agent can be assigned to issues, create branches, make changes, open pull requests, and then respond to review comments such as @copilot please adjust this. GitHub’s docs describe this as the normal Copilot agent workflow: assign an issue, review the PR, request changes, and iterate.
+
+Recommended PlayOS workflow
+1. Write specs/RFCs in playos-spec
+2. Create GitHub Issues from those RFCs
+3. Mark good issues as agent-ready
+4. Assign issue to Copilot
+5. Copilot creates PR
+6. You review/ask for changes
+7. Merge only after docs/tests are correct
+First, add repo instructions
+
+In each repo, create:
+
+AGENTS.md
+.github/copilot-instructions.md
+
+GitHub says Copilot can use repository custom instructions, and it also supports AGENTS.md; if both root AGENTS.md and .github/copilot-instructions.md exist, both are used.
+
+For playos-spec, AGENTS.md should say something like:
+
+# PlayOS Agent Instructions
+
+## Project Rules
+
+- PlayOS is a platform specification, not only an operating system.
+- Do not make Raylib a hard dependency of the Platform API.
+- Raylib is the reference engine and shell technology.
+- Use "PlayOS Platform API" for the engine-agnostic API.
+- Distinguish Runtime Devices from SDK Targets.
+- Prefer capability checks over platform checks.
+- Do not implement code in this repository unless explicitly requested.
+- Keep documentation clear, structured, and specification-first.
+
+## Required Structure
+
+- Book content lives under `book/src/`.
+- RFCs live under `rfcs/`.
+- ADRs live under `adr/`.
+- Every new platform concept should be documented before implementation.
+
+## Validation
+
+Before finishing, ensure:
+- `book/src/SUMMARY.md` links to new chapters.
+- Terminology is consistent.
+- Markdown is valid.
+Then create issue templates
+
+In playos-spec, create:
+
+.github/ISSUE_TEMPLATE/rfc-task.md
+.github/ISSUE_TEMPLATE/book-chapter.md
+.github/ISSUE_TEMPLATE/spec-update.md
+
+Example issue for Copilot:
+
+# RFC-0002: Capability System
+
+## Goal
+
+Create the first draft of RFC-0002 defining the PlayOS Capability System.
+
+## Context
+
+Read:
+- `AGENTS.md`
+- `book/src/02-vision.md`
+- `book/src/04-platform-architecture.md`
+
+## Required Output
+
+Create:
+- `rfcs/0002-capability-system.md`
+
+Update if needed:
+- `book/src/06-capability-model.md`
+
+## Requirements
+
+The RFC must define:
+- What a capability is
+- Required vs optional capabilities
+- Runtime capability discovery
+- SDK target limitations
+- Examples such as Touch, Battery, CloudSave, Overlay, Marketplace
+- Failure behavior when a capability is missing
+
+## Rules
+
+- Do not write implementation code.
+- Do not hardcode platforms like Android or ROG Ally in the API.
+- Use examples in C++ pseudocode only.
+
+Then assign that issue to Copilot.
+
+GitHub has also added options to choose the target repository and base branch when assigning issues to Copilot, which is useful if your issue lives in playos-spec but the implementation should happen in another repo.
+
+For implementation repos
+
+Example issue in playos-platform-api:
+
+# Implement Capability Registry Skeleton
+
+## Goal
+
+Implement the initial PlayOS capability registry based on RFC-0002.
+
+## Source of Truth
+
+Read:
+- `playos-spec/rfcs/0002-capability-system.md`
+- `AGENTS.md`
+
+## Required Output
+
+Create:
+- `include/playos/capabilities.h`
+- `src/capabilities.cpp`
+- `tests/capabilities_tests.cpp`
+
+## API Requirements
+
+Provide:
+- `PlayOS::Capabilities::Has(Capability capability)`
+- `PlayOS::Capabilities::List()`
+- `PlayOS::Capabilities::Register(...)`
+
+## Constraints
+
+- Engine agnostic.
+- No Raylib dependency.
+- No platform-specific checks in public API.
+My recommended day-one setup
+
+Start with playos-spec only:
+
+playos-spec
+├── README.md
+├── AGENTS.md
+├── .github/
+│   ├── copilot-instructions.md
+│   └── ISSUE_TEMPLATE/
+├── book/
+│   ├── book.toml
+│   └── src/
+├── rfcs/
+└── adr/
+
+Then create 5 issues and assign them one by one:
+
+RFC-0001: Platform Principles
+RFC-0002: Capability System
+RFC-0003: Runtime Devices vs SDK Targets
+RFC-0004: Package Format
+RFC-0005: Platform API Surface
+
+Do not let Copilot work on all of them at once at the beginning. Start with one issue, review the output, improve AGENTS.md, then continue.
+
+The key is: Copilot should not invent PlayOS. It should implement clearly scoped PlayOS decisions.
+
+Thought for a couple of seconds
+
+For the first commit in playos-spec, I would commit only the foundation of the specification repo — no code, no implementation decisions, no deep API yet.
+
+The first commit should say:
+
+“This repository is the source of truth for the PlayOS platform.”
+
+First commit message
+git commit -m "Initial PlayOS platform specification structure"
+First commit contents
+playos-spec/
+├── README.md
+├── AGENTS.md
+├── LICENSE
+├── CONTRIBUTING.md
+├── CODE_OF_CONDUCT.md
+├── book/
+│   ├── book.toml
+│   └── src/
+│       ├── SUMMARY.md
+│       ├── 01-preface.md
+│       ├── 02-vision.md
+│       ├── 03-platform-principles.md
+│       ├── 04-platform-architecture.md
+│       ├── 05-target-categories.md
+│       ├── 06-capability-model.md
+│       ├── 07-platform-api.md
+│       ├── 08-runtime-model.md
+│       ├── 09-device-profiles.md
+│       ├── 10-package-format.md
+│       ├── 11-cloud-and-marketplace.md
+│       ├── 12-certification.md
+│       └── 13-governance.md
+├── rfcs/
+│   └── 0000-template.md
+└── adr/
+    └── 0000-template.md
+README.md
+# PlayOS Specification
+
+PlayOS is an open console platform specification.
+
+This repository is the source of truth for the PlayOS Platform Specification, including the platform architecture, principles, RFCs, capability model, runtime model, package format, governance, and developer-facing platform contracts.
+
+PlayOS is not a game engine.
+
+PlayOS is not only a Linux distribution.
+
+PlayOS is a platform specification with reference implementations.
+
+## Core Ideas
+
+- Specification first
+- Engine agnostic
+- Raylib as the reference engine, not a hard dependency
+- Console-first user experience
+- Capability-based platform design
+- Runtime devices and SDK targets
+- Self-hostable cloud and marketplace services
+- Open governance and long-term compatibility
+
+## Repository Structure
+
+```text
+book/   The PlayOS Book and platform specification
+rfcs/   Requests for Comments for major design decisions
+adr/    Architecture Decision Records
+Related Repositories
+playos-platform-api
+playos-runtime
+playos-shell
+playos-cloud
+playos-marketplace
+playos-tools
+playos-samples
+playos-reference-devices
+playos-foundation
+
+## AGENTS.md
+
+```md
+# PlayOS Agent Instructions
+
+This repository defines the PlayOS Platform Specification.
+
+Agents working in this repository must follow these rules.
+
+## Core Rules
+
+1. PlayOS is a platform specification, not only an operating system.
+2. PlayOS is not a game engine.
+3. The PlayOS Platform API must remain engine agnostic.
+4. Raylib is the reference engine and reference shell technology, but not a hard dependency.
+5. Prefer capability checks over platform checks.
+6. Distinguish clearly between Runtime Devices and SDK Targets.
+7. Do not introduce implementation details unless the specification requires them.
+8. Do not create APIs that only work on one device unless they are explicitly marked as device-specific extensions.
+9. All major design decisions must go through an RFC or ADR.
+10. The specification is the source of truth for all other PlayOS repositories.
+
+## Terminology
+
+Use these terms consistently:
+
+- PlayOS Platform Specification
+- PlayOS Platform API
+- PlayOS Runtime
+- PlayOS Shell
+- PlayOS Cloud
+- PlayOS Marketplace
+- Runtime Device
+- SDK Target
+- Capability
+- Device Profile
+- Reference Implementation
+
+Avoid these mistakes:
+
+- Do not describe PlayOS as just a Linux distribution.
+- Do not describe the Platform API as a Raylib extension.
+- Do not hardcode ROG Ally, Android, PS Vita, or Orange Pi assumptions into the general platform model.
+- Do not use platform-specific checks where a capability query should be used.
+
+## Documentation Rules
+
+- Book chapters live in `book/src/`.
+- RFCs live in `rfcs/`.
+- ADRs live in `adr/`.
+- Update `book/src/SUMMARY.md` when adding book chapters.
+- Keep Markdown clear and readable.
+- Prefer short, precise sections.
+- Include examples where useful.
+
+## First Principle
+
+Every implementation should follow the specification.
+
+If the specification is unclear, update the specification before implementing code.
+book/book.toml
+[book]
+title = "The PlayOS Book"
+authors = ["PlayOS Foundation"]
+description = "The official PlayOS Platform Specification"
+language = "en"
+multilingual = false
+src = "src"
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/playos/playos-spec"
+edit-url-template = "https://github.com/playos/playos-spec/edit/main/book/{path}"
+book/src/SUMMARY.md
+# Summary
+
+# The PlayOS Book
+
+- [Preface](01-preface.md)
+- [Vision](02-vision.md)
+- [Platform Principles](03-platform-principles.md)
+- [Platform Architecture](04-platform-architecture.md)
+- [Target Categories](05-target-categories.md)
+- [Capability Model](06-capability-model.md)
+- [Platform API](07-platform-api.md)
+- [Runtime Model](08-runtime-model.md)
+- [Device Profiles](09-device-profiles.md)
+- [Package Format](10-package-format.md)
+- [Cloud and Marketplace](11-cloud-and-marketplace.md)
+- [Certification](12-certification.md)
+- [Governance](13-governance.md)
+First book chapter content
+
+Keep the first commit light. For each chapter, just add a short skeleton.
+
+Example book/src/01-preface.md:
+
+# Preface
+
+PlayOS is an open console platform specification.
+
+It defines a portable platform API, runtime model, package format, device model, capability system, and ecosystem for developing and distributing console-style applications and games.
+
+PlayOS is not a game engine.
+
+PlayOS is not only a Linux distribution.
+
+PlayOS is a specification-first platform with one or more reference implementations.
+
+Example book/src/02-vision.md:
+
+# Vision
+
+The mission of PlayOS is to make developing console-quality games simple, portable, and open.
+
+Developers should write games, not operating systems.
+
+Players should experience a fast, controller-first console environment.
+
+Hardware manufacturers should be able to adopt PlayOS without reinventing the full software stack.
+
+PlayOS aims to provide:
+
+- An engine-agnostic Platform API
+- A reference runtime
+- A reference shell
+- A packaging model
+- A cloud and marketplace model
+- A capability-based device abstraction
+- A path for certified hardware
+RFC template
+
+rfcs/0000-template.md
+
+# RFC-0000: Title
+
+## Status
+
+Draft
+
+## Summary
+
+Briefly describe the proposal.
+
+## Motivation
+
+Why is this needed?
+
+## Goals
+
+- Goal 1
+- Goal 2
+
+## Non-Goals
+
+- Non-goal 1
+- Non-goal 2
+
+## Design
+
+Describe the proposed design.
+
+## Capability Impact
+
+Describe any new or affected capabilities.
+
+## Runtime Impact
+
+Describe any impact on Runtime Devices.
+
+## SDK Target Impact
+
+Describe any impact on SDK Targets.
+
+## Compatibility
+
+Describe compatibility expectations.
+
+## Open Questions
+
+- Question 1
+- Question 2
+ADR template
+
+adr/0000-template.md
+
+# ADR-0000: Title
+
+## Status
+
+Proposed
+
+## Context
+
+What is the context of the decision?
+
+## Decision
+
+What decision was made?
+
+## Consequences
+
+What are the positive and negative consequences?
+
+## Alternatives Considered
+
+What alternatives were considered?
+LICENSE
+
+For the spec repo, I would use:
+
+Creative Commons Attribution 4.0 International
+
+For code repos later, use something like MIT or Apache-2.0. But for the spec/docs, CC-BY-4.0 is a good fit.
+
+First commit goal
+
+The first commit should not try to solve everything.
+
+It should establish:
+
+PlayOS is specification-first.
+The repo structure is clear.
+Agents know the rules.
+The book can be built with mdBook.
+RFCs and ADRs have a home.
+
+After that, the second commit should add the first real content:
+
+RFC-0001: Platform Principles
+RFC-0002: Runtime Devices and SDK Targets
+RFC-0003: Capability Model
+In read me.md shoukd we mention related repositories?
+
+Yes — mention them, but keep it short.
+
+The README.md of playos-spec should make it clear that this repo is the source of truth, and the other repos are implementations or supporting projects.
+
+I’d include a section like this:
+
+## Related Repositories
+
+The PlayOS ecosystem is split across multiple repositories. This repository, `playos-spec`, is the source of truth for platform architecture and specification decisions.
+
+| Repository | Purpose |
+|---|---|
+| `playos-platform-api` | Reference implementation of the engine-agnostic PlayOS Platform API. |
+| `playos-runtime` | Reference runtime for application lifecycle, package execution, and runtime services. |
+| `playos-shell` | Reference console UI built with Raylib. |
+| `playos-cloud` | Self-hostable backend services such as accounts, saves, achievements, leaderboards, and analytics. |
+| `playos-marketplace` | Marketplace and distribution layer for publishing, discovering, installing, and updating PlayOS content. |
+| `playos-tools` | Developer tools for packaging, templates, diagnostics, deployment, and SDK workflows. |
+| `playos-samples` | Official sample applications and tutorials. |
+| `playos-reference-devices` | Device profiles, backend notes, hardware bring-up guides, and reference device support. |
+| `playos-foundation` | Governance, public website, community resources, branding, and foundation materials. |
+
+And add this sentence right after the table:
+
+Implementation repositories should not define platform behavior independently. New platform behavior should be specified here first, usually through the book, an RFC, or an ADR.
+
+That is important because it tells humans and agents: do not invent architecture in implementation repos.
+
+So give me again a clean summary of what we are going to build:
+
+Thought for a few seconds
+
+Mostly yes — all platform-level documentation should live in playos-spec.
+
+But not every README for every repo.
+
+Think of it like this:
+
+playos-spec = source of truth
+other repos = local implementation docs
+What goes in playos-spec
+
+Put anything that defines what PlayOS is or how it must behave:
+
+Platform vision
+Architecture
+Terminology
+Platform principles
+Platform API specification
+Capability model
+Runtime device vs SDK target model
+Package format
+Device profile format
+Cloud/marketplace architecture
+Certification rules
+Governance
+RFCs
+ADRs
+Developer-facing platform contracts
+
+So yes, the PlayOS Book goes here.
+
+playos-spec/
+├── book/
+├── rfcs/
+├── adr/
+├── glossary.md
+└── AGENTS.md
+What goes in each implementation repo
+
+Each implementation repo should still have its own local docs, but only for that repo’s specific implementation.
+
+Example: playos-platform-api
+
+README.md
+BUILDING.md
+CONTRIBUTING.md
+docs/
+  backend-development.md
+  testing.md
+
+But it should not redefine what a capability is. It should point back to playos-spec.
+
+Example README sentence:
+
+The PlayOS Platform API implements the contracts defined in `playos-spec`. Platform behavior must be specified there before being implemented here.
+Clean rule
+
+Use this rule:
+
+If the document defines PlayOS behavior, it goes in playos-spec.
+
+If the document explains how to build, run, test, or contribute to one implementation, it goes in that implementation repo.
+Examples
+Documentation	Repo
+What is PlayOS?	playos-spec
+Capability model	playos-spec
+Package format	playos-spec
+ROG Ally device profile format	playos-spec
+Actual ROG Ally bring-up notes	playos-reference-devices
+How to build the C++ Platform API	playos-platform-api
+How to run the Raylib shell	playos-shell
+Cloud API architecture	playos-spec
+How to deploy the cloud backend with Docker	playos-cloud
+Marketplace business rules	playos-spec
+Marketplace frontend setup	playos-marketplace
+
+So: spec repo owns the contract; implementation repos own operational docs.
+
+So are we writing the Playos book in spec repo I am co fused
+
+Thought for 2m 38s
+
+Yes. I would structure it as The PlayOS Book inside playos-spec.
+
+I’ll use PlayOS in the structure because that is now the public brand. If you still want to keep GameOS as an internal codename, we can mention that in the preface, but the book should use the final public name consistently.
+
+The book should not be only a README. It should be the formal platform specification + developer guide + architecture reference.
+
+Think of it as:
+
+playos-spec
+  └── book
+        └── The official PlayOS Book
+Core idea
+
+The PlayOS Book should have four kinds of content:
+
+Type	Purpose
+Specification	Defines the official PlayOS platform contract.
+Architecture	Explains how the platform is designed.
+Developer Guide	Teaches developers how to build with PlayOS.
+Reference	Defines schemas, capabilities, APIs, registries, and certification rules.
+
+A good rule:
+
+If it defines what PlayOS is or how PlayOS must behave, it belongs in the PlayOS Book.
+Recommended full structure
+playos-spec/
+├── README.md
+├── AGENTS.md
+├── LICENSE
+├── CONTRIBUTING.md
+├── CODE_OF_CONDUCT.md
+│
+├── book/
+│   ├── book.toml
+│   └── src/
+│       ├── SUMMARY.md
+│       │
+│       ├── 00-front-matter/
+│       │   ├── 01-preface.md
+│       │   ├── 02-status.md
+│       │   ├── 03-how-to-read-this-book.md
+│       │   ├── 04-normative-language.md
+│       │   ├── 05-terminology.md
+│       │   └── 06-glossary.md
+│       │
+│       ├── 01-vision/
+│       │   ├── 01-what-is-playos.md
+│       │   ├── 02-mission.md
+│       │   ├── 03-problem-statement.md
+│       │   ├── 04-non-goals.md
+│       │   ├── 05-platform-promise.md
+│       │   ├── 06-ecosystem-vision.md
+│       │   └── 07-long-term-roadmap.md
+│       │
+│       ├── 02-platform-principles/
+│       │   ├── 01-specification-first.md
+│       │   ├── 02-engine-agnostic.md
+│       │   ├── 03-console-first.md
+│       │   ├── 04-capability-based.md
+│       │   ├── 05-runtime-independent.md
+│       │   ├── 06-self-hostable-by-design.md
+│       │   ├── 07-open-platform.md
+│       │   ├── 08-long-term-compatibility.md
+│       │   └── 09-security-and-trust.md
+│       │
+│       ├── 03-platform-architecture/
+│       │   ├── 01-overview.md
+│       │   ├── 02-layered-architecture.md
+│       │   ├── 03-platform-specification.md
+│       │   ├── 04-platform-api.md
+│       │   ├── 05-platform-sdk.md
+│       │   ├── 06-runtime.md
+│       │   ├── 07-shell.md
+│       │   ├── 08-cloud.md
+│       │   ├── 09-marketplace.md
+│       │   ├── 10-tools.md
+│       │   ├── 11-reference-implementations.md
+│       │   └── 12-repository-map.md
+│       │
+│       ├── 04-target-model/
+│       │   ├── 01-overview.md
+│       │   ├── 02-runtime-devices.md
+│       │   ├── 03-sdk-targets.md
+│       │   ├── 04-reference-devices.md
+│       │   ├── 05-certified-devices.md
+│       │   ├── 06-platform-backends.md
+│       │   ├── 07-device-profiles.md
+│       │   └── 08-target-compatibility-levels.md
+│       │
+│       ├── 05-capability-model/
+│       │   ├── 01-overview.md
+│       │   ├── 02-what-is-a-capability.md
+│       │   ├── 03-required-capabilities.md
+│       │   ├── 04-optional-capabilities.md
+│       │   ├── 05-runtime-capability-discovery.md
+│       │   ├── 06-capability-failure-behaviour.md
+│       │   ├── 07-capability-groups.md
+│       │   ├── 08-feature-levels.md
+│       │   ├── 09-vendor-capabilities.md
+│       │   └── 10-capability-registry.md
+│       │
+│       ├── 06-platform-api/
+│       │   ├── 01-overview.md
+│       │   ├── 02-api-design-rules.md
+│       │   ├── 03-naming-conventions.md
+│       │   ├── 04-types-and-errors.md
+│       │   ├── 05-initialization-and-shutdown.md
+│       │   ├── 06-event-loop-and-update-model.md
+│       │   ├── 07-lifecycle-api.md
+│       │   ├── 08-capabilities-api.md
+│       │   ├── 09-input-api.md
+│       │   ├── 10-storage-api.md
+│       │   ├── 11-display-api.md
+│       │   ├── 12-audio-api.md
+│       │   ├── 13-power-api.md
+│       │   ├── 14-network-api.md
+│       │   ├── 15-overlay-api.md
+│       │   ├── 16-cloud-save-api.md
+│       │   ├── 17-leaderboard-api.md
+│       │   ├── 18-achievements-api.md
+│       │   ├── 19-marketplace-api.md
+│       │   ├── 20-user-profile-api.md
+│       │   ├── 21-notification-api.md
+│       │   ├── 22-logging-and-diagnostics-api.md
+│       │   ├── 23-permissions-api.md
+│       │   ├── 24-extension-api.md
+│       │   └── 25-api-versioning.md
+│       │
+│       ├── 07-engine-integration/
+│       │   ├── 01-overview.md
+│       │   ├── 02-engine-agnostic-contract.md
+│       │   ├── 03-raylib-reference-kit.md
+│       │   ├── 04-sdl-integration.md
+│       │   ├── 05-custom-engine-integration.md
+│       │   ├── 06-godot-integration-future.md
+│       │   ├── 07-input-bridging.md
+│       │   ├── 08-rendering-boundaries.md
+│       │   └── 09-engine-integration-guidelines.md
+│       │
+│       ├── 08-runtime-architecture/
+│       │   ├── 01-overview.md
+│       │   ├── 02-runtime-responsibilities.md
+│       │   ├── 03-boot-model.md
+│       │   ├── 04-linux-reference-runtime.md
+│       │   ├── 05-compositor-model.md
+│       │   ├── 06-application-lifecycle.md
+│       │   ├── 07-package-execution.md
+│       │   ├── 08-runtime-services.md
+│       │   ├── 09-runtime-ipc.md
+│       │   ├── 10-input-routing.md
+│       │   ├── 11-game-switching.md
+│       │   ├── 12-overlay-integration.md
+│       │   ├── 13-audio-startup.md
+│       │   ├── 14-network-startup.md
+│       │   ├── 15-updates.md
+│       │   ├── 16-suspend-and-resume.md
+│       │   ├── 17-security-model.md
+│       │   └── 18-observability.md
+│       │
+│       ├── 09-shell-and-ux/
+│       │   ├── 01-overview.md
+│       │   ├── 02-console-ux-principles.md
+│       │   ├── 03-controller-first-navigation.md
+│       │   ├── 04-touch-interaction.md
+│       │   ├── 05-home-screen.md
+│       │   ├── 06-library.md
+│       │   ├── 07-store.md
+│       │   ├── 08-settings.md
+│       │   ├── 09-quick-settings.md
+│       │   ├── 10-downloads.md
+│       │   ├── 11-notifications.md
+│       │   ├── 12-power-menu.md
+│       │   ├── 13-developer-mode.md
+│       │   ├── 14-accessibility.md
+│       │   ├── 15-themes.md
+│       │   └── 16-reference-shell.md
+│       │
+│       ├── 10-package-format/
+│       │   ├── 01-overview.md
+│       │   ├── 02-package-goals.md
+│       │   ├── 03-package-anatomy.md
+│       │   ├── 04-manifest.md
+│       │   ├── 05-package-metadata.md
+│       │   ├── 06-assets.md
+│       │   ├── 07-executables.md
+│       │   ├── 08-architectures-and-abis.md
+│       │   ├── 09-permissions.md
+│       │   ├── 10-signing.md
+│       │   ├── 11-installation.md
+│       │   ├── 12-uninstallation.md
+│       │   ├── 13-updates-and-patches.md
+│       │   ├── 14-release-channels.md
+│       │   ├── 15-development-packages.md
+│       │   └── 16-package-validation.md
+│       │
+│       ├── 11-cloud-and-marketplace/
+│       │   ├── 01-overview.md
+│       │   ├── 02-self-hosting-principles.md
+│       │   ├── 03-cloud-architecture.md
+│       │   ├── 04-accounts-and-identity.md
+│       │   ├── 05-developer-portal.md
+│       │   ├── 06-package-storage.md
+│       │   ├── 07-marketplace-catalog.md
+│       │   ├── 08-store-sources.md
+│       │   ├── 09-entitlements.md
+│       │   ├── 10-payments-and-payouts.md
+│       │   ├── 11-cloud-saves.md
+│       │   ├── 12-leaderboards.md
+│       │   ├── 13-achievements.md
+│       │   ├── 14-analytics.md
+│       │   ├── 15-crash-reporting.md
+│       │   ├── 16-updates-and-cdn.md
+│       │   ├── 17-federation-and-private-stores.md
+│       │   ├── 18-oem-stores.md
+│       │   └── 19-cloud-api-versioning.md
+│       │
+│       ├── 12-device-model-and-porting/
+│       │   ├── 01-overview.md
+│       │   ├── 02-device-profile-schema.md
+│       │   ├── 03-backend-porting-model.md
+│       │   ├── 04-input-porting.md
+│       │   ├── 05-display-porting.md
+│       │   ├── 06-audio-porting.md
+│       │   ├── 07-power-porting.md
+│       │   ├── 08-storage-porting.md
+│       │   ├── 09-network-porting.md
+│       │   ├── 10-runtime-device-bringup.md
+│       │   ├── 11-sdk-target-bringup.md
+│       │   ├── 12-rog-ally-reference.md
+│       │   ├── 13-generic-linux-pc-reference.md
+│       │   ├── 14-orange-pi-reference.md
+│       │   ├── 15-windows-sdk-target.md
+│       │   ├── 16-android-sdk-target.md
+│       │   ├── 17-ps-vita-sdk-target.md
+│       │   └── 18-future-device-checklist.md
+│       │
+│       ├── 13-security-privacy-and-trust/
+│       │   ├── 01-overview.md
+│       │   ├── 02-trust-model.md
+│       │   ├── 03-package-signing.md
+│       │   ├── 04-permissions.md
+│       │   ├── 05-sandboxing.md
+│       │   ├── 06-secure-updates.md
+│       │   ├── 07-account-security.md
+│       │   ├── 08-privacy-principles.md
+│       │   ├── 09-telemetry-policy.md
+│       │   ├── 10-child-safety-and-parental-controls.md
+│       │   └── 11-supply-chain-security.md
+│       │
+│       ├── 14-certification/
+│       │   ├── 01-overview.md
+│       │   ├── 02-certification-levels.md
+│       │   ├── 03-platform-api-compatible.md
+│       │   ├── 04-runtime-compatible.md
+│       │   ├── 05-playos-certified-hardware.md
+│       │   ├── 06-game-certification.md
+│       │   ├── 07-store-certification.md
+│       │   ├── 08-device-certification-tests.md
+│       │   ├── 09-api-conformance-tests.md
+│       │   ├── 10-performance-requirements.md
+│       │   ├── 11-accessibility-requirements.md
+│       │   └── 12-certification-process.md
+│       │
+│       ├── 15-developer-guide/
+│       │   ├── 01-overview.md
+│       │   ├── 02-installing-the-sdk.md
+│       │   ├── 03-your-first-playos-app.md
+│       │   ├── 04-raylib-starter-project.md
+│       │   ├── 05-using-capabilities.md
+│       │   ├── 06-handling-input.md
+│       │   ├── 07-saving-data.md
+│       │   ├── 08-cloud-saves.md
+│       │   ├── 09-leaderboards.md
+│       │   ├── 10-achievements.md
+│       │   ├── 11-packaging-your-game.md
+│       │   ├── 12-testing-on-linux.md
+│       │   ├── 13-testing-on-android.md
+│       │   ├── 14-testing-on-ps-vita.md
+│       │   ├── 15-publishing-to-a-store.md
+│       │   ├── 16-debugging.md
+│       │   ├── 17-performance-guidelines.md
+│       │   └── 18-release-checklist.md
+│       │
+│       ├── 16-governance-and-process/
+│       │   ├── 01-overview.md
+│       │   ├── 02-playos-foundation.md
+│       │   ├── 03-governance-model.md
+│       │   ├── 04-rfc-process.md
+│       │   ├── 05-adr-process.md
+│       │   ├── 06-versioning-policy.md
+│       │   ├── 07-compatibility-policy.md
+│       │   ├── 08-deprecation-policy.md
+│       │   ├── 09-release-process.md
+│       │   ├── 10-contribution-model.md
+│       │   ├── 11-community-guidelines.md
+│       │   └── 12-commercial-ecosystem.md
+│       │
+│       └── 99-appendices/
+│           ├── 01-api-index.md
+│           ├── 02-capability-registry.md
+│           ├── 03-error-code-registry.md
+│           ├── 04-manifest-schema.md
+│           ├── 05-device-profile-schema.md
+│           ├── 06-permission-registry.md
+│           ├── 07-package-signature-format.md
+│           ├── 08-cli-reference.md
+│           ├── 09-glossary.md
+│           ├── 10-faq.md
+│           └── 11-bibliography.md
+│
+├── rfcs/
+│   ├── 0000-template.md
+│   ├── 0001-platform-principles.md
+│   ├── 0002-runtime-devices-and-sdk-targets.md
+│   ├── 0003-capability-model.md
+│   ├── 0004-platform-api-surface.md
+│   ├── 0005-package-format.md
+│   ├── 0006-device-profile-format.md
+│   └── 0007-cloud-and-marketplace-architecture.md
+│
+├── adr/
+│   ├── 0000-template.md
+│   └── 0001-use-mdbook-for-the-playos-book.md
+│
+├── schemas/
+│   ├── package-manifest.schema.json
+│   ├── device-profile.schema.json
+│   ├── capability-registry.schema.json
+│   └── permission-registry.schema.json
+│
+└── assets/
+    ├── diagrams/
+    │   ├── platform-architecture.svg
+    │   ├── runtime-device-stack.svg
+    │   ├── sdk-target-stack.svg
+    │   └── cloud-marketplace-architecture.svg
+    └── branding/
+        └── placeholder.md
+Important distinction
+
+The book lives here:
+
+book/
+
+The RFCs, ADRs, and schemas live outside the book, but the book references them.
+
+So the relationship is:
+
+book/      = official readable specification
+rfcs/      = design proposals and discussions
+adr/       = decisions that have been accepted
+schemas/   = machine-readable formats used by tools and agents
+Recommended SUMMARY.md
+
+This is the mdBook table of contents. It does not need to list every appendix immediately, but I would include the full structure from day one.
+
+# Summary
+
+# The PlayOS Book
+
+- [Preface](00-front-matter/01-preface.md)
+- [Specification Status](00-front-matter/02-status.md)
+- [How to Read This Book](00-front-matter/03-how-to-read-this-book.md)
+- [Normative Language](00-front-matter/04-normative-language.md)
+- [Terminology](00-front-matter/05-terminology.md)
+- [Glossary](00-front-matter/06-glossary.md)
+
+# Part I — Vision
+
+- [What Is PlayOS?](01-vision/01-what-is-playos.md)
+- [Mission](01-vision/02-mission.md)
+- [Problem Statement](01-vision/03-problem-statement.md)
+- [Non-Goals](01-vision/04-non-goals.md)
+- [Platform Promise](01-vision/05-platform-promise.md)
+- [Ecosystem Vision](01-vision/06-ecosystem-vision.md)
+- [Long-Term Roadmap](01-vision/07-long-term-roadmap.md)
+
+# Part II — Platform Principles
+
+- [Specification First](02-platform-principles/01-specification-first.md)
+- [Engine Agnostic](02-platform-principles/02-engine-agnostic.md)
+- [Console First](02-platform-principles/03-console-first.md)
+- [Capability Based](02-platform-principles/04-capability-based.md)
+- [Runtime Independent](02-platform-principles/05-runtime-independent.md)
+- [Self-Hostable by Design](02-platform-principles/06-self-hostable-by-design.md)
+- [Open Platform](02-platform-principles/07-open-platform.md)
+- [Long-Term Compatibility](02-platform-principles/08-long-term-compatibility.md)
+- [Security and Trust](02-platform-principles/09-security-and-trust.md)
+
+# Part III — Platform Architecture
+
+- [Overview](03-platform-architecture/01-overview.md)
+- [Layered Architecture](03-platform-architecture/02-layered-architecture.md)
+- [Platform Specification](03-platform-architecture/03-platform-specification.md)
+- [Platform API](03-platform-architecture/04-platform-api.md)
+- [Platform SDK](03-platform-architecture/05-platform-sdk.md)
+- [Runtime](03-platform-architecture/06-runtime.md)
+- [Shell](03-platform-architecture/07-shell.md)
+- [Cloud](03-platform-architecture/08-cloud.md)
+- [Marketplace](03-platform-architecture/09-marketplace.md)
+- [Tools](03-platform-architecture/10-tools.md)
+- [Reference Implementations](03-platform-architecture/11-reference-implementations.md)
+- [Repository Map](03-platform-architecture/12-repository-map.md)
+
+# Part IV — Target Model
+
+- [Overview](04-target-model/01-overview.md)
+- [Runtime Devices](04-target-model/02-runtime-devices.md)
+- [SDK Targets](04-target-model/03-sdk-targets.md)
+- [Reference Devices](04-target-model/04-reference-devices.md)
+- [Certified Devices](04-target-model/05-certified-devices.md)
+- [Platform Backends](04-target-model/06-platform-backends.md)
+- [Device Profiles](04-target-model/07-device-profiles.md)
+- [Target Compatibility Levels](04-target-model/08-target-compatibility-levels.md)
+
+# Part V — Capability Model
+
+- [Overview](05-capability-model/01-overview.md)
+- [What Is a Capability?](05-capability-model/02-what-is-a-capability.md)
+- [Required Capabilities](05-capability-model/03-required-capabilities.md)
+- [Optional Capabilities](05-capability-model/04-optional-capabilities.md)
+- [Runtime Capability Discovery](05-capability-model/05-runtime-capability-discovery.md)
+- [Capability Failure Behaviour](05-capability-model/06-capability-failure-behaviour.md)
+- [Capability Groups](05-capability-model/07-capability-groups.md)
+- [Feature Levels](05-capability-model/08-feature-levels.md)
+- [Vendor Capabilities](05-capability-model/09-vendor-capabilities.md)
+- [Capability Registry](05-capability-model/10-capability-registry.md)
+
+# Part VI — Platform API
+
+- [Overview](06-platform-api/01-overview.md)
+- [API Design Rules](06-platform-api/02-api-design-rules.md)
+- [Naming Conventions](06-platform-api/03-naming-conventions.md)
+- [Types and Errors](06-platform-api/04-types-and-errors.md)
+- [Initialization and Shutdown](06-platform-api/05-initialization-and-shutdown.md)
+- [Event Loop and Update Model](06-platform-api/06-event-loop-and-update-model.md)
+- [Lifecycle API](06-platform-api/07-lifecycle-api.md)
+- [Capabilities API](06-platform-api/08-capabilities-api.md)
+- [Input API](06-platform-api/09-input-api.md)
+- [Storage API](06-platform-api/10-storage-api.md)
+- [Display API](06-platform-api/11-display-api.md)
+- [Audio API](06-platform-api/12-audio-api.md)
+- [Power API](06-platform-api/13-power-api.md)
+- [Network API](06-platform-api/14-network-api.md)
+- [Overlay API](06-platform-api/15-overlay-api.md)
+- [Cloud Save API](06-platform-api/16-cloud-save-api.md)
+- [Leaderboard API](06-platform-api/17-leaderboard-api.md)
+- [Achievements API](06-platform-api/18-achievements-api.md)
+- [Marketplace API](06-platform-api/19-marketplace-api.md)
+- [User Profile API](06-platform-api/20-user-profile-api.md)
+- [Notification API](06-platform-api/21-notification-api.md)
+- [Logging and Diagnostics API](06-platform-api/22-logging-and-diagnostics-api.md)
+- [Permissions API](06-platform-api/23-permissions-api.md)
+- [Extension API](06-platform-api/24-extension-api.md)
+- [API Versioning](06-platform-api/25-api-versioning.md)
+
+# Part VII — Engine Integration
+
+- [Overview](07-engine-integration/01-overview.md)
+- [Engine-Agnostic Contract](07-engine-integration/02-engine-agnostic-contract.md)
+- [Raylib Reference Kit](07-engine-integration/03-raylib-reference-kit.md)
+- [SDL Integration](07-engine-integration/04-sdl-integration.md)
+- [Custom Engine Integration](07-engine-integration/05-custom-engine-integration.md)
+- [Godot Integration Future](07-engine-integration/06-godot-integration-future.md)
+- [Input Bridging](07-engine-integration/07-input-bridging.md)
+- [Rendering Boundaries](07-engine-integration/08-rendering-boundaries.md)
+- [Engine Integration Guidelines](07-engine-integration/09-engine-integration-guidelines.md)
+
+# Part VIII — Runtime Architecture
+
+- [Overview](08-runtime-architecture/01-overview.md)
+- [Runtime Responsibilities](08-runtime-architecture/02-runtime-responsibilities.md)
+- [Boot Model](08-runtime-architecture/03-boot-model.md)
+- [Linux Reference Runtime](08-runtime-architecture/04-linux-reference-runtime.md)
+- [Compositor Model](08-runtime-architecture/05-compositor-model.md)
+- [Application Lifecycle](08-runtime-architecture/06-application-lifecycle.md)
+- [Package Execution](08-runtime-architecture/07-package-execution.md)
+- [Runtime Services](08-runtime-architecture/08-runtime-services.md)
+- [Runtime IPC](08-runtime-architecture/09-runtime-ipc.md)
+- [Input Routing](08-runtime-architecture/10-input-routing.md)
+- [Game Switching](08-runtime-architecture/11-game-switching.md)
+- [Overlay Integration](08-runtime-architecture/12-overlay-integration.md)
+- [Audio Startup](08-runtime-architecture/13-audio-startup.md)
+- [Network Startup](08-runtime-architecture/14-network-startup.md)
+- [Updates](08-runtime-architecture/15-updates.md)
+- [Suspend and Resume](08-runtime-architecture/16-suspend-and-resume.md)
+- [Security Model](08-runtime-architecture/17-security-model.md)
+- [Observability](08-runtime-architecture/18-observability.md)
+
+# Part IX — Shell and UX
+
+- [Overview](09-shell-and-ux/01-overview.md)
+- [Console UX Principles](09-shell-and-ux/02-console-ux-principles.md)
+- [Controller-First Navigation](09-shell-and-ux/03-controller-first-navigation.md)
+- [Touch Interaction](09-shell-and-ux/04-touch-interaction.md)
+- [Home Screen](09-shell-and-ux/05-home-screen.md)
+- [Library](09-shell-and-ux/06-library.md)
+- [Store](09-shell-and-ux/07-store.md)
+- [Settings](09-shell-and-ux/08-settings.md)
+- [Quick Settings](09-shell-and-ux/09-quick-settings.md)
+- [Downloads](09-shell-and-ux/10-downloads.md)
+- [Notifications](09-shell-and-ux/11-notifications.md)
+- [Power Menu](09-shell-and-ux/12-power-menu.md)
+- [Developer Mode](09-shell-and-ux/13-developer-mode.md)
+- [Accessibility](09-shell-and-ux/14-accessibility.md)
+- [Themes](09-shell-and-ux/15-themes.md)
+- [Reference Shell](09-shell-and-ux/16-reference-shell.md)
+
+# Part X — Package Format
+
+- [Overview](10-package-format/01-overview.md)
+- [Package Goals](10-package-format/02-package-goals.md)
+- [Package Anatomy](10-package-format/03-package-anatomy.md)
+- [Manifest](10-package-format/04-manifest.md)
+- [Package Metadata](10-package-format/05-package-metadata.md)
+- [Assets](10-package-format/06-assets.md)
+- [Executables](10-package-format/07-executables.md)
+- [Architectures and ABIs](10-package-format/08-architectures-and-abis.md)
+- [Permissions](10-package-format/09-permissions.md)
+- [Signing](10-package-format/10-signing.md)
+- [Installation](10-package-format/11-installation.md)
+- [Uninstallation](10-package-format/12-uninstallation.md)
+- [Updates and Patches](10-package-format/13-updates-and-patches.md)
+- [Release Channels](10-package-format/14-release-channels.md)
+- [Development Packages](10-package-format/15-development-packages.md)
+- [Package Validation](10-package-format/16-package-validation.md)
+
+# Part XI — Cloud and Marketplace
+
+- [Overview](11-cloud-and-marketplace/01-overview.md)
+- [Self-Hosting Principles](11-cloud-and-marketplace/02-self-hosting-principles.md)
+- [Cloud Architecture](11-cloud-and-marketplace/03-cloud-architecture.md)
+- [Accounts and Identity](11-cloud-and-marketplace/04-accounts-and-identity.md)
+- [Developer Portal](11-cloud-and-marketplace/05-developer-portal.md)
+- [Package Storage](11-cloud-and-marketplace/06-package-storage.md)
+- [Marketplace Catalog](11-cloud-and-marketplace/07-marketplace-catalog.md)
+- [Store Sources](11-cloud-and-marketplace/08-store-sources.md)
+- [Entitlements](11-cloud-and-marketplace/09-entitlements.md)
+- [Payments and Payouts](11-cloud-and-marketplace/10-payments-and-payouts.md)
+- [Cloud Saves](11-cloud-and-marketplace/11-cloud-saves.md)
+- [Leaderboards](11-cloud-and-marketplace/12-leaderboards.md)
+- [Achievements](11-cloud-and-marketplace/13-achievements.md)
+- [Analytics](11-cloud-and-marketplace/14-analytics.md)
+- [Crash Reporting](11-cloud-and-marketplace/15-crash-reporting.md)
+- [Updates and CDN](11-cloud-and-marketplace/16-updates-and-cdn.md)
+- [Federation and Private Stores](11-cloud-and-marketplace/17-federation-and-private-stores.md)
+- [OEM Stores](11-cloud-and-marketplace/18-oem-stores.md)
+- [Cloud API Versioning](11-cloud-and-marketplace/19-cloud-api-versioning.md)
+
+# Part XII — Device Model and Porting
+
+- [Overview](12-device-model-and-porting/01-overview.md)
+- [Device Profile Schema](12-device-model-and-porting/02-device-profile-schema.md)
+- [Backend Porting Model](12-device-model-and-porting/03-backend-porting-model.md)
+- [Input Porting](12-device-model-and-porting/04-input-porting.md)
+- [Display Porting](12-device-model-and-porting/05-display-porting.md)
+- [Audio Porting](12-device-model-and-porting/06-audio-porting.md)
+- [Power Porting](12-device-model-and-porting/07-power-porting.md)
+- [Storage Porting](12-device-model-and-porting/08-storage-porting.md)
+- [Network Porting](12-device-model-and-porting/09-network-porting.md)
+- [Runtime Device Bring-Up](12-device-model-and-porting/10-runtime-device-bringup.md)
+- [SDK Target Bring-Up](12-device-model-and-porting/11-sdk-target-bringup.md)
+- [ROG Ally Reference](12-device-model-and-porting/12-rog-ally-reference.md)
+- [Generic Linux PC Reference](12-device-model-and-porting/13-generic-linux-pc-reference.md)
+- [Orange Pi Reference](12-device-model-and-porting/14-orange-pi-reference.md)
+- [Windows SDK Target](12-device-model-and-porting/15-windows-sdk-target.md)
+- [Android SDK Target](12-device-model-and-porting/16-android-sdk-target.md)
+- [PS Vita SDK Target](12-device-model-and-porting/17-ps-vita-sdk-target.md)
+- [Future Device Checklist](12-device-model-and-porting/18-future-device-checklist.md)
+
+# Part XIII — Security, Privacy and Trust
+
+- [Overview](13-security-privacy-and-trust/01-overview.md)
+- [Trust Model](13-security-privacy-and-trust/02-trust-model.md)
+- [Package Signing](13-security-privacy-and-trust/03-package-signing.md)
+- [Permissions](13-security-privacy-and-trust/04-permissions.md)
+- [Sandboxing](13-security-privacy-and-trust/05-sandboxing.md)
+- [Secure Updates](13-security-privacy-and-trust/06-secure-updates.md)
+- [Account Security](13-security-privacy-and-trust/07-account-security.md)
+- [Privacy Principles](13-security-privacy-and-trust/08-privacy-principles.md)
+- [Telemetry Policy](13-security-privacy-and-trust/09-telemetry-policy.md)
+- [Child Safety and Parental Controls](13-security-privacy-and-trust/10-child-safety-and-parental-controls.md)
+- [Supply Chain Security](13-security-privacy-and-trust/11-supply-chain-security.md)
+
+# Part XIV — Certification
+
+- [Overview](14-certification/01-overview.md)
+- [Certification Levels](14-certification/02-certification-levels.md)
+- [Platform API Compatible](14-certification/03-platform-api-compatible.md)
+- [Runtime Compatible](14-certification/04-runtime-compatible.md)
+- [PlayOS Certified Hardware](14-certification/05-playos-certified-hardware.md)
+- [Game Certification](14-certification/06-game-certification.md)
+- [Store Certification](14-certification/07-store-certification.md)
+- [Device Certification Tests](14-certification/08-device-certification-tests.md)
+- [API Conformance Tests](14-certification/09-api-conformance-tests.md)
+- [Performance Requirements](14-certification/10-performance-requirements.md)
+- [Accessibility Requirements](14-certification/11-accessibility-requirements.md)
+- [Certification Process](14-certification/12-certification-process.md)
+
+# Part XV — Developer Guide
+
+- [Overview](15-developer-guide/01-overview.md)
+- [Installing the SDK](15-developer-guide/02-installing-the-sdk.md)
+- [Your First PlayOS App](15-developer-guide/03-your-first-playos-app.md)
+- [Raylib Starter Project](15-developer-guide/04-raylib-starter-project.md)
+- [Using Capabilities](15-developer-guide/05-using-capabilities.md)
+- [Handling Input](15-developer-guide/06-handling-input.md)
+- [Saving Data](15-developer-guide/07-saving-data.md)
+- [Cloud Saves](15-developer-guide/08-cloud-saves.md)
+- [Leaderboards](15-developer-guide/09-leaderboards.md)
+- [Achievements](15-developer-guide/10-achievements.md)
+- [Packaging Your Game](15-developer-guide/11-packaging-your-game.md)
+- [Testing on Linux](15-developer-guide/12-testing-on-linux.md)
+- [Testing on Android](15-developer-guide/13-testing-on-android.md)
+- [Testing on PS Vita](15-developer-guide/14-testing-on-ps-vita.md)
+- [Publishing to a Store](15-developer-guide/15-publishing-to-a-store.md)
+- [Debugging](15-developer-guide/16-debugging.md)
+- [Performance Guidelines](15-developer-guide/17-performance-guidelines.md)
+- [Release Checklist](15-developer-guide/18-release-checklist.md)
+
+# Part XVI — Governance and Process
+
+- [Overview](16-governance-and-process/01-overview.md)
+- [PlayOS Foundation](16-governance-and-process/02-playos-foundation.md)
+- [Governance Model](16-governance-and-process/03-governance-model.md)
+- [RFC Process](16-governance-and-process/04-rfc-process.md)
+- [ADR Process](16-governance-and-process/05-adr-process.md)
+- [Versioning Policy](16-governance-and-process/06-versioning-policy.md)
+- [Compatibility Policy](16-governance-and-process/07-compatibility-policy.md)
+- [Deprecation Policy](16-governance-and-process/08-deprecation-policy.md)
+- [Release Process](16-governance-and-process/09-release-process.md)
+- [Contribution Model](16-governance-and-process/10-contribution-model.md)
+- [Community Guidelines](16-governance-and-process/11-community-guidelines.md)
+- [Commercial Ecosystem](16-governance-and-process/12-commercial-ecosystem.md)
+
+# Appendices
+
+- [API Index](99-appendices/01-api-index.md)
+- [Capability Registry](99-appendices/02-capability-registry.md)
+- [Error Code Registry](99-appendices/03-error-code-registry.md)
+- [Manifest Schema](99-appendices/04-manifest-schema.md)
+- [Device Profile Schema](99-appendices/05-device-profile-schema.md)
+- [Permission Registry](99-appendices/06-permission-registry.md)
+- [Package Signature Format](99-appendices/07-package-signature-format.md)
+- [CLI Reference](99-appendices/08-cli-reference.md)
+- [Glossary](99-appendices/09-glossary.md)
+- [FAQ](99-appendices/10-faq.md)
+- [Bibliography](99-appendices/11-bibliography.md)
+What should be written first?
+
+For the first commit, I would create the full folder structure but only add short stub content to each chapter.
+
+The first real chapters to write should be:
+
+00-front-matter/01-preface.md
+01-vision/01-what-is-playos.md
+01-vision/02-mission.md
+01-vision/04-non-goals.md
+02-platform-principles/01-specification-first.md
+02-platform-principles/02-engine-agnostic.md
+03-platform-architecture/01-overview.md
+04-target-model/02-runtime-devices.md
+04-target-model/03-sdk-targets.md
+05-capability-model/01-overview.md
+
+That gives the whole project its identity.
+
+Then the first RFCs should define the core decisions:
+
+RFC-0001: Platform Principles
+RFC-0002: Runtime Devices and SDK Targets
+RFC-0003: Capability Model
+RFC-0004: Platform API Surface
+RFC-0005: Package Format
+RFC-0006: Device Profile Format
+RFC-0007: Cloud and Marketplace Architecture
+
+This structure is big enough to support the full vision, but clean enough that GitHub Copilot agents can work on one chapter, one RFC, or one API area at a time without inventing the architecture.
+
+Can you write this for me: 00-front-matter/01-preface.md
+
+Thought for 1m 39s
+
+Copy this into:
+
+book/src/00-front-matter/01-preface.md
+# Preface
+
+PlayOS is an open console platform specification.
+
+It defines a portable platform model for building, running, packaging, distributing, and supporting console-style games and applications across different devices, operating systems, and hardware profiles.
+
+PlayOS is designed for developers who want the simplicity of lightweight game development, the consistency of a console platform, and the openness of modern cross-platform software.
+
+The goal of PlayOS is not only to run games.
+
+The goal is to define a platform contract that allows games, applications, runtimes, devices, stores, and cloud services to interoperate through a common specification.
+
+---
+
+## What PlayOS Is
+
+PlayOS is a specification-first platform.
+
+It defines:
+
+- a Platform API,
+- a runtime model,
+- a capability system,
+- a package format,
+- a device profile model,
+- a cloud and marketplace architecture,
+- a certification model,
+- and a governance process.
+
+PlayOS may have many implementations.
+
+There may be a Linux-based reference runtime, a Raylib-based reference shell, Android SDK targets, Windows development targets, PS Vita homebrew targets, ARM device targets, and future implementations that do not exist yet.
+
+The specification is the contract that connects them.
+
+---
+
+## What PlayOS Is Not
+
+PlayOS is not a game engine.
+
+Game developers may use Raylib, SDL, Godot, a custom engine, or another technology. Raylib is the reference engine for samples, tutorials, and the reference shell, but the PlayOS Platform API must remain engine agnostic.
+
+PlayOS is not only a Linux distribution.
+
+A Linux-based runtime may be the first full reference implementation, but the platform is broader than one operating system.
+
+PlayOS is not only a launcher.
+
+The shell is one part of the system. The platform also includes APIs, packaging, capabilities, cloud services, marketplace integration, device profiles, certification, and developer tooling.
+
+PlayOS is not only a marketplace.
+
+The marketplace is a platform service. It must be possible to use PlayOS with official stores, community stores, OEM stores, private stores, or self-hosted infrastructure.
+
+---
+
+## Specification First
+
+The PlayOS Book is the source of truth for the platform.
+
+Implementation repositories must follow the specification rather than define platform behavior independently.
+
+If a feature affects platform behavior, it should be specified here before it is implemented elsewhere.
+
+This applies to:
+
+- Platform API behavior,
+- runtime behavior,
+- package behavior,
+- capability behavior,
+- device profile behavior,
+- certification behavior,
+- cloud and marketplace behavior.
+
+The purpose of this rule is to keep PlayOS coherent as it grows across multiple devices, engines, runtimes, and contributors.
+
+---
+
+## Runtime Devices and SDK Targets
+
+PlayOS distinguishes between two major categories of targets.
+
+A **Runtime Device** runs the full PlayOS environment. This may include the PlayOS Runtime, Shell, package execution layer, marketplace client, system services, compositor, and hardware integration.
+
+Examples may include handheld PCs, Linux gaming devices, ARM boards, mini consoles, or future certified hardware.
+
+An **SDK Target** supports the PlayOS Platform API, or a subset of it, without running the full PlayOS runtime.
+
+Examples may include Windows, Linux desktop, macOS, Android, PS Vita homebrew, and other future targets.
+
+This distinction allows PlayOS to support both full console-like devices and lightweight portable SDK integrations.
+
+---
+
+## Capability-Based Design
+
+PlayOS applications should not rely on hardcoded platform checks.
+
+Instead of asking:
+
+```cpp
+#ifdef ANDROID
+
+applications should ask:
+
+if (PlayOS::Capabilities::Has(PlayOS::Capability::Touch)) {
+    // Use touch input.
+}
+
+Capabilities allow PlayOS to support many devices without forcing every device to provide every feature.
+
+A device may support touch but not cloud saves.
+
+Another device may support cloud saves but not system overlay.
+
+Another may support the Platform API but not the full runtime.
+
+The capability model makes these differences explicit and discoverable.
+
+Engine Agnostic, Raylib Friendly
+
+PlayOS is engine agnostic.
+
+The Platform API must not depend on Raylib.
+
+However, Raylib is an important reference technology for the project because it is simple, portable, open, and aligned with the goals of PlayOS.
+
+The reference shell may be built with Raylib.
+
+The first tutorials may use Raylib.
+
+The official starter projects may use Raylib.
+
+But the PlayOS Platform API must remain usable from other engines and frameworks.
+
+The correct relationship is:
+
+Game or Application
+    ├── Raylib / SDL / Godot / Custom Engine
+    └── PlayOS Platform API
+
+not:
+
+Game or Application
+    └── Raylib-only PlayOS extension
+Self-Hostable by Design
+
+PlayOS cloud and marketplace services should be self-hostable by design.
+
+The platform may provide official hosted services, but the architecture should not require developers, communities, schools, OEMs, or private groups to depend on one central provider.
+
+A healthy PlayOS ecosystem may include:
+
+official stores,
+community stores,
+OEM stores,
+private stores,
+local network stores,
+and fully self-hosted cloud services.
+
+This principle protects openness and gives the platform long-term flexibility.
+
+Audience
+
+This book is intended for:
+
+game developers,
+engine developers,
+runtime implementers,
+shell developers,
+cloud and marketplace developers,
+hardware porting teams,
+OEMs,
+contributors,
+certification reviewers,
+and AI coding agents working on PlayOS repositories.
+
+Different readers may use different parts of the book.
+
+Developers may begin with the Developer Guide.
+
+Runtime implementers may begin with the Runtime Architecture.
+
+Hardware teams may begin with the Device Model and Porting chapters.
+
+Contributors should begin with the Platform Principles, RFC process, and governance model.
+
+Normative and Informative Content
+
+Some parts of this book define required platform behavior.
+
+Other parts explain design intent, examples, recommendations, or future direction.
+
+The chapter on normative language explains how requirement words such as must, should, and may are used in this specification.
+
+When in doubt, the Platform Specification, accepted RFCs, accepted ADRs, schemas, and conformance requirements take priority over examples or explanatory text.
+
+Status of This Book
+
+This is an early version of the PlayOS Platform Specification.
+
+The structure is expected to evolve.
+
+APIs may change.
+
+Package formats may change.
+
+Capability names may change.
+
+Runtime behavior may change.
+
+However, the long-term goal is stability. Once the Platform API reaches a stable release, applications written against that version should continue to build and run on future compatible implementations whenever practical.
+
+The Platform Promise
+
+PlayOS exists to make console-style software development simple, portable, and open.
+
+A developer should be able to write a game, use the PlayOS Platform API, package it once, and target many environments through well-defined backends and capabilities.
+
+A player should experience PlayOS as a fast, controller-first, console-like environment.
+
+A hardware manufacturer should be able to adopt PlayOS without reinventing the entire software stack.
+
+A community should be able to self-host the services it depends on.
+
+This book defines the path toward that platform.
+
+Motto
+
+Write Once. Play Anywhere. Own Everything.
+
+is there a way to export this chat ?
+
+Yes. In ChatGPT you usually have a few options:
+
+Option 1 — Use ChatGPT export
+
+In the app or web:
+
+Open Settings
+Go to Data Controls
+Choose Export data
+Confirm the export
+You’ll receive an email with your data archive
+
+That exports your conversations, but it may be more than just this single chat.
+
+Option 2 — Copy this conversation manually
+
+For a project like PlayOS, I would actually recommend copying the key parts into files instead of exporting the raw chat.
+
+Create in playos-spec:
+
+notes/
+  founding-conversation-summary.md
+  architecture-brainstorm.md
+  repo-setup-plan.md
+
+Then paste the useful sections there.
+
+Option 3 — Use this chat as source material
+
+The better approach is:
+
+Chat conversation
+    ↓
+Structured docs
+    ↓
+playos-spec book
+    ↓
+RFCs / ADRs / GitHub issues
+
+The raw chat is useful history, but Copilot Agent will work much better from structured files like:
+
+AGENTS.md
+README.md
+book/src/*
+rfcs/*
+adr/*
+
+So yes, export it if you want a record, but I’d treat the PlayOS Book and RFCs as the real project source of truth.
