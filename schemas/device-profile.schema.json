@@ -2,39 +2,110 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://playos.org/schemas/device-profile.schema.json",
   "title": "PlayOS Device Profile",
-  "description": "Draft stub schema for a PlayOS device profile. To be defined by RFC-0006.",
+  "description": "Canonical JSON Schema for a PlayOS device profile. Defined by RFC-0006.",
   "type": "object",
-  "required": ["schemaVersion", "id", "name", "targetType"],
+  "required": ["device", "display", "capabilities"],
   "properties": {
-    "schemaVersion": {
-      "type": "string",
-      "description": "Version of the device profile schema this file conforms to.",
-      "examples": ["0.1.0"]
+    "device": {
+      "type": "object",
+      "description": "Device identity.",
+      "required": ["id", "name", "targetType"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique machine-readable identifier (e.g. 'rog-ally', 'steam-deck-lcd').",
+          "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable device name (e.g. 'ASUS ROG Ally')."
+        },
+        "targetType": {
+          "type": "string",
+          "description": "Whether the device runs the full PlayOS runtime or is an SDK host.",
+          "enum": ["runtime-device", "sdk-target"]
+        }
+      }
     },
-    "id": {
-      "type": "string",
-      "description": "Unique device profile identifier.",
-      "examples": ["rog-ally", "generic-linux-pc", "orange-pi"]
+    "input": {
+      "type": "object",
+      "description": "Physical input → logical PlayOS button mappings. Required on runtime devices.",
+      "properties": {
+        "home_button": {
+          "type": "string",
+          "description": "Symbolic name of the button that acts as the Home / guide button.",
+          "examples": ["asus_armoury", "steamdeck_qam", "xbox_guide"]
+        },
+        "quick_settings_button": {
+          "type": "string",
+          "description": "Symbolic name of the button that opens Quick Settings.",
+          "examples": ["asus_command_center", "steamdeck_quick_access"]
+        },
+        "built_in_controls": {
+          "type": "string",
+          "description": "Identifier for the built-in gamepad device (e.g. 'gamepad0')."
+        },
+        "touchscreen": {
+          "type": "string",
+          "description": "Identifier for the touchscreen device (e.g. 'touch0')."
+        }
+      }
     },
-    "name": {
-      "type": "string",
-      "description": "Human-readable device name."
-    },
-    "targetType": {
-      "type": "string",
-      "description": "Whether the device runs the full runtime or is an SDK target.",
-      "enum": ["runtime-device", "sdk-target"]
+    "display": {
+      "type": "object",
+      "description": "Native display characteristics.",
+      "required": ["default_width", "default_height", "refresh_rate"],
+      "properties": {
+        "default_width": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Native horizontal resolution in pixels."
+        },
+        "default_height": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Native vertical resolution in pixels."
+        },
+        "refresh_rate": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Native refresh rate in Hz."
+        },
+        "safe_area_insets": {
+          "type": "object",
+          "description": "Optional display insets for non-rectangular screens.",
+          "properties": {
+            "top":    { "type": "integer", "minimum": 0 },
+            "bottom": { "type": "integer", "minimum": 0 },
+            "left":   { "type": "integer", "minimum": 0 },
+            "right":  { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
     },
     "capabilities": {
-      "type": "array",
-      "description": "Capabilities provided by this device.",
-      "items": { "type": "string" }
-    },
-    "backends": {
       "type": "object",
-      "description": "Platform backends used to implement capabilities on this device.",
-      "additionalProperties": { "type": "string" }
+      "description": "Boolean map of capability IDs → supported.",
+      "additionalProperties": { "type": "boolean" }
+    },
+    "power": {
+      "type": "object",
+      "description": "Optional power/thermal configuration for certified hardware.",
+      "properties": {
+        "tdp_path": {
+          "type": "string",
+          "description": "sysfs path for TDP control."
+        },
+        "fan_path": {
+          "type": "string",
+          "description": "sysfs path for fan speed control."
+        }
+      }
+    },
+    "vendor": {
+      "type": "object",
+      "description": "Optional vendor-specific extensions. Keys should be namespaced.",
+      "additionalProperties": true
     }
-  },
-  "additionalProperties": true
+  }
 }

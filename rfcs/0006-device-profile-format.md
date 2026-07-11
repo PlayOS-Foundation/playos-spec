@@ -111,3 +111,35 @@ response (no crash). The profile is the source of truth.
 - Whether profiles should be independently versioned.
 - Conditional capabilities (e.g. "brightness only on AC") — out of scope
   for now.
+
+## Appendix: Input Mapping Vocabulary
+
+The `[input]` section uses symbolic names for hardware buttons. These names
+are resolved to platform-specific key codes by the `InputMapping` lookup table
+in `playos-platform-api`. Adding a new device means adding its vendor button
+name here and mapping it in the lookup table.
+
+### Standard names (cross-device)
+
+| Symbolic name | Description | Typical device |
+|---|---|---|
+| `xbox_guide` | Xbox Guide / PlayStation PS button | Xbox, PlayStation controllers |
+| `keyboard_f1` | F1 key as Home fallback | Desktop PCs, VMs |
+| `keyboard_esc` | Escape key as Quick Settings | Desktop PCs, VMs |
+
+### Vendor names (device-specific)
+
+| Symbolic name | Description | Device |
+|---|---|---|
+| `asus_armoury` | Armoury Crate button (left side) | ASUS ROG Ally |
+| `asus_command_center` | Command Center button (right side) | ASUS ROG Ally |
+| `steamdeck_qam` | Quick Access Menu (…) button | Steam Deck |
+| `steamdeck_steam` | Steam button | Steam Deck |
+| `legion_quick` | Legion Space / Quick Settings | Lenovo Legion Go |
+
+### Adding a new name
+
+1. Add the symbolic name to this appendix.
+2. Add the evdev/Win32 key code mappings in `playos-platform-api/src/backends/*/input_mapping.cpp`.
+3. Use the name in the device's `device-profile.toml`. No recompilation needed
+   — the lookup is runtime (TOML → string → key codes).
