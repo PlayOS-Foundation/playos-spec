@@ -1,71 +1,75 @@
 # Boot Model
 
-The PlayOS reference runtime boots directly into the console experience. No
-login manager, no desktop environment, no visible terminal.
+The PlayOS reference OS boots directly into the console experience. It has no display manager, desktop environment, or visible login session.
 
 ## Boot sequence
 
 ```text
-UEFI → Linux Kernel → systemd → seatd → PlayOS Compositor → PlayOS Shell
+UEFI
+  → bootloader
+  → Linux kernel and Alpine initramfs
+  → OpenRC sysinit/boot
+  → GPU and input readiness
+  → seatd
+  → PlayOS Compositor
+  → PlayOS Shell first frame
+  → asynchronous PlayOS services
 ```
 
-- **UEFI / bootloader** hands off to the kernel.
-- **Linux kernel** initializes the GPU (DRM/KMS) and input devices.
-- **systemd** starts the PlayOS session as its default target.
-- **seatd** provides seat and device access to the compositor without
-  requiring root.
-- **PlayOS Compositor** (wlroots/TinyWL) takes ownership of the display.
-- **PlayOS Shell** starts as a Wayland client and draws the console UI.
+OpenRC enters the PlayOS visual runlevel. seatd grants unprivileged device access. The compositor owns DRM/KMS, creates the Wayland socket, and starts the shell as a client. The asynchronous runlevel begins only after presentation readiness.
 
-## Critical path vs background
-
-The **critical boot path** is intentionally minimal:
+## Critical path
 
 ```text
-GPU  →  input  →  shell
+read-only root
+  → GPU and input
+  → seat access
+  → compositor
+  → shell first frame
 ```
 
-Only what is required to show an interactive UI is on the critical path.
-Everything else starts **asynchronously** and MUST NOT block the shell from
-appearing:
+Audio, networking, Bluetooth, indexing, updates, cloud, marketplace, telemetry, and debug access must not block the first shell frame. The shell exposes live readiness states while they start.
+
+## OpenRC runlevels
 
 ```text
-Background (async):
-  audio (PipeWire / WirePlumber)
-  Wi-Fi
-  Bluetooth
-  battery / power monitor
-  library scan
-  updates
-  cloud sync
+playos-visual
+  → required device readiness
+  → seatd
+  → playos-compositor
+      → playos-shell
+
+playos-async
+  → audio
+  → network
+  → Bluetooth
+  → library
+  → updates
+  → optional cloud and marketplace services
 ```
 
-The shell appears immediately and updates status indicators live as
-background services become ready ("Wi-Fi: connecting…", "Library:
-refreshing…").
+An asynchronous service may depend on compositor readiness. The compositor must not depend on an asynchronous service.
 
 ## Timing targets
 
-```text
-v0.1 target:   UI visible in under 10 seconds
-future target: UI visible in under 5 seconds
-resume target: 1–2 seconds
-```
+| Milestone | v0.x acceptance | Reference target |
+|---|---:|---:|
+| Cold boot to first interactive shell | under 8 seconds | at most 2 seconds |
+| Resume to interactive shell | under 3 seconds | at most 1 second |
+
+Measurements begin at UEFI handoff and separate firmware, kernel, userspace, compositor, and first-frame time.
 
 ## Requirements
 
-- The runtime MUST reach an interactive shell using only GPU and input.
-- Audio MUST NOT be a boot dependency; the shell MUST be usable while audio
-  is still initializing (see [Audio Startup](13-audio-startup.md)).
-- Non-critical services MUST start asynchronously.
+- The runtime must reach an interactive shell using only display, input, seat, and presentation.
+- Audio and networking must not be boot dependencies.
+- The first-frame path must not require remote services.
+- Background services must start asynchronously.
+- A failed background service must not terminate the compositor or shell.
+- Home must remain available to the runtime even when a game is unresponsive.
 
-## Vertical slice note
+## Vertical slice
 
-For the proof-of-concept, the minimal viable boot is: kernel brings up the
-780M GPU and the Ally's input devices, `seatd` grants access, the compositor
-starts on the TTY, and the Raylib shell renders. Audio, Wi-Fi, and library
-scanning are out of scope for the first slice.
+The Alpine vertical slice is complete when the ROG Ally boots the read-only image, amdgpu provides hardware rendering, seatd grants access, the custom wlroots compositor owns DRM/KMS, and the Raylib shell presents an interactive frame.
 
-See: [Compositor Model](05-compositor-model.md),
-[Linux Reference Runtime](04-linux-reference-runtime.md), and
-[ADR-0003](https://github.com/PlayOS-Foundation/playos-spec/blob/main/adr/0003-arch-linux-reference-runtime-base.md).
+See [Linux Reference Runtime](04-linux-reference-runtime.md), [Compositor Model](05-compositor-model.md), and [ADR-0004](../../../adr/0004-use-alpine-linux-reference-os-base.md).
