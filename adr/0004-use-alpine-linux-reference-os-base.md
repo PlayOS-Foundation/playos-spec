@@ -46,7 +46,7 @@ The PlayOS reference OS will use **Alpine Linux** as its upstream base.
 | Bluetooth | BlueZ |
 | Boot media | Alpine read-only image and modloop/initramfs |
 | Persistent state | Dedicated writable PlayOS data partition |
-| Build environment | Pinned Alpine container |
+| Build environment | Pinned Alpine build root using Alpine-native tools |
 | Reference hardware | ASUS ROG Ally |
 
 Released images must not build directly from Alpine `edge`. Kernel, Mesa, firmware, and wlroots updates must be promoted deliberately after virtual and hardware validation.
@@ -83,18 +83,13 @@ Third-party games requiring glibc, Steam Runtime, or another userspace must run 
 - `playos-reference-devices` owns Alpine hardware bring-up material and device profiles.
 - `playos-shell` remains a Wayland client and does not own boot policy.
 
-## Migration Policy
+## Implementation and Archive Policy
 
-The Arch implementation must be preserved long enough to retain working ROG Ally knowledge and regression evidence.
+Alpine is the only active reference-distro profile. The former Arch profile, package lists, build scripts, and systemd units are removed from active repositories. Git history is the canonical archive and must not be rewritten to hide the Arch phase.
 
-1. Establish an Alpine builder and minimal bootable profile.
-2. Port compositor and shell builds to musl.
-3. Translate systemd critical/background relationships to OpenRC runlevels.
-4. Reproduce virtual GPU and ROG Ally DRM/KMS bring-up.
-5. Validate controller, touch, audio, network, Bluetooth, suspend, and external displays.
-6. Retire the Arch profile only after Alpine meets the agreed definition of done.
+Distribution-neutral findings—especially ROG Ally firmware, graphics, input, networking, and boot observations—should be extracted into Alpine documentation and validation requirements. Arch-specific fixes must be revalidated and implemented with Alpine-native packages and tools rather than copied.
 
-Repository history must not be rewritten to hide the Arch phase.
+A future Arch or other distro backend requires a new proposal and its own maintained package recipes, image construction, init/service definitions, validation, and release lifecycle. Recovering files from history alone does not make that backend supported.
 
 ## Consequences
 
@@ -110,7 +105,7 @@ Repository history must not be rewritten to hide the Arch phase.
 
 ### Negative
 
-- archiso, pacman, PKGBUILD, and systemd work must be migrated.
+- Proven capabilities from the Arch prototype must be reimplemented and revalidated with Alpine-native tooling.
 - Native components may require musl portability fixes.
 - Some proprietary games assume glibc.
 - Package versions may differ from the first prototype.
@@ -121,7 +116,7 @@ Repository history must not be rewritten to hide the Arch phase.
 
 - **glibc-only payloads:** isolate them in declared compatibility runtimes.
 - **hardware support gaps:** pin tested releases and promote kernel, Mesa, firmware, or backports through CI and hardware gates.
-- **loss of Arch knowledge:** preserve the legacy profile until feature parity and retain Git history.
+- **loss of prototype knowledge:** retain Git history and extract distribution-neutral findings into current documentation and tests.
 - **slow services delaying UI:** keep them out of the visual runlevel.
 - **distribution assumptions entering runtime code:** test components on musl and keep packaging/init logic in `playos-refdistro`.
 - **edge instability:** prohibit unpinned edge inputs in releases.
@@ -145,4 +140,4 @@ This decision does not:
 - turn PlayOS into a general-purpose Alpine desktop;
 - guarantee arbitrary glibc binaries run directly on the host;
 - replace the PlayOS compositor with a desktop compositor;
-- discard the Arch implementation before Alpine feature parity.
+- keep multiple reference-distro implementations active without an explicit decision and independent maintenance lifecycle.
