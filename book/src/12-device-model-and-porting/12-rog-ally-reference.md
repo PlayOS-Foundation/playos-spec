@@ -1,80 +1,72 @@
 # ROG Ally Reference
 
-The **ASUS ROG Ally** is the primary reference runtime device for PlayOS and
-the target for the vertical-slice proof-of-concept.
+The **ASUS ROG Ally** is the primary PlayOS Runtime Device and the hardware target for the Alpine reference-OS vertical slice.
 
 ## Hardware summary
 
 | Aspect | Detail |
 |---|---|
-| GPU | AMD Radeon 780M (RDNA 3 iGPU) |
-| Graphics stack | Mesa + `vulkan-radeon` / RADV |
-| Display | 1080p, up to 120 Hz |
-| Input | Built-in gamepad controls + touchscreen |
-| Vendor buttons | Armoury Crate button, Command Center button |
+| CPU | AMD Ryzen Z1 / Z1 Extreme |
+| GPU | AMD Radeon 780M-class RDNA 3 integrated graphics |
+| Graphics stack | amdgpu + Mesa |
+| Display | 1920×1080, up to 120 Hz |
+| Input | Built-in gamepad, touchscreen, vendor buttons |
+| Firmware | UEFI |
+| Reference OS | Alpine Linux-based PlayOS image |
 
-The 780M renders a Raylib shell at 1080p/120 Hz with negligible GPU usage,
-leaving essentially all GPU headroom for games.
+## Device policy
 
-## Device profile (sketch)
+The device profile declares panel orientation, refresh modes, touch mapping, built-in controls, battery, brightness, and vendor-button capabilities.
 
-```toml
-[device]
-id = "rog-ally"
-name = "ASUS ROG Ally"
-targetType = "runtime-device"
+- Armoury button → Home.
+- Command Center button → Quick Settings.
 
-[input]
-home_button = "asus_armoury"
-quick_settings_button = "asus_command_center"
-built_in_controls = "gamepad0"
-touchscreen = "touch0"
+These mappings belong to the device profile, not hard-coded shell behaviour.
 
-[display]
-default_width = 1920
-default_height = 1080
-refresh_rate = 120
+## Bring-up modes
 
-[capabilities]
-input.basic = true
-input.touch = true
-display.info = true
-power.battery = true
-display.brightness = true
-system.overlay = true
-```
+1. **Reference image:** boot the Alpine PlayOS image from `playos-refdistro`. This is authoritative.
+2. **Development host:** build and launch the compositor and shell from Alpine installed on the Ally. This shortens development loops but does not replace image testing.
 
-Vendor buttons map to logical PlayOS inputs: **Armoury → Home**,
-**Command Center → QuickSettings**. See
-[Controller-First Navigation](../09-shell-and-ux/03-controller-first-navigation.md).
+The former Arch/CachyOS host kit is legacy migration material.
 
-## GPU acceleration check
+## Hardware rendering
 
-Confirm hardware rendering (not software):
+Bring-up must verify DRM and renderer state without relying on a desktop session:
 
 ```sh
-glxinfo | grep renderer
-# Expect: AMD Radeon 780M (or similar)
-# If it shows llvmpipe, the GPU is not being used.
+readlink -f /sys/class/drm/card0/device/driver
+cat /sys/kernel/debug/dri/0/name 2>/dev/null || true
 ```
 
-## Bring-up checklist (vertical slice)
+Compositor logs must confirm amdgpu and a hardware EGL/GLES renderer rather than pixman or llvmpipe fallback.
+
+## Alpine vertical-slice definition of done
 
 ```text
-[ ] Arch installed; 780M brings up DRM/KMS (not llvmpipe)
-[ ] seatd grants seat/device access without root
-[ ] TinyWL-based compositor starts on the TTY and owns the display
-[ ] Raylib shell renders as a Wayland client at 1080p
-[ ] Built-in gamepad navigates the shell (A = launch, B = back)
-[ ] Armoury button routes to Home (return-to-shell)
-[ ] One demo game launches and, on exit/Home, returns to the shell
+[ ] Alpine PlayOS image boots through UEFI
+[ ] amdgpu firmware loads without missing-firmware errors
+[ ] seatd grants compositor access without root
+[ ] PlayOS compositor owns DRM/KMS
+[ ] Raylib shell built against musl renders as a Wayland client
+[ ] built-in gamepad navigates the shell
+[ ] Home returns from a game to the existing shell
+[ ] touchscreen maps to the internal panel
+[ ] 60 Hz and 120 Hz modes are detected
+[ ] sample game launches and returns cleanly
+[ ] persistent PlayOS data survives reboot
+[ ] first-frame timing is recorded
 ```
 
-## Out of scope for the first slice
+## Subsequent gates
 
-Touch input, brightness/TDP/fan control, suspend/resume, and audio are
-deferred until the baseline console loop is proven.
+- controller and dock hotplug;
+- PipeWire audio;
+- Wi-Fi and Bluetooth;
+- brightness and battery;
+- suspend/resume;
+- external displays;
+- recovery boot;
+- signed system-image updates.
 
-See: [Boot Model](../08-runtime-architecture/03-boot-model.md),
-[Compositor Model](../08-runtime-architecture/05-compositor-model.md),
-[Runtime Devices](../04-target-model/02-runtime-devices.md).
+See [Boot Model](../08-runtime-architecture/03-boot-model.md), [Linux Reference Runtime](../08-runtime-architecture/04-linux-reference-runtime.md), and [ADR-0004](../../../adr/0004-use-alpine-linux-reference-os-base.md).
