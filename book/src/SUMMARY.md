@@ -149,6 +149,7 @@
 - [Accessibility](09-shell-and-ux/14-accessibility.md)
 - [Themes](09-shell-and-ux/15-themes.md)
 - [Reference Shell](09-shell-and-ux/16-reference-shell.md)
+- [Typography and Text Rendering](09-shell-and-ux/17-typography-and-text-rendering.md)
 
 # Part X — Package Format
 
