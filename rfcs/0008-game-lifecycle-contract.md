@@ -1,14 +1,15 @@
 ---
 rfc: 0008
 title: Game Lifecycle Contract
-status: Draft
+status: Accepted
 authors: []
 created: 2026-07-11
+accepted: 2026-07-22
 ---
 
 # RFC-0008: Game Lifecycle Contract
 
-> **Status:** Draft
+> **Status:** Accepted
 
 ## Summary
 
@@ -144,19 +145,78 @@ An application that conforms to the PlayOS lifecycle contract:
 - Defining a 3-second grace period creates a worst-case 3-second black
   screen if a game hangs.  A shorter timeout risks killing games that are
   doing legitimate slow saves.
+- A watchdog introduces runtime complexity and a small per-frame overhead
+  for heartbeat tracking.
 
-## Alternatives considered
+## Rationale and Alternatives
 
-- **No forced-exit timeout**: leaves the system in a permanently black state
-  if a game deadlocks.  Rejected.
+- **No forced-exit timeout**: leaves the system in a permanently black
+  state if a game deadlocks.  Rejected.
 - **Cooperative suspend instead of SIGTERM**: requires a Wayland protocol
-  extension.  Deferred to Stage 2.
+  extension.  Deferred to Stage 2 (suspend-and-resume, see Future
+  Possibilities).
+- **Immediate SIGKILL on Home**: fast but risks data loss.  The 3-second
+  grace period balances safety with responsiveness.
+- **Game-managed exit only (no runtime authority to kill)**: violates the
+  console-first principle — the platform, not the game, owns the
+  foreground.
+- **Per-device timeout values**: considered for slow-storage devices (SD
+  cards).  Rejected in favour of a single timeout with the ability for
+  device profiles to extend it via `game.graceful_exit_timeout_ms`.
+  The default of 3000 ms covers the common case; device profiles may
+  increase it.
 
-## Unresolved questions
+## Prior Art
 
-- Should the exit code be surfaced to the player in the shell UI?
-- What is the correct timeout for devices with slow storage (SD cards)?
-- Does the runtime need a watchdog for games that stop calling `Update()`?
+- **Android Activity lifecycle** (`onPause`, `onStop`, `onDestroy`):
+  provides a structured state machine with guaranteed callbacks before
+  termination.  PlayOS adopts a similar callback model (`OnSuspend` in
+  Stage 2) but keeps the Stage 1 contract deliberately simpler.
+- **Steam Deck / SteamOS**: uses `SIGTERM` → `SIGKILL` for game
+  termination via the Steam client, with a configurable timeout.
+- **Nintendo Switch**: the OS suspends the game process on Home; games
+  do not receive a termination signal unless the user explicitly closes
+  the title.  PlayOS Stage 2 aims for this model.
+- **POSIX process groups**: the `setpgid` + signal-to-group pattern is
+  well-established (systemd, supervisord).  PlayOS follows this
+  convention.
+
+## Unresolved Questions
+
+None — all questions from the draft phase have been resolved.
+
+- **Exit code surfacing:** Exit codes MAY be surfaced in the Shell UI
+  as non-blocking diagnostic information in developer mode.  In
+  production, non-zero exit codes SHOULD be logged but MUST NOT display
+  a blocking error dialog.  The Shell MAY show a non-intrusive
+  notification ("Game closed unexpectedly").
+- **Slow-storage timeout:** The 3-second default covers the common case.
+  Device profiles MAY override via the `game.graceful_exit_timeout_ms`
+  field.  The minimum allowed value is 1000 ms; there is no maximum.
+- **Watchdog for stalled games:** The runtime SHOULD implement a
+  heartbeat watchdog.  The Lifecycle Manager monitors the
+  `Lifecycle::Update()` call frequency.  If `Update()` is not called for
+  5 consecutive seconds, the runtime treats the application as hung and
+  initiates forced exit (§4).  The watchdog is a SHOULD, not a MUST —
+  it may be disabled in developer mode.
+
+## Future Possibilities
+
+- **Suspend-and-resume (Stage 2):** Instead of SIGTERM on Home, the
+  runtime suspends the game process (`SIGSTOP` / cgroup freeze) and
+  resumes it when the player returns.  Requires the `system.suspend`
+  capability and a Wayland protocol extension for surface hand-off.
+  See [Suspend and Resume](../book/src/08-runtime-architecture/16-suspend-and-resume.md).
+- **Multi-application foreground:** Future compositor support for
+  picture-in-picture or split-screen could allow two applications to
+  share the foreground.  The lifecycle contract would need to define
+  "partial foreground" states.
+- **Background applications:** Applications that continue running
+  (e.g., music players, download managers) while not holding the
+  foreground.  Would require a new lifecycle state and capability.
+- **Crash recovery:** Automatic restart of a crashed game (with player
+  consent) if save data was recently written.  Depends on the
+  observability and telemetry RFC.
 
 ## Implementation notes
 

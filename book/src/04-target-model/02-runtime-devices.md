@@ -15,7 +15,7 @@ A runtime device is expected to offer the complete console experience:
 - exposes device capabilities such as power, brightness, and touch where
   the hardware supports them.
 
-## Reference runtime devices
+## Reference Runtime Devices
 
 The following are adopted as reference runtime devices:
 
