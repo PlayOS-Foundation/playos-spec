@@ -237,6 +237,17 @@ Related RFCs: [0011](rfcs/0011-governance-versioning-compatibility.md)
 
 ---
 
+## Pending housekeeping
+
+Small updates needed to keep the spec in sync with implementation:
+
+- [ ] **Update Raylib version reference.** `book/src/07-engine-integration/03-raylib-reference-kit.md`
+  line 57 references `GIT_TAG 5.5` — update to `GIT_TAG 6.0` to match
+  `playos-shell` and `playos-samples` which already target 6.0.
+  See `playos-refdistro/mig2raylib6.md` for context.
+
+---
+
 ## Writing priority
 
 Recommended order for completing remaining parts, based on dependency
