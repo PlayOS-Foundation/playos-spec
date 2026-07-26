@@ -54,7 +54,7 @@ The reference CMake pattern fetches Raylib via `FetchContent` and links the
 Platform API as a sibling dependency or GitHub fetch:
 
 ```cmake
-FetchContent_Declare(raylib GIT_REPOSITORY https://github.com/raysan5/raylib.git GIT_TAG 5.5)
+FetchContent_Declare(raylib GIT_REPOSITORY https://github.com/raysan5/raylib.git GIT_TAG 6.0)
 FetchContent_MakeAvailable(raylib)
 
 # Platform API resolved from sibling checkout or GitHub
