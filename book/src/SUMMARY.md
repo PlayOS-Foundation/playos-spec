@@ -96,7 +96,8 @@
 - [Logging and Diagnostics API](06-platform-api/22-logging-and-diagnostics-api.md)
 - [Permissions API](06-platform-api/23-permissions-api.md)
 - [Extension API](06-platform-api/24-extension-api.md)
-- [API Versioning](06-platform-api/25-api-versioning.md)
+- [Font API](06-platform-api/25-font-api.md)
+- [API Versioning](06-platform-api/26-api-versioning.md)
 
 # Part VII — Engine Integration
 

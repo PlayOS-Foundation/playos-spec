@@ -93,3 +93,4 @@ but are not required to do so.
 - [Accessibility (High Contrast)](14-accessibility.md)
 - [Settings](08-settings.md)
 - [OEM Stores](../11-cloud-and-marketplace/18-oem-stores.md)
+- [Font API](../06-platform-api/25-font-api.md)
