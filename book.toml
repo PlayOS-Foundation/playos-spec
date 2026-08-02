@@ -3,15 +3,12 @@ title = "PlayOS Specification"
 description = "Architecture, API contracts, component specifications, and delivery plan for PlayOS — a console operating system for the ASUS ROG Ally."
 authors = ["PlayOS Contributors"]
 language = "en"
-multilingual = false
 src = "src"
 
 [output.html]
-theme = "coal"
 default-theme = "coal"
 preferred-dark-theme = "coal"
 git-repository-url = "https://github.com/your-org/playos-spec"
-git-repository-icon = "fa-github"
 edit-url-template = "https://github.com/your-org/playos-spec/edit/main/src/{path}"
 additional-css = ["theme/playos.css"]
 no-section-label = false
