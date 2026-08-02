@@ -4,7 +4,299 @@
 
 **Primary Outcome:** Games installed in `/data/games/` are discovered, displayed in the shell, and their save and cache paths are correctly isolated per game. Data survives reboot.
 
-**Prerequisites:** Sprint 5 complete — shell running on ROG Ally.
+**Prerequisites:** Sprint 5 complete — Raylib shell running on the ROG Ally and consuming the public `libplayos` API.
+
+---
+
+## Why This Sprint Exists
+
+Sprint 5 used stub data loaded from hardcoded entries. Sprint 6 replaces all of that with real persistent storage. Without this sprint, the shell is a demo; with it, the shell is a real game library. Every subsequent sprint depends on having reliable isolated per-game paths.
+
+---
+
+## Start Condition Checklist
+
+- Sprint 5 shell boots and navigates on the Ally.
+- `/data` partition discovery exists in `playos-init` (Sprint 1 skeleton) but the full provisioning and layout are still stubs.
+- `playos_storage.h` was stubbed in Sprint 5 — this sprint makes it real.
+- The QEMU image can be booted for host-side storage logic testing.
+
+---
+
+## Decisions Locked for This Sprint
+
+- **Partition identification:** search order is GPT partition type GUID → label `playos-data` → UUID on kernel cmdline
+- **Data directory schema:** the `/data/` layout defined here is final for MVP — do not change without an ADR
+- **Manifest format:** v1 JSON schema defined here is the stable game metadata contract for MVP
+- **`PLAYOS_GAME_ID` env var:** set by `playos-init` at game launch; storage API derives paths from it
+- **FactoryReset scope this sprint:** `erase_cache` and `erase_config` only; saves and games are destructive and deferred to Sprint 10
+
+---
+
+## Scope
+
+### In Scope
+
+- `/data` partition mount, first-boot provisioning, directory tree creation
+- `/data` directory schema (final MVP layout)
+- Game manifest v1 schema
+- Real `playos_storage.h` implementation
+- Live game discovery in the shell
+- Three real minimal sample games with valid manifests and compiled binaries
+- `FactoryReset` IPC (cache and config only this sprint)
+
+### Explicitly Out of Scope
+
+- Game launch / lifecycle (Sprint 7)
+- Audio (Sprint 8)
+- Power / thermal (Sprint 9)
+- Installer / disk formatting (Sprint 10)
+- Full factory reset with save erasure (Sprint 10)
+
+---
+
+## Required Repository Changes
+
+| Repo | Required work |
+|---|---|
+| `playos-refdistro` | Storage provisioning in `playos-init`, sample game packages, QEMU/Ally test content |
+| `playos-platform-api` | Real `playos_storage.h` implementation |
+| `playos-shell` | Live manifest-driven game discovery, icon loading, invalid manifest handling |
+| `playos-runtime` | `FactoryReset` IPC command definition |
+| `playos-spec` | Game manifest v1 schema file |
+
+---
+
+## Expected Files and Directories
+
+### `playos-refdistro`
+
+```text
+src/playos-init/src/storage.c       # provisioning, mount, directory creation
+br2-external/board/common/rootfs-overlay/data/games/
+    com.playos.sample-triangle/
+        manifest.json
+        bin/triangle
+    com.playos.sample-input/
+        manifest.json
+        bin/input-viewer
+    com.playos.sample-audio/
+        manifest.json
+        bin/audio-stub
+```
+
+### `playos-platform-api`
+
+```text
+include/playos/playos_storage.h
+src/playos_storage.c
+```
+
+### `playos-spec`
+
+```text
+schemas/game-manifest-v1.json
+```
+
+---
+
+## Agent Task Breakdown
+
+### Task Status Grid
+
+Update the **Status** column as work progresses: `not started` → `in progress` → `blocked` or `done`.
+
+| Task ID | Task | Primary repo | Status | Notes / evidence |
+|---|---|---|---|---|
+| S6-T1 | Implement `/data` partition provisioning in `playos-init` | `playos-refdistro` | not started | |
+| S6-T2 | Define and create the final `/data` directory schema | `playos-refdistro` | not started | |
+| S6-T3 | Define game manifest v1 schema | `playos-spec`, `playos-refdistro` | not started | |
+| S6-T4 | Implement real `playos_storage.h` API | `playos-platform-api` | not started | |
+| S6-T5 | Implement live game discovery in the shell | `playos-shell` | not started | |
+| S6-T6 | Build and install three real sample games | `playos-refdistro` | not started | |
+| S6-T7 | Add `FactoryReset` IPC command (cache/config scope) | `playos-runtime`, `playos-refdistro` | not started | |
+| S6-T8 | Persistence and isolation validation | `playos-refdistro` | not started | |
+
+### S6-T1 — Implement `/data` partition provisioning in `playos-init`
+
+- Search for the data partition in order: GPT type GUID → label `playos-data` → UUID from kernel cmdline
+- Mount at `/data` with ext4
+- Validate `/data/.playos-storage-version` marker on every mount
+- On first boot: create all top-level directories and write the version marker
+- On missing partition: log clearly with all attempted identifiers and available block devices, then halt — never silently format
+
+**Done when:** QEMU and Ally boot and show a correctly populated `/data` tree with the version marker present.
+
+### S6-T2 — Define and create the final `/data` directory schema
+
+```text
+/data/
+├── .playos-storage-version
+├── games/<game-id>/{manifest.json, bin/, assets/, shaders/, licenses/}
+├── saves/<game-id>/{profiles/, autosaves/, settings/}
+├── cache/<game-id>/{shaders/, compiled-assets/, temporary/}
+├── profiles/
+├── resources/
+├── downloads/
+├── logs/
+├── updates/
+├── screenshots/
+└── config/
+```
+
+**Done when:** all directories are created on first boot and the layout matches this schema exactly.
+
+### S6-T3 — Define game manifest v1 schema
+
+Create `playos-spec/schemas/game-manifest-v1.json` (JSON Schema format) and document the required/optional fields:
+
+```json
+{
+  "id": "com.example.game",
+  "name": "Example Game",
+  "version": "1.0.0",
+  "executable": "bin/game",
+  "api_version": 1,
+  "graphics": "gles3",
+  "architecture": "x86_64",
+  "controllers": true,
+  "network": false,
+  "description": "Short description.",
+  "icon": "assets/icon.png"
+}
+```
+
+Validation rules:
+- `id` must match the parent directory name
+- `executable` must exist relative to the game directory
+- `api_version` must be ≤ current system API version
+- `architecture` must match the running system
+
+**Done when:** the schema file exists and sample game manifests pass validation against it.
+
+### S6-T4 — Implement real `playos_storage.h` API
+
+```c
+const char *playos_storage_get_games_path(void);
+const char *playos_storage_get_saves_path(const char *game_id);
+const char *playos_storage_get_cache_path(const char *game_id);
+const char *playos_storage_get_config_path(void);
+const char *playos_storage_get_logs_path(void);
+int64_t     playos_storage_free_bytes(void);
+int         playos_storage_atomic_write(const char *path, const void *data, size_t len);
+```
+
+- Derive per-game paths from `PLAYOS_GAME_ID` environment variable
+- `playos_storage_atomic_write` writes to a temp file then renames into place
+- Return `NULL` for unavailable paths; never construct paths to non-existent mounts
+
+**Done when:** the shell and sample games can call the API and receive correct isolated paths.
+
+### S6-T5 — Implement live game discovery in the shell
+
+- Call `playos_storage_get_games_path()`
+- Enumerate subdirectories
+- Read and parse `manifest.json` for each
+- Validate against the manifest rules; skip and log invalid entries without crashing
+- Load `assets/icon.png` if present; use placeholder if absent
+- Sort results by name
+- Replace the Sprint 5 stub list entirely
+
+**Done when:** the shell shows discovered games dynamically from `/data/games/` on every startup.
+
+### S6-T6 — Build and install three real sample games
+
+- `com.playos.sample-triangle` — renders a Raylib triangle; proves GPU + Wayland path works
+- `com.playos.sample-input` — displays live controller state
+- `com.playos.sample-audio` — placeholder binary; audio will be wired in Sprint 8
+
+Each must have a valid manifest and a compiled binary that at minimum starts without crashing.
+
+**Done when:** all three appear in the shell library and can be selected in the detail screen.
+
+### S6-T7 — Add `FactoryReset` IPC command (cache/config scope)
+
+- Add `FactoryReset { erase_cache: bool, erase_config: bool }` to the IPC message set
+- Implementation: unmount any sub-mounts, recursively delete selected directories, recreate them
+- `erase_games` and `erase_saves` are defined in the schema but return an explicit "deferred to Sprint 10" error
+
+**Done when:** `FactoryReset { erase_cache: true }` clears `/data/cache/` and the directory is recreated.
+
+### S6-T8 — Persistence and isolation validation
+
+- Write a file via `playos_storage_atomic_write` to a game's save path; reboot; read it back
+- Verify two games have non-overlapping save paths
+- Plant a broken manifest; verify shell skips it without crashing
+- Verify `playos_storage_free_bytes()` returns a non-negative value
+
+**Done when:** all persistence and isolation tests pass and are documented as evidence.
+
+---
+
+## Implementation Guidance
+
+### Partition discovery order
+
+Log every step: what was tried, what was found, why a candidate was accepted or rejected. This log is critical for debugging on new hardware.
+
+### Atomic writes
+
+The atomic write helper must be used for all persistent game data writes in the platform API. Raw `fwrite` to save paths is not acceptable.
+
+### Manifest loading
+
+Keep the manifest parser minimal and defensive. Unknown fields must be ignored, not rejected. Only fail on missing required fields or invalid values.
+
+---
+
+## Verification and Evidence
+
+| Evidence | How it is produced |
+|---|---|
+| Mount proof | `/proc/mounts` showing `/data` at boot |
+| Directory proof | `ls /data` showing all expected subdirectories |
+| Version marker proof | contents of `/data/.playos-storage-version` |
+| Discovery proof | three sample games appear in shell library |
+| Persistence proof | file written before reboot is readable after reboot |
+| Isolation proof | two games' save paths are non-overlapping |
+| Invalid manifest proof | shell log showing skipped invalid entry |
+
+---
+
+## Acceptance Criteria
+
+- [ ] `/data` partition is mounted at boot; all directories exist
+- [ ] `/data/.playos-storage-version` is written and validated
+- [ ] Missing data partition causes a clear diagnostic halt with no silent format
+- [ ] Shell discovers all games in `/data/games/` dynamically
+- [ ] Invalid manifests are skipped and logged without crashing the shell
+- [ ] Game icons load if present; placeholder shown otherwise
+- [ ] Per-game save paths are correctly isolated
+- [ ] A saved file survives reboot
+- [ ] Three real sample games appear in the shell library
+- [ ] `FactoryReset { erase_cache: true }` clears and recreates the cache directory
+- [ ] `playos_storage_free_bytes()` returns a non-negative value
+
+---
+
+## Handoff to Sprint 7
+
+Sprint 7 may assume:
+
+- `/data` is reliably mounted with the final directory schema
+- game manifests are validated on discovery
+- `PLAYOS_GAME_ID` is an established pattern for per-game path isolation
+- three sample games exist and are discoverable
+
+Sprint 7 should focus on the launch flow, lifecycle, and overlay — not on re-implementing storage.
+
+---
+
+## Exit Gate
+
+Games installed in `/data/games/` are discovered and shown in the shell. Save and cache paths are correctly isolated per game. All data persists across reboots.
+
+*Previous: [Sprint 5](Sprint-5.md) | Next: [Sprint 7](Sprint-7.md)*
 
 ---
 
