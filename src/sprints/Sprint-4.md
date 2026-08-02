@@ -1,119 +1,256 @@
 # Sprint 4 — AMDGPU and Native DRM/KMS
 
-**Goal:** `playos-compositor` permanently owns the ROG Ally display through the DRM/KMS backend with AMDGPU, GBM, EGL, and Mesa. A hardware-accelerated test client renders to the physical screen.
+**Goal:** Move `playos-compositor` from developer/test backends to the real native graphics path on the ROG Ally using AMDGPU, DRM/KMS, GBM, EGL, Mesa, and wlroots.
 
-**Primary Outcome:** The compositor starts on the ROG Ally, initializes AMDGPU via DRM/KMS, and presents a hardware-accelerated test client surface on the built-in display.
+**Primary Outcome:** The compositor starts on the Ally, selects the correct GPU without hardcoded device paths, owns the built-in display through DRM/KMS, and presents a hardware-accelerated test client.
 
-**Prerequisites:** Sprint 3 complete — ROG Ally boots, AMDGPU driver loads, `/dev/dri/` is populated.
+**Prerequisites:** Sprint 3 complete — the Ally boots reliably, AMDGPU loads, `/dev/dri/` is populated, and physical hardware validation scripts exist.
 
 ---
 
-## Key Deliverables
+## Why This Sprint Exists
 
-### DRM/KMS Backend in `playos-compositor`
+Sprint 4 converts the project from a simulated console UI pipeline into a real console graphics stack. It is the first sprint where PlayOS genuinely owns the handheld's screen as the future production system will.
 
-Replace the headless/nested backend with a real DRM backend for the physical device.
+---
 
-**GPU discovery (do not assume `/dev/dri/card0`):**
-1. Enumerate all DRM devices via `libdrm`
-2. Resolve each to its PCI identity (vendor + device ID)
-3. Identify the device connected to the active display connector
-4. Validate renderer initialization on the selected device
-5. Select the render node (`renderD*`) for EGL context
+## Start Condition Checklist
 
-```c
-/* Supported vendor IDs */
-#define PCI_VENDOR_AMD   0x1002
-#define PCI_VENDOR_INTEL 0x8086  /* deferred until Sprint 13 */
+- Sprint 3 Ally USB boot path works.
+- `/dev/dri/card*` and `/dev/dri/renderD*` appear on the device.
+- Headless and nested compositor modes from Sprint 2 still work.
+- Mesa and libdrm can be built in the image.
+
+---
+
+## Decisions Locked for This Sprint
+
+- **Canonical Ally defconfig name:** `br2-external\configs\playos_ally_defconfig`
+- **Compositor owner:** `playos-compositor` permanently owns DRM/KMS
+- **GPU selection policy:** enumerate and identify; never hardcode `/dev/dri/card0`
+- **Renderer path:** GBM + EGL + OpenGL ES through wlroots
+- **Fallback path:** log failure and attempt the documented recovery graphics path; do not silently downgrade to a production-looking success state
+
+---
+
+## Scope
+
+### In Scope
+
+- native DRM/KMS backend selection
+- GPU discovery and output selection
+- GBM/EGL/Mesa renderer initialization
+- physical display presentation on the Ally
+- hardware-accelerated test client
+- Buildroot dependency/config updates for native graphics
+
+### Explicitly Out of Scope
+
+- real shell UI
+- overlay lifecycle
+- first-frame game foreground policy
+- direct scanout as a release requirement
+- Intel graphics support
+
+---
+
+## Required Repository Changes
+
+| Repo | Required work |
+|---|---|
+| `playos-compositor` | Native DRM/KMS path, GPU discovery, output setup, renderer logging, test client updates |
+| `playos-refdistro` | Ally graphics dependencies and config updates in Buildroot |
+| `playos-spec` | Clarify graphics policy or ADRs only if implementation forces new decisions |
+
+---
+
+## Expected Files and Directories
+
+### `playos-compositor`
+
+```text
+src/
+├── drm_backend.c
+├── gpu_discovery.c
+├── output_modes.c
+├── renderer_gbm_egl.c
+└── diagnostics.c
+
+tools/test-client/
+└── src/main.c
 ```
 
-Log the selected device, connector, mode, and renderer to `/run/playos/log/compositor.log`.
+### `playos-refdistro`
 
-**DRM/KMS initialization via wlroots:**
-- Use `wlr_backend_autocreate()` — it selects DRM on bare metal automatically
-- Or use `wlr_drm_backend_create()` directly for explicit device control
-- Initialize `wlr_renderer` with GLES2 or GLES3 (GBM path)
-- Initialize `wlr_allocator` with GBM
-- Enumerate outputs; select the primary built-in display
+```text
+br2-external/configs/
+└── playos_ally_defconfig
 
-**Output configuration:**
-- Select the preferred mode (native resolution and refresh rate)
-- Log: connector name, mode, and format
-- Set output scale = 1.0 initially (HiDPI scaling deferred)
-- Handle output hotplug events (external display attach/detach) — log only for now
+br2-external/package/
+└── ... graphics dependencies enabled through Buildroot config/package metadata ...
+```
 
-**Renderer:**
-- `wlr_renderer` backed by `GBM + EGL + OpenGL ES`
-- Mesa RadeonSI for the AMDGPU device
-- Verify renderer reports OpenGL ES 3.0 or 3.1
+---
 
-**Fallback diagnostic mode:**
-- If DRM/KMS initialization fails, log the failure and attempt SimpleDRM (firmware framebuffer)
-- If SimpleDRM also fails, write a diagnostic to serial/log and halt
-- This fallback is the recovery graphics path
+## Agent Task Breakdown
 
-### Hardware-Accelerated Test Client
+### Task Status Grid
 
-Extend the Sprint 2 test client to use OpenGL ES:
-- Connect to compositor Wayland socket
-- Create an EGL surface via `eglCreateWindowSurface`
-- Render a colored gradient with a simple GLES2 shader
-- Display: PlayOS name, sprint number, GPU name, resolution, refresh rate
-- Animates (e.g., color cycle) to confirm active rendering
+Update the **Status** column as work progresses: `not started` → `in progress` → `blocked` or `done`.
 
-### Direct Scanout (Optional — Stretch Goal)
+| Task ID | Task | Primary repo | Status | Notes / evidence |
+|---|---|---|---|---|
+| S4-T1 | Add deterministic GPU discovery | `playos-compositor` | not started | |
+| S4-T2 | Bring up native DRM/KMS through wlroots | `playos-compositor` | not started | |
+| S4-T3 | Initialise the GBM/EGL/Mesa rendering path | `playos-compositor` | not started | |
+| S4-T4 | Present a hardware-accelerated test client | `playos-compositor` | not started | |
+| S4-T5 | Add recovery and diagnostics behaviour | `playos-compositor` | not started | |
+| S4-T6 | Update Buildroot graphics dependencies | `playos-refdistro` | not started | |
+| S4-T7 | Preserve earlier test modes | `playos-compositor`, `playos-refdistro` | not started | |
 
-If time permits, implement a basic direct scanout attempt:
-- Check if the game surface buffer is compatible with the DRM output plane
-- Assign it directly to the plane; fall back to composition if incompatible
-- Log scanout decisions
+### S4-T1 — Add deterministic GPU discovery
 
-This is an optimization only — correctness is not gated on it.
+- Enumerate DRM devices.
+- Resolve each candidate to vendor/device identity.
+- Associate the selected device with the active built-in display connector.
+- Select the matching render node for EGL.
 
-### `playos-compositor` DRM Configuration
+Minimum recognised vendor IDs:
 
-Update `br2-external/configs/playos_rog_ally_defconfig`:
-- Ensure `libdrm`, `GBM`, `EGL`, `Mesa` are present in the Buildroot config
-- Mesa must include: RadeonSI, GBM, EGL, OpenGL ES (`gallium-drivers=radeonsi`, `platforms=drm,wayland`)
-- Validate Mesa is musl-compatible (it is, but verify in practice)
+```c
+#define PCI_VENDOR_AMD   0x1002
+#define PCI_VENDOR_INTEL 0x8086  /* not used for this sprint's target path */
+```
+
+**Done when:** logs show the selected card node, render node, vendor/device IDs, connector, and chosen mode.
+
+### S4-T2 — Bring up native DRM/KMS through wlroots
+
+- Use wlroots with the native DRM backend on bare metal.
+- Create the renderer and allocator for the chosen device.
+- Enumerate outputs and bind to the built-in panel.
+- Select the preferred mode.
+
+**Done when:** the compositor can start on the Ally without using headless or nested backends.
+
+### S4-T3 — Initialise the GBM/EGL/Mesa rendering path
+
+- Use GBM for buffers.
+- Use EGL/OpenGL ES through Mesa.
+- Log the renderer name and supported GLES version.
+- Fail clearly if hardware acceleration is not active.
+
+**Done when:** the compositor reports a working accelerated renderer on the Ally.
+
+### S4-T4 — Present a hardware-accelerated test client
+
+- Update the Sprint 2 test client to render through EGL on Wayland.
+- Show a visible moving or changing frame, not a single static colour.
+- Display useful diagnostics on screen if practical: PlayOS, sprint number, GPU name, resolution, refresh rate.
+
+**Done when:** the Ally screen shows an actively rendered client surface driven by the compositor.
+
+### S4-T5 — Add recovery and diagnostics behaviour
+
+- If DRM/KMS init fails, log the failing phase clearly.
+- Attempt the documented fallback path if one is available in the current build.
+- If fallback also fails, halt with a clear diagnostic path.
+
+**Done when:** simulated or induced failure produces actionable logs instead of a silent black screen.
+
+### S4-T6 — Update Buildroot graphics dependencies
+
+- Ensure the Ally image includes the needed native graphics stack:
+  - libdrm
+  - GBM
+  - EGL
+  - Mesa with RadeonSI
+  - wlroots dependencies
+
+- Validate the chosen configuration is compatible with musl.
+
+**Done when:** the Ally image contains the required runtime libraries and the compositor starts on-device.
+
+### S4-T7 — Preserve earlier test modes
+
+- Do not break headless QEMU validation.
+- Do not break nested Wayland developer validation.
+- Keep backend selection explicit and logged.
+
+**Done when:** the project still supports fast non-device iteration after native graphics lands.
+
+---
+
+## Implementation Guidance
+
+### Output selection
+
+- Prefer the panel reported as the built-in/internal connector.
+- Apply the preferred mode first.
+- Set output scale to `1.0` for now.
+- External display hotplug may be logged only; no multi-display UX is required yet.
+
+### Logging
+
+Log at minimum:
+
+- backend mode
+- selected GPU/card/render node
+- connector name
+- selected mode and refresh rate
+- renderer name
+- GLES version
+- any fallback path entered
+
+Write logs to `/run/playos/log/compositor.log`.
+
+### Test client expectations
+
+The sprint acceptance target is not the future shell. It is a diagnostic client. Keep it simple, deterministic, and useful for proving the rendering path.
+
+---
+
+## Verification and Evidence
+
+| Evidence | How it is produced |
+|---|---|
+| GPU selection proof | compositor log entries for card, render node, PCI IDs |
+| Output proof | compositor log entries for connector and selected mode |
+| Acceleration proof | renderer and GLES version in logs |
+| On-screen proof | visible animated test client on the Ally screen |
+| Regression proof | QEMU headless path still runs after native DRM work |
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Compositor starts on the ROG Ally using the DRM backend (not headless or nested)
-- [ ] AMDGPU DRM device is correctly identified and selected (not hardcoded `/dev/dri/card0`)
-- [ ] Compositor log shows: selected GPU, connector, mode, renderer (GLES version)
-- [ ] Test client renders a hardware-accelerated surface on the built-in display
-- [ ] Mesa reports OpenGL ES 3.0 or 3.1 on AMD
-- [ ] Compositor survives: connect USB keyboard, enter BusyBox shell from a second TTY — display is stable
-- [ ] If DRM init fails (simulated), compositor logs the failure and enters fallback path
-- [ ] QEMU headless path is unchanged — CI still passes
+- [ ] `playos-compositor` starts on the Ally using the native DRM backend
+- [ ] GPU discovery is based on enumeration, not hardcoded `/dev/dri/card0`
+- [ ] the built-in display connector is identified and configured
+- [ ] the compositor log records the selected GPU, render node, connector, mode, renderer, and GLES version
+- [ ] a hardware-accelerated test client is visible on the Ally screen
+- [ ] the renderer path is GBM + EGL + Mesa on AMDGPU
+- [ ] an induced or simulated DRM init failure produces clear diagnostics and fallback behaviour
+- [ ] QEMU headless validation still works
+- [ ] nested Wayland validation still works
 
 ---
 
-## Repositories Primarily Involved
+## Handoff to Sprint 5
 
-| Repo | Work |
-|---|---|
-| `playos-compositor` | DRM/KMS backend, GPU discovery, GLES renderer, output config |
-| `playos-refdistro` | Mesa config, libdrm, GBM, EGL in Buildroot; ROG Ally defconfig update |
-| `playos-spec` | ADR on GPU discovery policy; update graphics architecture notes |
+Sprint 5 may assume:
 
----
+- the compositor can own the real display on the Ally
+- the graphics stack is hardware accelerated
+- a visible Wayland client can render on-device
+- backend selection and logging are already mature enough for shell bring-up
 
-## Testing Approach
-
-- Physical ROG Ally required for all DRM/KMS tests
-- QEMU CI continues to use headless backend — DRM path tested on device only
-- Log validation: parse `/run/playos/log/compositor.log` for expected GPU/mode/renderer lines
-- Visual: hardware-accelerated animation visible on Ally screen
-- Stress: run compositor for 10 minutes; check for memory leaks or GPU hangs
+Sprint 5 should focus on replacing the test client with the real shell, not revisiting DRM fundamentals.
 
 ---
 
 ## Exit Gate
 
-`playos-compositor` initializes AMDGPU via DRM/KMS on the ROG Ally and presents a hardware-accelerated test client on the built-in display. GPU is selected by enumeration, not hardcoded path.
+`playos-compositor` initializes AMDGPU via DRM/KMS on the ROG Ally, owns the built-in display, and presents a hardware-accelerated diagnostic client without breaking existing headless and nested workflows.
 
 *Previous: [Sprint 3](Sprint-3.md) | Next: [Sprint 5](Sprint-5.md)*
