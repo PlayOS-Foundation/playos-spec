@@ -169,7 +169,7 @@ package/playos-compositor/
 
 # playos-compositor.mk
 PLAYOS_COMPOSITOR_VERSION = $(call read-file,$(BR2_EXTERNAL_PLAYOS_PATH)/../../versions.lock,PLAYOS_COMPOSITOR_COMMIT)
-PLAYOS_COMPOSITOR_SITE = https://github.com/your-org/playos-compositor
+PLAYOS_COMPOSITOR_SITE = https://github.com/PlayOS-Foundation/playos-compositor
 PLAYOS_COMPOSITOR_SITE_METHOD = git
 PLAYOS_COMPOSITOR_DEPENDENCIES = wlroots libdrm wayland wayland-protocols libxkbcommon
 PLAYOS_COMPOSITOR_INSTALL_TARGET = YES

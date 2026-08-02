@@ -8,8 +8,8 @@ src = "src"
 [output.html]
 default-theme = "coal"
 preferred-dark-theme = "coal"
-git-repository-url = "https://github.com/your-org/playos-spec"
-edit-url-template = "https://github.com/your-org/playos-spec/edit/main/src/{path}"
+git-repository-url = "https://github.com/PlayOS-Foundation/playos-spec"
+edit-url-template = "https://github.com/PlayOS-Foundation/playos-spec/edit/main/src/{path}"
 additional-css = ["theme/playos.css"]
 no-section-label = false
 
