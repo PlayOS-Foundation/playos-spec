@@ -1,0 +1,38 @@
+/* PlayOS brand overrides for mdBook coal theme */
+
+:root {
+    --playos-accent: #e53e3e;      /* ROG red */
+    --playos-accent-dim: #9b2335;
+    --playos-code-bg: #1a1a2e;
+}
+
+/* Sidebar accent bar */
+.sidebar .sidebar-scrollbox {
+    border-right: 2px solid var(--playos-accent-dim);
+}
+
+/* Active chapter highlight */
+.chapter li.chapter-item.expanded > a,
+.chapter li.chapter-item > a.active {
+    color: var(--playos-accent) !important;
+    font-weight: 600;
+}
+
+/* Section dividers in nav */
+.chapter li.part-title {
+    color: var(--playos-accent);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 1.2em;
+}
+
+/* Code blocks */
+pre code {
+    background: var(--playos-code-bg) !important;
+}
+
+/* Top menu bar */
+#menu-bar {
+    border-bottom: 2px solid var(--playos-accent-dim);
+}
