@@ -59,7 +59,7 @@ Sprint 4 converts the project from a simulated console UI pipeline into a real c
 | Repo | Required work |
 |---|---|
 | `playos-compositor` | Native DRM/KMS path, GPU discovery, output setup, renderer logging, test client updates |
-| `playos-refdistro` | Ally graphics dependencies and config updates in Buildroot |
+| `playos-refdistro` | Defconfig: enable `BR2_PACKAGE_PLAYOS_COMPOSITOR` + `BR2_PACKAGE_MESA3D_GBM`. Mesa/EGL/GLES/radeonsi already enabled from Sprint 3. wlroots/wayland come from Buildroot built-ins via compositor Config.in selects. |
 | `playos-spec` | Clarify graphics policy or ADRs only if implementation forces new decisions |
 
 ---
@@ -84,10 +84,13 @@ tools/test-client/
 
 ```text
 br2-external/configs/
-└── playos_ally_defconfig
+└── playos_ally_defconfig       ← add BR2_PACKAGE_PLAYOS_COMPOSITOR=y + BR2_PACKAGE_MESA3D_GBM=y
 
-br2-external/package/
-└── ... graphics dependencies enabled through Buildroot config/package metadata ...
+br2-external/package/playos-compositor/
+└── playos-compositor.mk        ← already cmake-package, no changes needed
+
+Buildroot built-in packages used (no br2-external wrappers needed):
+  wlroots, wayland, wayland-protocols, libxkbcommon, pixman, mesa3d, libdrm
 ```
 
 ---
@@ -160,16 +163,12 @@ Minimum recognised vendor IDs:
 
 ### S4-T6 — Update Buildroot graphics dependencies
 
-- Ensure the Ally image includes the needed native graphics stack:
-  - libdrm
-  - GBM
-  - EGL
-  - Mesa with RadeonSI
-  - wlroots dependencies
+- **Already done (Sprint 3):** Mesa3D with radeonsi gallium driver (`BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_RADEONSI`), OpenGL EGL (`BR2_PACKAGE_MESA3D_OPENGL_EGL`), OpenGL ES (`BR2_PACKAGE_MESA3D_OPENGL_ES`), and Vulkan AMD driver are enabled in `playos_ally_defconfig`.
+- **Remaining:** Enable `BR2_PACKAGE_MESA3D_GBM` (GBM buffer allocation) and add `BR2_PACKAGE_PLAYOS_COMPOSITOR=y` to the defconfig. The compositor's `Config.in` already `select`s wlroots, wayland, wayland-protocols, libxkbcommon, and pixman — Buildroot's built-in packages provide these (no br2-external packages needed).
+- **Compositor .mk status:** Already a cmake-package (not a stub). Builds from `$(BR2_EXTERNAL_PlayOS_PATH)/../src/playos-compositor` with wlroots 0.20 dependencies. Tested in Sprint 2 for headless/nested modes.
+- Validate musl compatibility with the full graphics stack.
 
-- Validate the chosen configuration is compatible with musl.
-
-**Done when:** the Ally image contains the required runtime libraries and the compositor starts on-device.
+**Done when:** `playos_ally_defconfig` includes `BR2_PACKAGE_PLAYOS_COMPOSITOR=y` and `BR2_PACKAGE_MESA3D_GBM=y`, the Ally image contains all runtime libraries, and the compositor binary builds and starts on-device.
 
 ### S4-T7 — Preserve earlier test modes
 
