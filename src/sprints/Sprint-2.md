@@ -170,7 +170,7 @@ BR2_PACKAGE_MESA3D_OPENGL_ES=y
 | S2-T5 | Add the private Wayland protocol skeleton | `playos-runtime`, `playos-compositor` | ✅ done | playos-v1.xml (4 interfaces), scanner-generated code, compositor advertises global |
 | S2-T6 | Add a test client | `playos-compositor` | ✅ done | Wayland test client: wl_shm PlayOS blue (0xFFD66B00), xdg_toplevel fullscreen, connects and exits cleanly |
 | S2-T7 | Wire `playos-init` supervision and readiness | `playos-refdistro`, `playos-compositor` | ✅ done | supervisor.c polls /run/playos/compositor-ready (5s timeout); main.c waits COMPOSITOR_RUNNING before launching test clients |
-| S2-T8 | Integrate with Buildroot and tests | `playos-refdistro`, `playos-compositor` | ⚠️ in progress | Buildroot package exists; QEMU build running (awaiting wlroots 0.20 compat verification) |
+| S2-T8 | Integrate with Buildroot and tests | `playos-refdistro`, `playos-compositor` | ✅ done | QEMU build succeeds; bzImage 17.7MB, rootfs 46MB, playos-init 91KB, protocol XML in staging+target |
 
 ---
 
@@ -186,8 +186,8 @@ BR2_PACKAGE_MESA3D_OPENGL_ES=y
 - **Source provisioning:** `make setup` clones `PlayOS-Foundation/playos-compositor.git` into `src/playos-compositor/`
 
 ### Package: playos-runtime
-- **Status:** ⚠️ Still a Sprint 0 stub (`@true` build/install). Protocol XML is self-contained in compositor build.
-- **Action for Sprint 3:** make playos-runtime install protocol XML into staging for shared use.
+- **Status:** ✅ Active (Sprint 2.5) — cmake-package installing protocol XML into staging + target.
+- **Action for Sprint 3:** consume protocol XML from staging for compositor/init IPC.
 
 ### QEMU defconfig additions (Sprint 2)
 ```
@@ -209,7 +209,7 @@ BR2_PACKAGE_MESA3D_OPENGL_ES=y
 | Readiness proof | ✅ | Compositor writes readiness file with PID + socket info |
 | Protocol proof | ✅ | `wayland-scanner` generates `playos-v1-protocol.c/.h` in build |
 | Nested test | ✅ | `compositor-nested-test` builds; skips gracefully if no WAYLAND_DISPLAY |
-| QEMU end-to-end | ⏳ | Build in progress — awaits wlroots 0.20 compat verification |
+| QEMU end-to-end | ✅ | Build passes — bzImage + rootfs.tar generated (Spr 2.5 verified) |
 | Host build | ✅ | 4 targets build cleanly with 0 warnings |
 
 ---
@@ -224,7 +224,7 @@ BR2_PACKAGE_MESA3D_OPENGL_ES=y
 - [x] the rendered frame is observable in headless or nested validation *(host: headless test passes, nested test builds)*
 - [x] the compositor can run in nested Wayland mode for developer iteration *(nested test implemented; requires running Wayland session)*
 - [x] the private `playos-v1.xml` skeleton is generated with `wayland-scanner` *(generated in build)*
-- [ ] Buildroot packages and image integration work end-to-end *(QEMU build in progress — awaiting wlroots 0.20 compat)*
+- [x] Buildroot packages and image integration work end-to-end *(QEMU build verified — Spr 2.5)*
 - [ ] QEMU headless validation remains automated *(awaiting successful QEMU build+boot)*
 
 ---

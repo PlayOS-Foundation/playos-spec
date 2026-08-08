@@ -4,7 +4,7 @@
 
 **Primary Outcome:** All 7 audit findings resolved. `make setup` produces a bit-identical source tree from `versions.lock`. IPC code lives in one canonical location. Board files match spec layout. Deprecated files removed. The foundation is clean before physical hardware work starts.
 
-**Status:** 🟡 In progress — 7/8 tasks complete, T8 (QEMU build verification) pending
+**Status:** 🟢 Complete — 8/8 tasks done, QEMU build verified
 
 **Prerequisites:** Sprint 2 implementation complete. Audit report produced (session checkpoint `004-sprint-1-2-implementation-audi.md`).
 
@@ -26,9 +26,9 @@ Sprint 3 touches physical hardware, kernel configs, firmware, and a new public A
 
 ## Start Condition Checklist
 
-- [ ] Sprint 2 QEMU build still works (or at minimum the code compiles).
-- [ ] Audit report has been reviewed and the 7 findings are understood.
-- [ ] All 6 repos are accessible and writable.
+- [x] Sprint 2 QEMU build still works (or at minimum the code compiles). *(Verified: bzImage + rootfs.tar built successfully)*
+- [x] Audit report has been reviewed and the 7 findings are understood.
+- [x] All 6 repos are accessible and writable.
 
 ---
 
@@ -90,7 +90,7 @@ Every task below is independently checkable.
 | S2.5-T5 | Remove deprecated `linux.fragment` | `playos-refdistro` | done | Already deleted; not referenced in defconfig |
 | S2.5-T6 | Implement GPT partition GUID search in mount.c | `playos-refdistro` | done | Strategy 4: scans GPT headers on block devices for PlayOS data partition type GUID |
 | S2.5-T7 | Wire playos-runtime Buildroot package to install protocol XML | `playos-refdistro` | done | cmake-package pointing to ../src/playos-runtime; installs playos-v1.xml |
-| S2.5-T8 | Update Sprint-2.md acceptance criteria after QEMU verification | `playos-spec` | not started | QEMU build pending |
+| S2.5-T8 | Update Sprint-2.md acceptance criteria after QEMU verification | `playos-spec` | done | QEMU build passes; bzImage (17.7MB), rootfs.tar (46MB), playos-v1.xml in staging+target |
 
 ---
 
