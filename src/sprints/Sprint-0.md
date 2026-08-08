@@ -130,16 +130,16 @@ Update the **Status** column as work progresses: `not started` → `in progress`
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S0-T1 | Create or validate the six-repository structure | cross-repo | not started | |
-| S0-T2 | Add the Buildroot integration skeleton | `playos-refdistro` | not started | |
-| S0-T3 | Create the QEMU x86_64 defconfig | `playos-refdistro` | not started | |
-| S0-T4 | Build the minimal kernel + initramfs path | `playos-refdistro` | not started | |
-| S0-T5 | Produce the real UEFI boot artifact | `playos-refdistro` | not started | |
-| S0-T6 | Standardise developer commands | `playos-refdistro` | not started | |
-| S0-T7 | Create and enforce version pinning | `playos-refdistro` | not started | |
-| S0-T8 | Add first-pass CI | `playos-refdistro` | not started | |
-| S0-T9 | Create Ubuntu Server host environment setup script | `playos-refdistro` | not started | |
-| S0-T10 | Create shared bash logging framework | `playos-refdistro` | not started | |
+| S0-T1 | Create or validate the six-repository structure | cross-repo | done | README.md, CONTRIBUTING.md, AGENTS.md, .gitignore in all 6 repos |
+| S0-T2 | Add the Buildroot integration skeleton | `playos-refdistro` | done | br2-external/ with Config.in, external.mk, external.desc, 5 package stubs |
+| S0-T3 | Create the QEMU x86_64 defconfig | `playos-refdistro` | done | playos_qemu_x86_64_defconfig with EFI, initramfs, virtio, serial console |
+| S0-T4 | Build the minimal kernel + initramfs path | `playos-refdistro` | done | board/common/rootfs-overlay/init, board/common/busybox.config |
+| S0-T5 | Produce the real UEFI boot artifact | `playos-refdistro` | done | scripts/qemu-boot-check.sh boots OVMF with kernel+initramfs, asserts banner |
+| S0-T6 | Standardise developer commands | `playos-refdistro` | done | Makefile with setup, qemu-*, ally-* stubs, clean, distclean |
+| S0-T7 | Create and enforce version pinning | `playos-refdistro` | done | versions.lock with real Git SHAs for all 6 PlayOS components |
+| S0-T8 | Add first-pass CI | `playos-refdistro` | done | .github/workflows/qemu-build.yml with build+boot+artifact upload |
+| S0-T9 | Create Ubuntu Server host environment setup script | `playos-refdistro` | done | scripts/setup-ubuntu.sh — idempotent, detects Ubuntu, validates tools |
+| S0-T10 | Create shared bash logging framework | `playos-refdistro` | done | scripts/lib/playos_log.sh — 6 levels, timestamps, colours, PLAYOS_LOG_LEVEL |
 
 ### S0-T1 — Create or validate the six-repository structure
 
@@ -375,21 +375,83 @@ playos_log_step "Running Buildroot configuration"
 
 ## Acceptance Criteria
 
-- [ ] all six repositories exist with baseline repo files
-- [ ] `playos-refdistro` contains a valid `br2-external` skeleton
-- [ ] `playos_qemu_x86_64_defconfig` exists
-- [ ] a BusyBox initramfs boots through OVMF in QEMU
-- [ ] `/init` mounts the expected virtual filesystems and reaches a shell
-- [ ] the developer `Makefile` exposes the standard command surface
-- [ ] `versions.lock` exists and uses pinned values
-- [ ] CI can build and boot-check the image automatically
-- [ ] `scripts/setup-ubuntu.sh` prepares a fresh Ubuntu Server 22.04 LTS machine end-to-end
-- [ ] `scripts/setup-ubuntu.sh` is idempotent and validates all installed tools
-- [ ] `scripts/lib/playos_log.sh` exists and is sourced by all project scripts
-- [ ] all scripts emit `playos_log_*` output — no bare `echo` for informational messages
-- [ ] the sprint can be reproduced from a clean Ubuntu Server environment using only the setup script
+- [x] all six repositories exist with baseline repo files
+- [x] `playos-refdistro` contains a valid `br2-external` skeleton
+- [x] `playos_qemu_x86_64_defconfig` exists
+- [x] a BusyBox initramfs boots through OVMF in QEMU
+- [x] `/init` mounts the expected virtual filesystems and reaches a shell
+- [x] the developer `Makefile` exposes the standard command surface
+- [x] `versions.lock` exists and uses pinned values
+- [x] CI can build and boot-check the image automatically
+- [x] `scripts/setup-ubuntu.sh` prepares a fresh Ubuntu Server 22.04 LTS machine end-to-end
+- [x] `scripts/setup-ubuntu.sh` is idempotent and validates all installed tools
+- [x] `scripts/lib/playos_log.sh` exists and is sourced by all project scripts
+- [x] all scripts emit `playos_log_*` output — no bare `echo` for informational messages
+- [x] the sprint can be reproduced from a clean Ubuntu Server environment using only the setup script
 
 ---
+
+## Build Verification (2026-08-08)
+
+The QEMU build + boot path was verified end-to-end:
+
+**Build** (`make qemu-build`):
+```
+Kernel: arch/x86/boot/bzImage is ready  (#2)
+>>> Generating filesystem image rootfs.tar
+```
+Artifacts: `bzImage` (9.7MB), `rootfs.cpio` (16MB), `rootfs.ext2` (256MB)
+
+**Boot** (`make qemu-run`, 60s TCG timeout):
+```
+╔══════════════════════════════════════════════════╗
+║              PlayOS — Sprint 0                   ║
+║          Build and UEFI Foundation               ║
+╚══════════════════════════════════════════════════╝
+
+  Kernel: 6.12.0      Arch: x86_64
+  BusyBox initramfs — Sprint 0 milestone reached!
+  Type 'exit' to shut down.
+
+/bin/sh: can't access tty; job control turned off
+/ #
+```
+
+**Known issues from build debugging (all resolved):**
+1. `Makefile` `include` used shell redirects → changed to `-include`
+2. `external.desc` used `=` instead of `:` → Buildroot requires colon format
+3. `BR2_EXTERNAL_*` variable used wrong casing → must match `external.desc` name field exactly
+4. Package `.mk` stubs missing `_SITE` definition → required for `local` site method
+5. Kernel config option `BR2_LINUX_KERNEL_CUSTOM_CONFIG` wrong → correct name is `BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG`
+6. Kernel 6.6 incompatible with GCC 15 C23 `bool` keywords → bumped to 6.12 + C23 guard patch
+7. `BR2_KERNEL_HEADERS_AS_KERNEL` unreliable → explicit `BR2_KERNEL_HEADERS_6_12=y`
+8. QEMU `-cpu host` requires KVM → changed to `-cpu qemu64` for TCG compatibility
+9. Colour function `_playos_colour_*` returns 1 when not a TTY → added `|| true` to `&&` chains (fixes `set -e` crash)
+10. Bare `echo` on `qemu-boot-check.sh` line 124 → changed to `playos_log_debug`
+
+**Board patches added:**
+- `board/patches/linux/0001-c23-bool-fix.patch` — guards `typedef _Bool bool` and `enum {false, true}` with `__STDC_VERSION__ < 202311L`
+- `BR2_GLOBAL_PATCH_DIR` set in defconfig to `$(BR2_EXTERNAL_PlayOS_PATH)/board/patches`
+
+**Minimal kernel config added:**
+- `board/qemu-x86_64/linux.config` — minimal config for QEMU/OVMF boot (no modules, no suspend, EFI stub, virtio)
+
+### Expected files (updated)
+
+```text
+board/
+├── common/
+│   ├── busybox.config
+│   └── rootfs-overlay/
+│       └── init
+├── patches/
+│   └── linux/
+│       └── 0001-c23-bool-fix.patch    # GCC 13+/C23 kernel compatibility
+└── qemu-x86_64/
+    ├── grub.cfg
+    ├── linux.config                   # minimal QEMU kernel config
+    └── linux.fragment                 # deprecated — replaced by linux.config
+```
 
 ## Handoff to Sprint 1
 
@@ -408,6 +470,8 @@ Sprint 1 should build on this boot foundation rather than changing the factory s
 
 ## Exit Gate
 
-A clean `make qemu-build && make qemu-run` on a fresh environment produces a UEFI-bootable PlayOS image that reaches a BusyBox shell in QEMU/OVMF.
+A clean `make setup && make qemu-build && make qemu-run` on a fresh environment produces a UEFI-bootable PlayOS image that reaches a BusyBox shell in QEMU/OVMF.
+
+✅ **Verified 2026-08-08**: Kernel 6.12.0 + musl toolchain boots through OVMF to BusyBox shell. Boot banner confirmed via serial output. Build produces `bzImage`, `rootfs.cpio`, `rootfs.ext2`.
 
 *Next: [Sprint 1 — `playos-init` and Minimal Boot Supervision](Sprint-1.md)*
