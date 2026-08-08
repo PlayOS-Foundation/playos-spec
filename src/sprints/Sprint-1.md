@@ -136,7 +136,7 @@ Update the **Status** column as work progresses: `not started` → `in progress`
 | S1-T1 | Bootstrap the `playos-init` source tree | `playos-refdistro` | done | CMakeLists.txt, init.h, init.c, test_init_state.c |
 | S1-T2 | Implement mandatory PID 1 boot responsibilities | `playos-refdistro` | done | mount.c, logging.c, shutdown.c, child_process.c |
 | S1-T3 | Discover and mount the data partition | `playos-refdistro` | done | mount.c scans PARTLABEL=playos-data, creates dirs |
-| S1-T4 | Add minimal compositor supervision | `playos-refdistro` | done | supervisor.c with restart policy (5/10s limit) |
+| S1-T4 | Add minimal compositor supervision | `playos-refdistro` | done | supervisor.c with restart policy (3 restarts per 60-second window, 500ms delay) |
 | S1-T5 | Implement the trusted control IPC server | `playos-refdistro`, `playos-runtime` | done | ipc_framing.c, ipc_server.c, ipc_client.c at /run/playos/control.sock |
 | S1-T6 | Implement stub game lifecycle handling | `playos-refdistro`, `playos-runtime` | done | LaunchGame/TerminateGame via IPC, SIGCHLD reaper |
 | S1-T7 | Integrate with Buildroot | `playos-refdistro` | done | cmake-package, installs as /init |

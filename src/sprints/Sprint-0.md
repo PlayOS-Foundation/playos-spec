@@ -430,16 +430,16 @@ Artifacts: `bzImage` (9.7MB), `rootfs.cpio` (16MB), `rootfs.ext2` (256MB)
 10. Bare `echo` on `qemu-boot-check.sh` line 124 → changed to `playos_log_debug`
 
 **Board patches added:**
-- `board/patches/linux/0001-c23-bool-fix.patch` — guards `typedef _Bool bool` and `enum {false, true}` with `__STDC_VERSION__ < 202311L`
+- `br2-external/board/patches/linux/0001-c23-bool-fix.patch` — guards `typedef _Bool bool` and `enum {false, true}` with `__STDC_VERSION__ < 202311L`
 - `BR2_GLOBAL_PATCH_DIR` set in defconfig to `$(BR2_EXTERNAL_PlayOS_PATH)/board/patches`
 
 **Minimal kernel config added:**
-- `board/qemu-x86_64/linux.config` — minimal config for QEMU/OVMF boot (no modules, no suspend, EFI stub, virtio)
+- `br2-external/board/qemu-x86_64/linux.config` — minimal config for QEMU/OVMF boot (no modules, no suspend, EFI stub, virtio)
 
 ### Expected files (updated)
 
 ```text
-board/
+br2-external/board/
 ├── common/
 │   ├── busybox.config
 │   └── rootfs-overlay/
@@ -449,8 +449,7 @@ board/
 │       └── 0001-c23-bool-fix.patch    # GCC 13+/C23 kernel compatibility
 └── qemu-x86_64/
     ├── grub.cfg
-    ├── linux.config                   # minimal QEMU kernel config
-    └── linux.fragment                 # deprecated — replaced by linux.config
+    └── linux.config                   # minimal QEMU kernel config
 ```
 
 ## Handoff to Sprint 1
