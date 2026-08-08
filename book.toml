@@ -10,7 +10,7 @@ default-theme = "coal"
 preferred-dark-theme = "coal"
 git-repository-url = "https://github.com/PlayOS-Foundation/playos-spec"
 edit-url-template = "https://github.com/PlayOS-Foundation/playos-spec/edit/main/src/{path}"
-additional-css = ["theme/playos.css"]
+additional-css = []
 no-section-label = false
 
 [output.html.search]
