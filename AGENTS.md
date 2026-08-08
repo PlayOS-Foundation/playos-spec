@@ -71,4 +71,4 @@ mdbook serve      # live-reload preview at http://localhost:3000
 - Do not delete or rewrite ADRs — supersede them.
 - Do not commit `book/` — it is in `.gitignore` and built by CI.
 - Do not change `src/ideas.md` — it is the original source document, kept for historical reference only.
-- Do not add implementation code here — code lives in the other five repositories.
+- Do not add implementation code here — code lives in the other PlayOS repositories.
