@@ -4,7 +4,7 @@
 
 **Primary Outcome:** All 7 audit findings resolved. `make setup` produces a bit-identical source tree from `versions.lock`. IPC code lives in one canonical location. Board files match spec layout. Deprecated files removed. The foundation is clean before physical hardware work starts.
 
-**Status:** 🔴 Not started
+**Status:** 🟡 In progress — 7/8 tasks complete, T8 (QEMU build verification) pending
 
 **Prerequisites:** Sprint 2 implementation complete. Audit report produced (session checkpoint `004-sprint-1-2-implementation-audi.md`).
 
@@ -83,14 +83,14 @@ Every task below is independently checkable.
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S2.5-T1 | Unify IPC code — make playos-init/ipc/ canonical, remove playos-runtime duplicate | `playos-refdistro`, `playos-runtime` | not started | |
-| S2.5-T2 | Enforce version pinning in `make setup` | `playos-refdistro` | not started | |
-| S2.5-T3 | Update Sprint-0.md: board directory location | `playos-spec` | not started | |
-| S2.5-T4 | Update Sprint-1.md: restart policy (3/60s) | `playos-spec` | not started | |
-| S2.5-T5 | Remove deprecated `linux.fragment` | `playos-refdistro` | not started | |
-| S2.5-T6 | Implement GPT partition GUID search in mount.c | `playos-refdistro` | not started | |
-| S2.5-T7 | Wire playos-runtime Buildroot package to install protocol XML | `playos-refdistro` | not started | |
-| S2.5-T8 | Update Sprint-2.md acceptance criteria after QEMU verification | `playos-spec` | not started | |
+| S2.5-T1 | Unify IPC code — make playos-init/ipc/ canonical, remove playos-runtime duplicate | `playos-refdistro`, `playos-runtime` | done | frame_validate added to ipc_client.c; playos-runtime IPC C sources removed; CMakeLists.txt → protocol-only |
+| S2.5-T2 | Enforce version pinning in `make setup` | `playos-refdistro` | done | Already implemented in Makefile (clones + checkout pinned SHAs from versions.lock) |
+| S2.5-T3 | Update Sprint-0.md: board directory location | `playos-spec` | done | board/ → br2-external/board/ in paths and expected tree; linux.fragment removed |
+| S2.5-T4 | Update Sprint-1.md: restart policy (3/60s) | `playos-spec` | done | (5/10s limit) → (3 restarts per 60-second window, 500ms delay) |
+| S2.5-T5 | Remove deprecated `linux.fragment` | `playos-refdistro` | done | Already deleted; not referenced in defconfig |
+| S2.5-T6 | Implement GPT partition GUID search in mount.c | `playos-refdistro` | done | Strategy 4: scans GPT headers on block devices for PlayOS data partition type GUID |
+| S2.5-T7 | Wire playos-runtime Buildroot package to install protocol XML | `playos-refdistro` | done | cmake-package pointing to ../src/playos-runtime; installs playos-v1.xml |
+| S2.5-T8 | Update Sprint-2.md acceptance criteria after QEMU verification | `playos-spec` | not started | QEMU build pending |
 
 ---
 
