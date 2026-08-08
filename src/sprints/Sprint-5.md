@@ -4,7 +4,7 @@
 
 **Primary Outcome:** The ROG Ally boots into a visible shell UI that shows a stub game library, responds to controller navigation, and remains alive as the persistent PlayOS foreground experience.
 
-**Prerequisites:** Sprint 4 complete — the compositor owns the real display on the Ally. Sprint 3 complete — the public input ABI exists and a hardware-backed input path is available.
+**Prerequisites:** Sprint 4 complete — the compositor owns the real display on the Ally. Sprint 3 complete — the public input ABI is finalized (bit positions resolved), evdev backend is implemented, and the `playos-platform-api` headers are in place with stub implementations.
 
 ---
 
@@ -18,7 +18,8 @@ Sprint 5 is the first real user-facing PlayOS sprint. Everything before it prove
 
 - Sprint 4 native DRM/KMS path works on the Ally.
 - `playos-compositor` can present a diagnostic client on real hardware.
-- `playos-platform-api` already exposes the Sprint 3 input contract.
+- `playos-platform-api` already has all 8 public headers declared, the Sprint 3 input contract is finalized (bit positions fixed, evdev backend implemented), and stubs exist for system/storage/lifecycle/logging.
+- The Sprint 3 critical review finding (input header bit position mismatch) has been resolved — current `playos_input.h` matches the spec.
 - The shell can rely on a working Wayland session and hardware-accelerated rendering path.
 
 ---
@@ -29,8 +30,8 @@ Sprint 5 is the first real user-facing PlayOS sprint. Everything before it prove
 - **UI framework:** Raylib
 - **Windowing model:** one fullscreen shell surface only
 - **Input model:** controller-first; mouse and keyboard are developer-only aids, not product requirements
-- **Backend ownership:** the custom Raylib PlayOS backend is maintained by `playos-shell`; `playos-platform-api` provides the public API consumed by the shell
-- **Library content source for this sprint:** stub manifests in `/data/games/`
+- **Backend ownership:** the custom Raylib PlayOS backend is maintained by `playos-shell`; `playos-platform-api` provides the public API consumed by the shell. **Exception for input:** the shell needs SYSTEM/QUICK_MENU button access, which `libplayos` input API strips (those buttons are reserved, never delivered to game processes). The shell reads controller input directly through the evdev backend provided by `playos-platform-api` or through a future trusted compositor protocol.
+- **Library content source for this sprint:** stub manifests in `/data/games/` (retrieved via `playos_storage_get_games_path()`) 
 - **Launch behaviour:** the shell may issue a stub launch request or present a placeholder transition, but a full playable game lifecycle is deferred to Sprint 7
 - **Battery UI:** no real power API dependency yet; use placeholder or omit battery if the real power contract is not available
 
@@ -64,7 +65,7 @@ Sprint 5 is the first real user-facing PlayOS sprint. Everything before it prove
 | Repo | Required work |
 |---|---|
 | `playos-shell` | Raylib shell app, custom PlayOS backend integration, screens, controller navigation |
-| `playos-platform-api` | public API groups needed by the shell (`system`, `storage`, `lifecycle`, `logging`) |
+| `playos-platform-api` | Headers already exist. Remaining work: add `playos_storage_get_games_path()`, implement the 4 stubs (system/storage/lifecycle/logging) with real backends, hand off to refdistro for libplayos packaging |
 | `playos-refdistro` | Raylib packaging, `playos-shell` packaging, stub content under `/data/games/` |
 | `playos-spec` | shell UX conventions and any clarified shell/runtime contract notes |
 
@@ -102,18 +103,17 @@ assets/
 
 ### `playos-platform-api`
 
+All headers and source stubs already exist on disk. Sprint 5 adds one new function (`playos_storage_get_games_path`) and implements the stubs:
+
 ```text
 include/playos/
-├── playos_system.h
-├── playos_storage.h
-├── playos_lifecycle.h
-└── playos_logging.h
+├── playos_storage.h         ← EXTEND: add get_games_path() declaration
 
 src/
-├── playos_system.c
-├── playos_storage.c
-├── playos_lifecycle.c
-└── playos_logging.c
+├── playos_system.c          ← IMPLEMENT: real sysinfo from /proc + sysfs
+├── playos_storage.c         ← IMPLEMENT: real paths + get_games_path()
+├── playos_lifecycle.c       ← IMPLEMENT: real event-fd from IPC
+└── playos_logging.c         ← IMPLEMENT: real structured logging to file
 ```
 
 ### `playos-refdistro`
@@ -140,7 +140,7 @@ Update the **Status** column as work progresses: `not started` → `in progress`
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S5-T1 | Finalise the shell-facing public API surface | `playos-platform-api` | not started | |
+| S5-T1 | Finalise the shell-facing public API surface | `playos-platform-api` | in progress | Headers exist. Stubs exist. Needs: `get_games_path()`, real impls. |
 | S5-T2 | Add the custom Raylib PlayOS backend | `playos-shell` | not started | |
 | S5-T3 | Bootstrap the shell application structure | `playos-shell` | not started | |
 | S5-T4 | Implement library data loading from stub manifests | `playos-shell`, `playos-refdistro` | not started | |
@@ -152,33 +152,37 @@ Update the **Status** column as work progresses: `not started` → `in progress`
 
 ### S5-T1 — Finalise the shell-facing public API surface
 
-Add or complete the public API groups needed by the shell in this sprint:
+> **Note:** All 4 header files for this task already exist with full declarations. The evdev input backend is already implemented. Source files exist as stubs (return NULL/0/-1). This task is about **extending with one missing function** and **implementing the stubs** for Sprint 5's minimum needs.
 
-- `playos_system.h`
-- `playos_storage.h`
-- `playos_lifecycle.h`
-- `playos_logging.h`
-
-Minimum expectations:
+**Update `playos_storage.h` — add the one missing function:**
 
 ```c
-uint32_t    playos_system_api_version(void);
-const char *playos_system_os_version(void);
-const char *playos_system_device_model(void);
-
-int         playos_lifecycle_poll(playos_lifecycle_event_t *event);
-
+/**
+ * Read-only path to the game library directory.
+ * e.g. /data/games/
+ *
+ * @return  Null-terminated path string.
+ */
 const char *playos_storage_get_games_path(void);
-const char *playos_storage_get_saves_path(const char *game_id);
-const char *playos_storage_get_cache_path(const char *game_id);
-int64_t     playos_storage_free_bytes(void);
-
-void        playos_log(playos_log_level_t level, const char *tag, const char *fmt, ...);
 ```
 
-**Rule:** only expose what the shell actually needs in Sprint 5. Do not drag in the full future API surface just because it will exist later.
+This function is needed because the shell is NOT a game — it doesn't have `PLAYOS_GAME_ID` set. The existing storage API assumes the caller is a game process. The shell needs `get_games_path()` to discover installed game manifests.
 
-**Done when:** the shell can compile and link only against documented public headers for its system, storage, lifecycle, and logging needs.
+**Implement the 4 stubs for Sprint 5:**
+
+| Function | Implementation target |
+|---|---|
+| `playos_system_*()` | Read from `/proc/cpuinfo`, `/proc/meminfo`, `/sys/class/drm/`; hardcode device model |
+| `playos_storage_*()` | Base paths from `/data/games/`, `/data/saves/`, `/data/cache/`; `free_bytes` via `statvfs` |
+| `playos_lifecycle_*()` | Create private `eventfd`; wire to IPC from playos-init when available, poll-only stub for now |
+| `playos_log_*()` | Write to file under `/run/playos/log/` with timestamp; `crash_marker` via `sync()` + `write()` |
+
+The type names used in the actual headers differ from the draft in this spec — use the actual types already declared:
+- `PlayOSLifecycleEvent` (not `playos_lifecycle_event_t`)
+- `PlayOSLogLevel` (not `playos_log_level_t`)
+- `playos_storage_get_saves_path(void)` and `playos_storage_get_cache_path(void)` — no `game_id` parameter (game isolation is via `PLAYOS_GAME_ID` env var)
+
+**Done when:** the shell can compile and link against `libplayos.so` for system, storage, lifecycle (poll-only), and logging needs.
 
 ### S5-T2 — Add the custom Raylib PlayOS backend
 
@@ -237,6 +241,12 @@ Desktop-only features must be disabled or become no-ops:
 - focus must always remain visible and unambiguous
 - no mouse is required for normal operation
 
+> **⚠️ Trusted vs untrusted input:** The shell is a **trusted** system component — it needs the SYSTEM (Xbox Guide) and QUICK_MENU (Ally Armoury Crate) buttons. The public `playos_input_get_controller_state()` function strips these reserved buttons before returning (since games must never see them). The shell must either:
+>   1. Link the evdev backend directly (bypassing `libplayos` for input), **or**
+>   2. Consume input through a compositor protocol (e.g., the future `session_manager` protocol in `playos-v1.xml`)
+>
+> For Sprint 5, option 1 (direct evdev) is the pragmatic path — the shell already runs on the same system as the evdev input backend and can access `/dev/input/` directly. Long term, a privileged input protocol in the compositor is preferred.
+
 Recommended first screen flow:
 
 ```text
@@ -285,7 +295,7 @@ Required UI surfaces for this sprint:
 ### S5-T8 — Integrate Raylib and shell packaging into Buildroot
 
 - Add `playos-shell` package metadata.
-- Add Raylib packaging or patch integration for the custom backend.
+- Add Raylib with the custom PlayOS backend. **Strategy:** Create a vendored Raylib source in `playos-shell` rather than patching upstream — the `rcore_playos.c` backend replaces core platform code (`rcore_desktop.c` / `rcore_desktop_glfw.c`) and is tightly coupled to the PlayOS compositor. A Buildroot package references this vendored source.
 - Ensure the shell depends on `libplayos`.
 - Make the image start the real shell after compositor readiness.
 
@@ -322,6 +332,8 @@ For Sprint 5, keep the manifest intentionally small. A minimal JSON shape is eno
   "description": "Stub entry used for shell bring-up."
 }
 ```
+
+**Note:** The shell discovers manifests from `/data/games/` using `playos_storage_get_games_path()`. This function is added to `playos-platform-api` in S5-T1. The shell is not a game process, so it does not have `PLAYOS_GAME_ID` set and must use this shell-specific discovery API rather than the per-game path functions.
 
 ### Lifecycle scope
 
