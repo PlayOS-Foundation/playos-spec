@@ -133,14 +133,14 @@ Update the **Status** column as work progresses: `not started` → `in progress`
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S1-T1 | Bootstrap the `playos-init` source tree | `playos-refdistro` | not started | |
-| S1-T2 | Implement mandatory PID 1 boot responsibilities | `playos-refdistro` | not started | |
-| S1-T3 | Discover and mount the data partition | `playos-refdistro` | not started | |
-| S1-T4 | Add minimal compositor supervision | `playos-refdistro` | not started | |
-| S1-T5 | Implement the trusted control IPC server | `playos-refdistro`, `playos-runtime` | not started | |
-| S1-T6 | Implement stub game lifecycle handling | `playos-refdistro`, `playos-runtime` | not started | |
-| S1-T7 | Integrate with Buildroot | `playos-refdistro` | not started | |
-| S1-T8 | Add test coverage and evidence capture | `playos-refdistro`, `playos-runtime` | not started | |
+| S1-T1 | Bootstrap the `playos-init` source tree | `playos-refdistro` | done | CMakeLists.txt, init.h, init.c, test_init_state.c |
+| S1-T2 | Implement mandatory PID 1 boot responsibilities | `playos-refdistro` | done | mount.c, logging.c, shutdown.c, child_process.c |
+| S1-T3 | Discover and mount the data partition | `playos-refdistro` | done | mount.c scans PARTLABEL=playos-data, creates dirs |
+| S1-T4 | Add minimal compositor supervision | `playos-refdistro` | done | supervisor.c with restart policy (5/10s limit) |
+| S1-T5 | Implement the trusted control IPC server | `playos-refdistro`, `playos-runtime` | done | ipc_framing.c, ipc_server.c, ipc_client.c at /run/playos/control.sock |
+| S1-T6 | Implement stub game lifecycle handling | `playos-refdistro`, `playos-runtime` | done | LaunchGame/TerminateGame via IPC, SIGCHLD reaper |
+| S1-T7 | Integrate with Buildroot | `playos-refdistro` | done | cmake-package, installs as /init |
+| S1-T8 | Add test coverage and evidence capture | `playos-refdistro`, `playos-runtime` | done | 4 QEMU integration tests all PASS, host tests PASS |
 
 ### S1-T1 — Bootstrap the `playos-init` source tree
 
@@ -313,20 +313,20 @@ The implementation agent must leave the sprint with concrete evidence:
 
 ## Acceptance Criteria
 
-- [ ] `playos-init` is PID 1 as verified by `/proc/1/comm` or `ps`
-- [ ] `/dev`, `/proc`, `/sys`, and `/run` are mounted by `playos-init`
-- [ ] the data partition is discovered, mounted at `/data`, and first-boot directories are created
-- [ ] `playos-init` supervises a compositor placeholder process and restarts it on exit
-- [ ] repeated compositor failure enters the documented recovery halt path
-- [ ] `/run/playos/control.sock` exists with mode `0660`
-- [ ] an authorized client can connect and receive `StatusReport`
-- [ ] an unauthorized client is rejected clearly
-- [ ] `LaunchGame` spawns a stub process and emits `GameStarted`
-- [ ] `TerminateGame` stops the stub process and emits `GameExited`
-- [ ] `Shutdown` performs an orderly halt path
-- [ ] zombie processes are reaped correctly
-- [ ] the Buildroot image boots through the real `/init` binary
-- [ ] host and QEMU tests cover framing, supervision, and lifecycle behaviour
+- [x] `playos-init` is PID 1 as verified by `/proc/1/comm` or `ps`
+- [x] `/dev`, `/proc`, `/sys`, and `/run` are mounted by `playos-init`
+- [x] the data partition is discovered, mounted at `/data`, and first-boot directories are created
+- [x] `playos-init` supervises a compositor placeholder process and restarts it on exit
+- [x] repeated compositor failure enters the documented recovery halt path
+- [x] `/run/playos/control.sock` exists with mode `0660`
+- [x] an authorized client can connect and receive `StatusReport`
+- [x] an unauthorized client is rejected clearly
+- [x] `LaunchGame` spawns a stub process and emits `GameStarted`
+- [x] `TerminateGame` stops the stub process and emits `GameExited`
+- [x] `Shutdown` performs an orderly halt path
+- [x] zombie processes are reaped correctly
+- [x] the Buildroot image boots through the real `/init` binary
+- [x] host and QEMU tests cover framing, supervision, and lifecycle behaviour
 
 ---
 
