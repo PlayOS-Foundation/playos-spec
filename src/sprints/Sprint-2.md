@@ -4,7 +4,7 @@
 
 **Primary Outcome:** `playos-compositor` starts under `playos-init`, creates a Wayland socket, signals readiness, accepts one fullscreen client, and presents a visible frame through the wlroots scene/output pipeline.
 
-**Status:** 🟢 Implementation Complete — host build verified; QEMU Buildroot build in progress
+**Status:** 🟢 Complete — QEMU Buildroot build passed, compositor boots, signals readiness, renders in headless mode, all acceptance criteria verified
 
 **Prerequisites:** Sprint 1 complete — `playos-init` runs as PID 1, supervision works, and the trusted control IPC is available.
 
