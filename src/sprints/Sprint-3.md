@@ -109,14 +109,14 @@ Update the **Status** column as work progresses: `not started` → `in progress`
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S3-T1 | Create the Ally defconfig and boot image path | `playos-refdistro` | not started | |
-| S3-T2 | Enable the required kernel subsystems | `playos-refdistro` | not started | |
-| S3-T3 | Package required firmware | `playos-refdistro` | not started | |
-| S3-T4 | Add device verification tooling | `playos-refdistro` | not started | |
-| S3-T5 | Finalise the public input contract | `playos-platform-api` | not started | |
-| S3-T6 | Implement the evdev prototype backend | `playos-platform-api` | not started | |
-| S3-T7 | Document the hardware mapping | `playos-platform-api`, `playos-spec` | not started | |
-| S3-T8 | Capture physical hardware evidence | `playos-refdistro` | not started | |
+| S3-T1 | Create the Ally defconfig and boot image path | `playos-refdistro` | done | `playos_ally_defconfig`, Makefile targets |
+| S3-T2 | Enable the required kernel subsystems | `playos-refdistro` | done | `board/ally/linux.config`, EFI stub, AMDGPU, all subsystems |
+| S3-T3 | Package required firmware | `playos-refdistro` | done | AMDGPU blobs + AMD ucode via linux-firmware |
+| S3-T4 | Add device verification tooling | `playos-refdistro` | done | `tools/hw-check/` (6 scripts), all PASSED on Ally |
+| S3-T5 | Finalise the public input contract | `playos-platform-api` | done | `playos_input.h` with bitmask buttons |
+| S3-T6 | Implement the evdev prototype backend | `playos-platform-api` | done | `src/backends/backend_evdev.c`, auto-discovery |
+| S3-T7 | Document the hardware mapping | `playos-platform-api`, `playos-spec` | done | `docs/rog-ally-input-mapping.md` |
+| S3-T8 | Capture physical hardware evidence | `playos-refdistro` | done | Ally booted from USB, all hw-check tests PASSED |
 
 ### S3-T1 — Create the Ally defconfig and boot image path
 
@@ -278,18 +278,18 @@ This sprint is complete only when device presence is tied to a concrete script o
 
 ## Acceptance Criteria
 
-- [ ] `playos_ally_defconfig` exists and is used by the Ally build path
-- [ ] a USB image can be produced for the Ally
-- [ ] the Ally boots PlayOS from removable media
-- [ ] AMDGPU and DRM device nodes appear
-- [ ] the controller appears through evdev and emits expected events
-- [ ] audio hardware is visible and can play a short test sample
-- [ ] NVMe, battery, and thermal information are visible
-- [ ] `/run/playos/hw-check.log` is produced by the verification tooling
-- [ ] `playos_input.h` defines a stable public input contract
-- [ ] button values are represented as bitmask flags
-- [ ] the evdev backend prototype reads controller state on the Ally
-- [ ] the hardware input mapping document is committed
+- [x] `playos_ally_defconfig` exists and is used by the Ally build path
+- [x] a USB image can be produced for the Ally
+- [x] the Ally boots PlayOS from removable media
+- [x] AMDGPU and DRM device nodes appear
+- [x] the controller appears through evdev and emits expected events
+- [x] audio hardware is visible and can play a short test sample
+- [x] NVMe, battery, and thermal information are visible
+- [x] `/run/playos/hw-check.log` is produced by the verification tooling
+- [x] `playos_input.h` defines a stable public input contract
+- [x] button values are represented as bitmask flags
+- [x] the evdev backend prototype reads controller state on the Ally
+- [x] the hardware input mapping document is committed
 
 ---
 
@@ -311,3 +311,40 @@ Sprint 4 should consume this hardware baseline and focus on native compositor ow
 A PlayOS USB image boots on physical ROG Ally hardware, essential devices enumerate correctly, and the first hardware-backed `libplayos` input API contract and evdev prototype are in place.
 
 *Previous: [Sprint 2](Sprint-2.md) | Next: [Sprint 4](Sprint-4.md)*
+
+---
+
+## Sprint 3 Outcomes
+
+**Status: COMPLETE** — all 8 tasks done, committed, and verified on physical ROG Ally hardware.
+
+### Deliverables
+
+| Repo | Commits | Key Artifacts |
+|---|---|---|
+| `playos-refdistro` | `9305481`, `d31ec48`, `561b701`, `b6fbb69`, `e9b0c44`, `65117f2` | Ally defconfig, kernel config, USB image script, flash script, hw-check tools |
+| `playos-platform-api` | `d7a0050`, `580026c` | Input header, evdev backend, input mapping docs, API stubs |
+
+### Key Technical Decisions
+
+1. **EFI stub boot, not GRUB** — kernel bzImage with embedded initramfs placed directly as `EFI/BOOT/BOOTX64.EFI`. UEFI firmware boots the kernel without an intermediate bootloader. Simpler, faster, fewer dependencies.
+
+2. **Embedded initramfs** — `BR2_LINUX_KERNEL_INITRAMFS_SOURCE` is critical. Without it the kernel panics because it has no rootfs. The 178MB cpio gzips to ~59MB inside the bzImage.
+
+3. **No modules** — all kernel drivers built-in (`# CONFIG_MODULES is not set`). Simplifies the boot path — no module loading, no initramfs module discovery.
+
+4. **BusyBox retained for debugging** — production should strip it, but kept for Sprint 3 hardware verification (need a shell to run hw-check).
+
+### Lessons Learned
+
+1. **`lsblk` columns break on model names with spaces** — "SanDisk 3.2Gen1" gets split into two columns. Use `lsblk -P` (key=value pairs) for reliable parsing.
+
+2. **GPT backup header consumes disk space** — partition sizes must account for ~34 sectors at end. Use `sgdisk -n N:0:0` (fill remaining) for the last partition instead of fixed size.
+
+3. **Buildroot `BR2_LINUX_KERNEL_INITRAMFS_SOURCE` is easy to miss** — the kernel compiles fine without it but panics at boot. Consider adding a post-build check that verifies initramfs is embedded.
+
+4. **Ally boots reliably from USB via Volume Down + Power** — no Secure Boot key enrollment needed (the Ally's UEFI has Secure Boot disabled by default).
+
+5. **SP5100 is the watchdog chip on ROG Ally** — needs `CONFIG_SP5100_TCO`, not generic iTCO.
+
+6. **Kernel cmdline fallback matters** — `CONFIG_CMDLINE="console=tty1 quiet loglevel=3"` ensures boot works even when UEFI doesn't supply cmdline.
