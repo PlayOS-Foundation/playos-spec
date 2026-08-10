@@ -4,7 +4,7 @@
 
 **Primary Outcome:** The ROG Ally boots into a visible shell UI that shows a stub game library, responds to controller navigation, and remains alive as the persistent PlayOS foreground experience.
 
-**Prerequisites:** Sprint 4 complete — the compositor owns the real display on the Ally. Sprint 3 complete — the public input ABI is finalized (bit positions resolved), evdev backend is implemented, and the `playos-platform-api` headers are in place with stub implementations.
+**Prerequisites:** Sprint 4 complete and **verified on-device** — the compositor owns the real display on the Ally at 1920×1080@120Hz, the EGL/GLES2 test client renders at 119.8 fps with visible animated bars. Sprint 3 complete — the public input ABI is finalized (bit positions resolved), evdev backend is implemented, and the `playos-platform-api` headers are in place with stub implementations.
 
 ---
 
@@ -16,11 +16,12 @@ Sprint 5 is the first real user-facing PlayOS sprint. Everything before it prove
 
 ## Start Condition Checklist
 
-- Sprint 4 native DRM/KMS path works on the Ally.
-- `playos-compositor` can present a diagnostic client on real hardware.
-- `playos-platform-api` already has all 8 public headers declared, the Sprint 3 input contract is finalized (bit positions fixed, evdev backend implemented), and stubs exist for system/storage/lifecycle/logging.
+- Sprint 4 native DRM/KMS path works on the Ally — **verified**: eDP-1 @ 1920×1080@120Hz, amdgpu, GLES 3.2 on Ryzen Z1 Extreme.
+- `playos-compositor` can present a diagnostic client on real hardware — **verified**: test client rendered animated orange bars at 119.8 fps.
+- `playos-platform-api` already has all 8 public headers declared, the Sprint 3 input contract is finalized (bit positions fixed, evdev backend implemented — `src/backends/backend_evdev.c` at 12KB), and stubs exist for system/storage/lifecycle/logging.
 - The Sprint 3 critical review finding (input header bit position mismatch) has been resolved — current `playos_input.h` matches the spec.
-- The shell can rely on a working Wayland session and hardware-accelerated rendering path.
+- The shell can rely on a working Wayland session (`wayland-0` at `/run/playos`) and hardware-accelerated rendering path.
+- The compositor scene is pre-configured: dark blue `#0a1628` background rect at layer bottom, xdg surfaces placed at (0,0) at top. The shell is the sole xdg client — no scene changes needed in the compositor for this sprint.
 
 ---
 
@@ -31,9 +32,11 @@ Sprint 5 is the first real user-facing PlayOS sprint. Everything before it prove
 - **Windowing model:** one fullscreen shell surface only
 - **Input model:** controller-first; mouse and keyboard are developer-only aids, not product requirements
 - **Backend ownership:** the custom Raylib PlayOS backend is maintained by `playos-shell`; `playos-platform-api` provides the public API consumed by the shell. **Exception for input:** the shell needs SYSTEM/QUICK_MENU button access, which `libplayos` input API strips (those buttons are reserved, never delivered to game processes). The shell reads controller input directly through the evdev backend provided by `playos-platform-api` or through a future trusted compositor protocol.
-- **Library content source for this sprint:** stub manifests in `/data/games/` (retrieved via `playos_storage_get_games_path()`) 
+- **Library content source for this sprint:** stub manifests in `/data/games/` (retrieved via `playos_storage_get_games_path()`)
 - **Launch behaviour:** the shell may issue a stub launch request or present a placeholder transition, but a full playable game lifecycle is deferred to Sprint 7
 - **Battery UI:** no real power API dependency yet; use placeholder or omit battery if the real power contract is not available
+- **Wayland display:** `wayland-0` at `XDG_RUNTIME_DIR=/run/playos` (matching the current compositor setup from Sprint 4)
+- **Logging:** persistent logs at `/data/log/shell.log` following the Sprint 4 `child_log_redirect()` pattern established in `supervisor.c`
 
 ---
 
@@ -66,7 +69,7 @@ Sprint 5 is the first real user-facing PlayOS sprint. Everything before it prove
 |---|---|
 | `playos-shell` | Raylib shell app, custom PlayOS backend integration, screens, controller navigation |
 | `playos-platform-api` | Headers already exist. Remaining work: add `playos_storage_get_games_path()`, implement the 4 stubs (system/storage/lifecycle/logging) with real backends, hand off to refdistro for libplayos packaging |
-| `playos-refdistro` | Raylib packaging, `playos-shell` packaging, stub content under `/data/games/` |
+| `playos-refdistro` | Raylib packaging, `playos-shell` packaging (replace no-op stub with real cmake-package), stub content under `/data/games/`, update `supervisor.c` to launch `playos-shell` instead of `playos-test-client` |
 | `playos-spec` | shell UX conventions and any clarified shell/runtime contract notes |
 
 ---
@@ -120,14 +123,17 @@ src/
 
 ```text
 br2-external/package/
-├── raylib/
-└── playos-shell/
+├── raylib/                  ← NEW: vendored raylib from playos-shell source
+└── playos-shell/            ← REPLACE: current no-op stub → real cmake-package
 
 br2-external/board/common/rootfs-overlay/
 └── data/games/
     ├── com.playos.demo1/manifest.json
     ├── com.playos.demo2/manifest.json
     └── com.playos.demo3/manifest.json
+
+src/playos-init/src/
+└── supervisor.c             ← UPDATE: launch playos-shell instead of playos-test-client
 ```
 
 ---
@@ -140,19 +146,19 @@ Update the **Status** column as work progresses: `not started` → `in progress`
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S5-T1 | Finalise the shell-facing public API surface | `playos-platform-api` | in progress | Headers exist. Stubs exist. Needs: `get_games_path()`, real impls. |
+| S5-T1 | Finalise the shell-facing public API surface | `playos-platform-api` | ready | Headers exist. Stubs exist. Evdev backend implemented (12KB). Needs: `get_games_path()` declaration + 4 stub impls. |
 | S5-T2 | Add the custom Raylib PlayOS backend | `playos-shell` | not started | |
 | S5-T3 | Bootstrap the shell application structure | `playos-shell` | not started | |
 | S5-T4 | Implement library data loading from stub manifests | `playos-shell`, `playos-refdistro` | not started | |
 | S5-T5 | Implement controller-first navigation and focus rules | `playos-shell` | not started | |
 | S5-T6 | Build the library, detail, and status-bar UI | `playos-shell` | not started | |
 | S5-T7 | Add shell lifecycle handling and persistent process behavior | `playos-shell`, `playos-platform-api` | not started | |
-| S5-T8 | Integrate Raylib and shell packaging into Buildroot | `playos-refdistro` | not started | |
+| S5-T8 | Integrate Raylib and shell packaging into Buildroot | `playos-refdistro` | not started | Stub .mk exists (no-op). Must become real cmake-package. |
 | S5-T9 | Add validation, stub content, and runtime evidence capture | `playos-shell`, `playos-refdistro` | not started | |
 
 ### S5-T1 — Finalise the shell-facing public API surface
 
-> **Note:** All 4 header files for this task already exist with full declarations. The evdev input backend is already implemented. Source files exist as stubs (return NULL/0/-1). This task is about **extending with one missing function** and **implementing the stubs** for Sprint 5's minimum needs.
+> **Note:** All 8 header files already exist with full declarations. The evdev input backend at `src/backends/backend_evdev.c` (12KB) is already implemented. Source files exist as stubs (return NULL/0/-1). This task is about **extending with one missing function** and **implementing the stubs** for Sprint 5's minimum needs.
 
 **Update `playos_storage.h` — add the one missing function:**
 
@@ -160,6 +166,10 @@ Update the **Status** column as work progresses: `not started` → `in progress`
 /**
  * Read-only path to the game library directory.
  * e.g. /data/games/
+ *
+ * Unlike per-game path functions, this does not require
+ * PLAYOS_GAME_ID — it is intended for the shell process
+ * which is not a game and does not carry a game ID.
  *
  * @return  Null-terminated path string.
  */
@@ -294,10 +304,13 @@ Required UI surfaces for this sprint:
 
 ### S5-T8 — Integrate Raylib and shell packaging into Buildroot
 
-- Add `playos-shell` package metadata.
+Current state: `br2-external/package/playos-shell/` exists as a no-op stub (build/install both `@true`).
+
+- Rewrite `playos-shell.mk` as a real `cmake-package` building from `$(BR2_EXTERNAL_PlayOS_PATH)/../src/playos-shell`.
 - Add Raylib with the custom PlayOS backend. **Strategy:** Create a vendored Raylib source in `playos-shell` rather than patching upstream — the `rcore_playos.c` backend replaces core platform code (`rcore_desktop.c` / `rcore_desktop_glfw.c`) and is tightly coupled to the PlayOS compositor. A Buildroot package references this vendored source.
 - Ensure the shell depends on `libplayos`.
-- Make the image start the real shell after compositor readiness.
+- Update `supervisor.c` to launch `/usr/bin/playos-shell` instead of `/usr/bin/playos-test-client` after the compositor is ready.
+- Log shell output to `/data/log/shell.log` using the existing `child_log_redirect()` helper (same pattern as test-client logging from Sprint 4).
 
 **Done when:** the Ally image boots into the shell automatically.
 
@@ -319,6 +332,15 @@ Required UI surfaces for this sprint:
 - Always favour immediate controller clarity over dense visuals.
 - Do not introduce nested menus beyond the single detail screen in this sprint.
 - Keep animation and visual effects light until the shell baseline is stable.
+
+### Compositor integration notes
+
+The compositor scene from Sprint 4 is pre-configured:
+- **Background:** a dark blue (`#0a1628`) `wlr_scene_rect` at the layer bottom of each output's scene tree.
+- **Client surfaces:** xdg toplevel surfaces are wrapped in a `wlr_scene_xdg_surface_create()` tree, positioned at (0,0), and raised to top.
+- **Render loop:** `handle_frame` commits the scene output via `wlr_scene_output_commit()` and sends `frame_done`.
+
+No compositor changes are needed for Sprint 5 — the shell is a normal xdg Wayland client. The shell should connect to `wayland-0` at `XDG_RUNTIME_DIR=/run/playos` (the same Wayland session the test client currently uses).
 
 ### Manifest format
 
@@ -349,6 +371,8 @@ At minimum log:
 - selection changes
 - screen transitions
 - lifecycle transitions
+
+Log to `/data/log/shell.log` using the persistent USB logging approach established in Sprint 4 (`child_log_redirect()` in supervisor.c). Local dev testing can also write to `/run/playos/log/shell.log`.
 
 ---
 

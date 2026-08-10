@@ -223,11 +223,11 @@ The sprint acceptance target is not the future shell. It is a diagnostic client.
 
 ## Acceptance Criteria
 
-- [x] `playos-compositor` starts on the Ally using the native DRM backend (code path implemented; HW test pending on-device)
+- [x] `playos-compositor` starts on the Ally using the native DRM backend (verified on-device: eDP-1, amdgpu, DRM/KMS, 1920×1080@120Hz)
 - [x] GPU discovery is based on enumeration, not hardcoded `/dev/dri/card0`
 - [x] the built-in display connector is identified and configured
 - [x] the compositor log records the selected GPU, render node, connector, mode, renderer, and GLES version
-- [x] a hardware-accelerated test client is visible on the Ally screen (EGL/GLES2 path implemented; on-device verification pending)
+- [x] a hardware-accelerated test client is visible on the Ally screen (verified on-device: animated bars at 119.8 fps, Ryzen Z1 Extreme, GLES 3.2)
 - [x] the renderer path is GBM + EGL + Mesa on AMDGPU
 - [x] an induced or simulated DRM init failure produces clear diagnostics and fallback behaviour
 - [x] QEMU headless validation still works (verified: `compositor-headless-test` passes)
