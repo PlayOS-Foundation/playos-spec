@@ -174,34 +174,42 @@ The shell uses the `playos-runtime` restricted control client library to:
 
 ## Raylib PlayOS Backend (`rcore_playos.c`)
 
-See [platform-api.md](platform-api.md) §6 for the backend interface.
+Raylib 6.0 is **active** (Sprint 5.5). It is vendored into
+`playos-shell/external/raylib` (pinned by `RAYLIB_COMMIT` in
+`versions.lock`) and built as a static library with the custom
+`PLATFORM_PLAYOS` backend (`external/raylib/src/platforms/rcore_playos.c`).
 
 The backend implements:
+- Wayland connection and `wl_compositor`/`xdg_wm_base`/`playos_manager_v1` globals
 - Fullscreen `xdg_toplevel` surface — no decorations, no resize
-- EGL context via Wayland EGL (`eglBindAPI(EGL_OPENGL_ES_API)`)
-- Frame callbacks for v-sync pacing
-- Lifecycle event polling (reads from `PLAYOS_LIFECYCLE_FD`)
-- Input from `playos_input_get_controller_state()` mapped to Raylib key events
-- Shell sends its own exit request as `Shutdown` IPC (not `exit()`)
+- `wl_egl_window` + EGL/GLES2 context (`eglBindAPI(EGL_OPENGL_ES_API)`), made current before raylib's `rlgl` init
+- Frame callbacks for v-sync pacing + `eglSwapBuffers` in `SwapScreenBuffer()`
+
+Rendering is Raylib-only; Raylib is **not** the input path. Controller input
+stays shell-owned direct evdev (`src/input.c`) so reserved SYSTEM/QUICK_MENU
+buttons survive. `PollInputEvents()` in the backend only resets raylib's
+internal input state. Lifecycle events are polled in `main.c` via
+`playos_lifecycle_poll()` — suspend/background skips `BeginDrawing`/
+`EndDrawing`, and TERMINATE exits cleanly (`running = false`, no bare
+`exit()`).
 
 ---
 
 ## Build
 
 ```cmake
-# playos-shell/CMakeLists.txt
-find_package(playos-platform-api REQUIRED)  # libplayos + rcore_playos.c
-find_package(raylib REQUIRED)
+# playos-shell/CMakeLists.txt (PLAYOS_SHELL_USE_RAYLIB=ON)
+add_subdirectory(external/raylib)   # vendored Raylib 6.0, PLATFORM=PlayOS
+find_library(PLAYOS_LIB playos ...) # libplayos from playos-platform-api
 
 target_sources(playos-shell PRIVATE
     src/main.c
-    src/screens/library.c
-    src/screens/game_detail.c
-    src/screens/launching.c
-    src/screens/settings.c
-    src/ui/status_bar.c
-    src/ui/notification.c
-    src/discovery/manifest.c
+    src/input.c
+    src/screen_home.c
+    src/screen_library.c
+    src/screen_game_detail.c
+    src/screen_settings.c
+    src/render_util.c
 )
-target_link_libraries(playos-shell playos raylib)
+target_link_libraries(playos-shell PRIVATE raylib ${PLAYOS_LIB} m)
 ```

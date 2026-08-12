@@ -28,7 +28,7 @@ Use Raylib as the rendering framework for the shell, overlay, and recommended ga
 Rather than using Raylib's generic Wayland backend as-is, PlayOS implements `rcore_playos.c` which:
 - Creates a fullscreen `xdg_toplevel` with trusted role environment variables
 - Integrates `playos_lifecycle_poll()` into the Raylib frame loop
-- Maps `playos_input_get_controller_state()` to Raylib input events
+- Keeps controller input shell-owned (direct evdev, `src/input.c`) — Raylib is rendering-only and its `PollInputEvents()` just resets internal input state
 - Disables desktop features (resize, decorations, clipboard, multi-window)
 
 ## Alternatives Considered
@@ -47,3 +47,14 @@ Rather than using Raylib's generic Wayland backend as-is, PlayOS implements `rco
 - Raylib version must be pinned in `versions.lock`
 - The `rcore_playos.c` backend must be maintained when Raylib updates change platform backend APIs
 - Multi-surface support (shell + overlay as one process) is limited by Raylib's single-surface design — the overlay is a separate process as a result (see [ADR for overlay architecture])
+
+## Follow-up (Sprint 5.5)
+
+Raylib is now **active** for the shell. Sprint 5.5 vendored Raylib **6.0**
+into `playos-shell/external/raylib` and implemented
+`external/raylib/src/platforms/rcore_playos.c` as the `PLATFORM_PLAYOS`
+backend, replacing the shell's earlier direct EGL/GLES2 renderer. The shell
+links the vendored static library when `PLAYOS_SHELL_USE_RAYLIB=ON`; the
+raw-GLES2 path was retired. Raylib remains rendering-only — controller input
+is still read directly from evdev by `src/input.c` so SYSTEM/QUICK_MENU
+reserved buttons survive.
