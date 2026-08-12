@@ -197,6 +197,8 @@ Every task below is independently checkable.
 - A Raylib frame draws through `rcore_playos.c` in the nested Wayland dev environment.
 - `main.c` no longer manages the EGL surface/context directly.
 
+**On-device fix (frame pacing):** The first Ally bring-up froze after `entering main loop` — the shell logged no FPS lines and the screen showed only the compositor's background. Root cause: `SwapScreenBuffer()` armed a `wl_surface_frame` callback and committed the surface *before* `eglSwapBuffers` attached a buffer. On frame 1 the surface is still unmapped (no buffer), so the compositor never presents it and the frame callback never fires — `wl_display_dispatch` blocks forever. Fix (`playos-shell@02fa9fa`): reorder to the canonical wait-after-swap pattern — wait for the previous frame's callback, then `eglSwapBuffers` (which attaches the buffer and commits), then arm the callback for the frame just presented.
+
 ---
 
 ### S5.5-T4 — Port Rendering from Raw GLES2 to the Raylib Draw API
