@@ -74,6 +74,7 @@ Add only after the core console lifecycle is stable:
 - Dropbear SSH — explicit Developer Mode only
 - `playos-update` — PlayOS wrapper around the update engine
 - `playos-input` service — remapping, virtual gamepads, gyro, haptics
+- `playos-sdk` — game developer SDK (musl toolchain + `libplayos`/`libraylib` headers and libs) so third parties can build games on a regular x86_64 Linux host without Buildroot
 - Dedicated audio service — mixing, notifications over games
 - Bluetooth
 - Fast, fully qualified suspend/resume
