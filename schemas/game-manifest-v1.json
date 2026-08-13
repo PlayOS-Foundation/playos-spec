@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://playos.foundation/schemas/game-manifest-v1.json",
+  "title": "PlayOS Game Manifest v1",
+  "description": "Stable metadata contract for a game installed under /data/games/<game-id>/manifest.json. Unknown fields are ignored; only missing required fields or invalid values are rejected.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "id",
+    "name",
+    "version",
+    "executable",
+    "api_version",
+    "architecture"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Reverse-DNS game identifier; must equal the parent directory name."
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable display name shown in the shell library."
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version string."
+    },
+    "executable": {
+      "type": "string",
+      "description": "Path to the launchable binary, relative to the game directory."
+    },
+    "api_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "PlayOS platform API version this game was built against; must be <= the running system's PLAYOS_API_VERSION."
+    },
+    "graphics": {
+      "type": "string",
+      "description": "Graphics backend hint (e.g. gles3)."
+    },
+    "architecture": {
+      "type": "string",
+      "description": "Target CPU architecture (e.g. x86_64, aarch64); must match the running system."
+    },
+    "controllers": {
+      "type": "boolean",
+      "description": "Whether the game requires a controller."
+    },
+    "network": {
+      "type": "boolean",
+      "description": "Whether the game requires network access."
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description shown in the shell game detail screen."
+    },
+    "icon": {
+      "type": "string",
+      "description": "Path to a PNG icon, relative to the game directory (e.g. assets/icon.png)."
+    }
+  }
+}

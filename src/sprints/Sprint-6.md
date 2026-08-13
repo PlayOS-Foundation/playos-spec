@@ -4,7 +4,7 @@
 
 **Primary Outcome:** Games installed in `/data/games/` are discovered, displayed in the shell, and their save and cache paths are correctly isolated per game. Data survives reboot.
 
-**Status:** 🟡 Planned — not started as a sprint. Two pieces pre-landed ahead of this sprint: the storage API (`S6-T4`) shipped in Sprint 5, and `playos-init` already mounts `/data` with a minimal first-boot directory set. Discovery is only a partial basic scan (see `S6-T5`).
+**Status:** 🟡 Implemented on host — tasks S6-T1 through S6-T7 are code-complete and building; S6-T8 isolation is source-verified. Target runtime validation (QEMU/Ally boot, GPU/icon rendering, reboot persistence, live `FactoryReset` erase, cross-compiled samples) is still pending on hardware.
 
 **Prerequisites:** Sprint 5.6 complete — repository boundaries are clean and every component's C source lives in its own repository.
 
@@ -25,10 +25,10 @@ Reality check as of Sprint 5.6: the storage API and a basic discovery scan alrea
 - [x] `playos-init` already creates a minimal first-boot directory set (`src/mount.c`, `playos_data_create_dirs()`).
 - [x] The real `playos_storage.h` / `playos_storage.c` API shipped in Sprint 5 (`playos-platform-api`).
 - [x] `playos-shell` already performs a basic `/data/games/` scan and reads `name` / `version` / `description` from `manifest.json` (`src/screen_library.c`).
-- [ ] No `/data/.playos-storage-version` marker exists yet.
-- [ ] No game manifest v1 schema file exists yet (`playos-spec/schemas/` is absent).
-- [ ] `playos-samples` is scaffold-only (no sample games).
-- [ ] No `FactoryReset` message exists in `playos-runtime/protocols/playos-v1.xml`.
+- [x] `/data/.playos-storage-version` marker is written and validated by `playos-init` (`src/mount.c`).
+- [x] Game manifest v1 schema exists (`playos-spec/schemas/game-manifest-v1.json`).
+- [x] `playos-samples` contains three real sample games with manifests and built binaries.
+- [x] `FactoryReset` handler exists in `playos-init` (JSON message specified in `playos-spec/src/runtime-ipc.md`).
 
 ---
 
@@ -72,12 +72,11 @@ Reality check as of Sprint 5.6: the storage API and a basic discovery scan alrea
 | `playos-init` | Extend `/data` provisioning: full directory schema, `.playos-storage-version` marker; add `FactoryReset` handler |
 | `playos-platform-api` | Real `playos_storage` API (already implemented in Sprint 5 — verify, no new surface) |
 | `playos-shell` | Complete manifest-driven discovery: full validation, icon loading, sorting, robust skip-on-invalid |
-| `playos-runtime` | `FactoryReset` IPC message definition (protocol-only) |
 | `playos-samples` | Three real sample games with valid manifests and compiled binaries |
 | `playos-refdistro` | Package/install the sample games into the rootfs overlay (no C source) |
 | `playos-spec` | Game manifest v1 schema + this sprint doc |
 
-> `playos-init` and `playos-runtime` both touch `FactoryReset`, but the ownership is split: `playos-runtime` owns the protocol message, `playos-init` owns the handler (it is the IPC server owner).
+> `FactoryReset` is a JSON IPC message already specified in `playos-spec/src/runtime-ipc.md`; `playos-init` owns both the message handling and the directory-erase logic (it is the IPC server owner). `playos-runtime` is not involved — its `protocols/playos-v1.xml` is the Wayland compositor protocol.
 
 ---
 
@@ -101,12 +100,6 @@ src/playos_storage.c              ← already real (Sprint 5)
 
 ```text
 src/screen_library.c           ← exists — extend for validation, icon loading, sorting, skip-on-invalid
-```
-
-### `playos-runtime`
-
-```text
-protocols/playos-v1.xml        ← add FactoryReset message
 ```
 
 ### `playos-samples`
@@ -140,14 +133,14 @@ schemas/game-manifest-v1.json
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S6-T1 | Implement `/data` partition provisioning | `playos-init` | in progress | Mount already works (`src/mount.c`); missing version marker + full provisioning |
-| S6-T2 | Define and create the final `/data` directory schema | `playos-init` | in progress | `playos_data_create_dirs()` creates only `games`, `saves`, `system`, `log` |
-| S6-T3 | Define game manifest v1 schema | `playos-spec` | not started | No `schemas/` dir yet |
-| S6-T4 | Implement real `playos_storage` API | `playos-platform-api` | done (Sprint 5) | `playos_storage.h` + `playos_storage.c` are real and match the canonical signature |
-| S6-T5 | Implement live game discovery in the shell | `playos-shell` | in progress | `screen_library.c` scans `/data/games/`, parses `name`/`version`/`description`; no validation/icons/sort |
-| S6-T6 | Build and install three real sample games | `playos-samples`, `playos-refdistro` | not started | `playos-samples` is scaffold-only |
-| S6-T7 | Add `FactoryReset` IPC command (cache/config scope) | `playos-runtime`, `playos-init` | not started | No `FactoryReset` in `playos-v1.xml` |
-| S6-T8 | Persistence and isolation validation | `playos-refdistro` | not started | |
+| S6-T1 | Implement `/data` partition provisioning | `playos-init` | done | Version marker write/validate + full provisioning added to `src/mount.c`; builds, `init_state` test passes |
+| S6-T2 | Define and create the final `/data` directory schema | `playos-init` | done | `playos_data_create_dirs()` now creates the full 11-dir schema + marker |
+| S6-T3 | Define game manifest v1 schema | `playos-spec` | done | `schemas/game-manifest-v1.json` created and JSON-valid |
+| S6-T4 | Implement real `playos_storage` API | `playos-platform-api` | done (Sprint 5) | Verified canonical signature; no new surface |
+| S6-T5 | Implement live game discovery in the shell | `playos-shell` | done (runtime pending) | Validation/icons/sort/skip-on-invalid added to `screen_library.c`; builds |
+| S6-T6 | Build and install three real sample games | `playos-samples`, `playos-refdistro` | done (host build) | Three samples build+run on host; overlay installed (target cross-compile unverified) |
+| S6-T7 | Add `FactoryReset` IPC command (cache/config scope) | `playos-init` | done (runtime pending) | JSON message per `runtime-ipc.md`; handler in `ipc_handler.c` + `ipc/ipc.h`; builds |
+| S6-T8 | Persistence and isolation validation | `playos-refdistro` | partial (source-verified) | Isolation verified in source; reboot/QEMU persistence unverified |
 
 ---
 
@@ -266,10 +259,10 @@ Each must have a valid manifest and a compiled binary that at minimum starts wit
 
 ### S6-T7 — Add `FactoryReset` IPC command (cache/config scope)
 
-- Add `FactoryReset { erase_cache: bool, erase_config: bool }` to `playos-runtime/protocols/playos-v1.xml`.
-- Implement the handler in `playos-init` (IPC server owner): unmount any sub-mounts, recursively delete the selected directories, recreate them.
+- `FactoryReset` is specified as a JSON IPC message in `playos-spec/src/runtime-ipc.md` with flags `erase_games`, `erase_saves`, `erase_cache`, `erase_config`, `erase_logs` (all default `false`).
+- Implement the handler in `playos-init` (IPC server owner): reject when a game is running, recursively delete the selected directories, recreate them.
 - `erase_cache` targets `/data/cache`; `erase_config` targets `/data/config`.
-- `erase_games` and `erase_saves` may be defined in the schema but return an explicit "deferred to Sprint 10" result.
+- `erase_games`, `erase_saves`, and `erase_logs` are reported as `"deferred"` in the response and acted on in Sprint 10.
 
 **Done when:** `FactoryReset { erase_cache: true }` clears `/data/cache/` and the directory is recreated.
 
