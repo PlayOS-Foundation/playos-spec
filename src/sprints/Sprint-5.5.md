@@ -127,15 +127,15 @@ Every task below is independently checkable.
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S5.5-T1 | Upgrade vendored Raylib 5.5 → 6.0 and pin it | `playos-shell`, `playos-refdistro` | not started | `external/raylib/` currently 5.5; `versions.lock` `RAYLIB_COMMIT` empty |
-| S5.5-T2 | Reconcile Raylib 6.0 breaking changes | `playos-shell` | not started | Produce and apply a 5.5 → 6.0 migration list |
-| S5.5-T3 | Implement `rcore_playos.c` platform backend (6.0) | `playos-shell` | not started | Custom Wayland/EGL backend per ADR-0006 |
-| S5.5-T4 | Port rendering from raw GLES2 to Raylib draw API | `playos-shell` | not started | Retire shader + bitmap font in `render_util.c` |
-| S5.5-T5 | Wire controller input (rendering-only Raylib) | `playos-shell` | not started | Keep `input.c` evdev; no Raylib gamepad |
-| S5.5-T6 | Integrate lifecycle polling into the Raylib frame loop | `playos-shell` | not started | Suspend skips draw; TERMINATE exits cleanly |
-| S5.5-T7 | Buildroot packaging: flip to Raylib 6.0 | `playos-refdistro` | not started | `USE_RAYLIB=ON`; vendored raylib links in image |
-| S5.5-T8 | Spec and docs reconciliation | `playos-spec`, `playos-shell` | not started | Remove "Raylib deferred" language everywhere |
-| S5.5-T9 | Validation and runtime evidence | `playos-shell`, `playos-refdistro` | not started | dev / QEMU / Ally paths verified |
+| S5.5-T1 | Upgrade vendored Raylib 5.5 → 6.0 and pin it | `playos-shell`, `playos-refdistro` | done | `RAYLIB_COMMIT=dbc56a87` (6.0) in `versions.lock` |
+| S5.5-T2 | Reconcile Raylib 6.0 breaking changes | `playos-shell` | done | Migration list applied |
+| S5.5-T3 | Implement `rcore_playos.c` platform backend (6.0) | `playos-shell` | done | Custom Wayland/EGL backend; non-blocking render loop (`1046262`) |
+| S5.5-T4 | Port rendering from raw GLES2 to Raylib draw API | `playos-shell` | done | `render_util.c` helpers map to Raylib draw API |
+| S5.5-T5 | Wire controller input (rendering-only Raylib) | `playos-shell` | done | `input.c` evdev unchanged; no Raylib gamepad |
+| S5.5-T6 | Integrate lifecycle polling into the Raylib frame loop | `playos-shell` | done | `playos_lifecycle_poll()` per frame |
+| S5.5-T7 | Buildroot packaging: flip to Raylib 6.0 | `playos-refdistro` | done | `USE_RAYLIB=ON`; `libraylib.so.6.0.0` in image |
+| S5.5-T8 | Spec and docs reconciliation | `playos-spec`, `playos-shell` | done | Sprint doc updated |
+| S5.5-T9 | Validation and runtime evidence | `playos-shell`, `playos-refdistro` | in progress | QEMU validated; Ally re-test pending |
 
 ---
 
@@ -197,7 +197,9 @@ Every task below is independently checkable.
 - A Raylib frame draws through `rcore_playos.c` in the nested Wayland dev environment.
 - `main.c` no longer manages the EGL surface/context directly.
 
-**On-device fix (frame pacing):** The first Ally bring-up froze after `entering main loop` — the shell logged no FPS lines and the screen showed only the compositor's background. Root cause: `SwapScreenBuffer()` armed a `wl_surface_frame` callback and committed the surface *before* `eglSwapBuffers` attached a buffer. On frame 1 the surface is still unmapped (no buffer), so the compositor never presents it and the frame callback never fires — `wl_display_dispatch` blocks forever. Fix (`playos-shell@02fa9fa`): reorder to the canonical wait-after-swap pattern — wait for the previous frame's callback, then `eglSwapBuffers` (which attaches the buffer and commits), then arm the callback for the frame just presented.
+**On-device fix (frame pacing):** The first two Ally bring-ups froze in the frame loop — the shell logged no FPS lines and the screen either showed only the compositor's background (frame 1) or froze right after the first painted frame (frame 2). Root cause: `SwapScreenBuffer()` blocked on a `wl_surface_frame` callback whose associated commit could never be presented by this compositor — arming the callback before `eglSwapBuffers` left the surface unmapped on frame 1, and arming it after (without a commit) left the callback unarmed on frame 2. Either way `wl_display_dispatch` blocked forever, stalling the main loop (and therefore evdev input + the FPS counter).
+
+**Final fix (`playos-shell@1046262`):** drop `wl_surface_frame` pacing entirely and mirror the proven `test-client` render loop — `eglSwapInterval(0)` keeps `eglSwapBuffers` non-blocking, and `PollInputEvents()` pumps Wayland events each frame with `wl_display_dispatch_pending` + `wl_display_flush`. The compositor remains the presentation authority. Validated in QEMU (main loop advances, FPS lines emitted) and ready for Ally re-test.
 
 ---
 
