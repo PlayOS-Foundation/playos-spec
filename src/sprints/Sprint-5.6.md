@@ -4,7 +4,7 @@
 
 **Primary Outcome:** `playos-init` becomes a first-class repository (created by the maintainer, seeded from the in-tree source). Both `playos-init` and `playos-shell` are removed from the `playos-refdistro` git index, git-ignored, cloned by `make setup` from their own repositories, and pinned by a real commit SHA in `versions.lock`. Buildroot packages continue to build from the `src/` clones unchanged.
 
-**Status:** 🟡 Planned — awaiting implementation
+**Status:** 🟢 Complete — implemented and verified
 
 **Prerequisites:** Sprint 5.5 complete — the shell renders through Raylib 6.0 and the `playos-shell` repository is pushed at `main`. The maintainer has created (or will create) the empty `PlayOS-Foundation/playos-init` repository.
 
@@ -28,11 +28,11 @@ This is a **pure cleanup sprint** — no feature, protocol, or UX changes. The u
 
 ## Start Condition Checklist
 
-- [ ] Sprint 5.5 complete; `playos-shell` renders through Raylib 6.0.
-- [ ] `PlayOS-Foundation/playos-shell` repository is pushed at `main` (verified: HEAD `104626206dfd2de59b4c576d3990d43b3b65980b` == `origin/main`).
-- [ ] `PlayOS-Foundation/playos-init` repository exists (empty, or with only a README/license). *(Created by the maintainer — not by the implementing agent.)*
-- [ ] Local checkouts are available: `playos-refdistro` and the sibling `playos-shell` repo under the PlayOS workspace root (`$HOME/playos/`).
-- [ ] `make setup` / `make qemu-build` are understood and can be run to verify the result.
+- [x] Sprint 5.5 complete; `playos-shell` renders through Raylib 6.0.
+- [x] `PlayOS-Foundation/playos-shell` repository is pushed at `main` (verified: HEAD `104626206dfd2de59b4c576d3990d43b3b65980b` == `origin/main`).
+- [x] `PlayOS-Foundation/playos-init` repository exists (empty, or with only a README/license). *(Created by the maintainer — not by the implementing agent.)*
+- [x] Local checkouts are available: `playos-refdistro` and the sibling `playos-shell` repo under the PlayOS workspace root (`$HOME/playos/`).
+- [x] `make setup` / `make qemu-build` are understood and can be run to verify the result.
 
 ---
 
@@ -55,7 +55,7 @@ This is a **pure cleanup sprint** — no feature, protocol, or UX changes. The u
 - Untrack `playos-refdistro/src/playos-init` and `playos-refdistro/src/playos-shell` from the refdistro git index
 - Add `src/playos-shell` to `playos-refdistro/.gitignore` (init is already listed)
 - Wire `playos-shell` into the `Makefile` `setup` target (clone + pinned checkout), mirroring the existing four components
-- Update `versions.lock` so `PLAYOS_INIT_COMMIT` and `PLAYOS_SHELL_COMMIT` point at real, pushed commits, and remove the `(in monorepo)` / `(LOCAL — push pending)` annotations
+- Update `versions.lock` so `PLAYOS_INIT_COMMIT` points at the new `playos-init` repo HEAD, and remove the `(in monorepo)` annotation (`PLAYOS_SHELL_COMMIT` is already pinned correctly)
 - Verify `make setup` clones all five components and `playos-init` / `playos-shell` still build from the clones
 - Update docs / repo inventory so no document claims init or shell C source lives in `playos-refdistro`
 
@@ -101,7 +101,7 @@ tests/                   ← host + ipc test sources
 ```text
 .gitignore                ← UPDATE: add `src/playos-shell` to the "Cloned source dependencies" block
 Makefile                  ← UPDATE: add PLAYOS_SHELL_COMMIT var + playos-shell clone block in `setup`
-versions.lock             ← UPDATE: real SHA for INIT and SHELL; remove stale annotations
+versions.lock             ← UPDATE: real SHA for INIT only (from S5.6-T1); remove the `(in monorepo)` annotation
 AGENTS.md                 ← UPDATE: IPC Sources note points at the playos-init repo (cloned to src/playos-init)
 src/playos-init/          ← REMOVED from index + working tree (re-created by make setup)
 src/playos-shell/         ← REMOVED from index + working tree (re-created by make setup)
@@ -126,14 +126,14 @@ Every task below is independently checkable.
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S5.6-T1 | Seed and push the `playos-init` repository | `playos-init` | pending | Clone empty repo, copy in-tree source, commit, push, record full SHA |
-| S5.6-T2 | Reconcile and confirm the `playos-shell` canonical SHA | `playos-shell` | pending | `1046262…` is current; in-tree copy already in sync (verify only) |
-| S5.6-T3 | Untrack `src/playos-init` from refdistro | `playos-refdistro` | pending | `git rm -r src/playos-init`; already in `.gitignore` |
-| S5.6-T4 | Untrack `src/playos-shell` from refdistro and gitignore it | `playos-refdistro` | pending | `git rm -r src/playos-shell`; add to `.gitignore` |
-| S5.6-T5 | Wire `playos-shell` into `make setup` | `playos-refdistro` | pending | Add `PLAYOS_SHELL_COMMIT` + clone block, mirroring the other four |
-| S5.6-T6 | Pin real SHAs and clean `versions.lock` | `playos-refdistro` | pending | Remove the `(in monorepo)` annotation (shell already pinned) |
-| S5.6-T7 | Verify `make setup` + build from extracted repos | `playos-refdistro` | pending | All five clones present; init + shell build |
-| S5.6-T8 | Docs and repo-inventory reconciliation | `playos-spec`, `playos-refdistro` | pending | No doc claims C source lives in refdistro |
+| S5.6-T1 | Seed and push the `playos-init` repository | `playos-init` | done | Cloned empty repo, copied in-tree source, committed, pushed (`3a89f09f…`) |
+| S5.6-T2 | Reconcile and confirm the `playos-shell` canonical SHA | `playos-shell` | done | `1046262…` confirmed current; in-tree copy already in sync |
+| S5.6-T3 | Untrack `src/playos-init` from refdistro | `playos-refdistro` | done | `git rm -r src/playos-init`; already in `.gitignore` |
+| S5.6-T4 | Untrack `src/playos-shell` from refdistro and gitignore it | `playos-refdistro` | done | `git rm -r src/playos-shell`; added to `.gitignore` |
+| S5.6-T5 | Wire `playos-shell` into `make setup` | `playos-refdistro` | done | Added `PLAYOS_SHELL_COMMIT` + clone block, mirroring the other four |
+| S5.6-T6 | Pin real SHAs and clean `versions.lock` | `playos-refdistro` | done | Removed the `(in monorepo)` annotation (shell already pinned) |
+| S5.6-T7 | Verify `make setup` + build from extracted repos | `playos-refdistro` | done | All five clones present; init + shell build |
+| S5.6-T8 | Docs and repo-inventory reconciliation | `playos-spec`, `playos-refdistro` | done | No doc claims C source lives in refdistro |
 
 ---
 
@@ -423,16 +423,16 @@ After T1–T7, run `make qemu-build` (or at minimum the targeted `playos-init-re
 
 ## Acceptance Criteria
 
-- [ ] `PlayOS-Foundation/playos-init` exists, is seeded from the in-tree source (minus build artifacts), and is pushed to `main`
-- [ ] `PlayOS-Foundation/playos-shell` `main` == `origin/main`, and its full SHA is recorded
-- [ ] `git ls-files src/playos-init` and `git ls-files src/playos-shell` in `playos-refdistro` both return nothing
-- [ ] `.gitignore` lists `src/playos-shell` (and still lists `src/playos-init`)
-- [ ] `make setup` clones all five components into `src/` and checks out the pinned SHAs
-- [ ] `playos-init` and `playos-shell` rebuild successfully from the clones
-- [ ] `versions.lock` has real, non-empty, 40-char SHAs for both `PLAYOS_INIT_COMMIT` and `PLAYOS_SHELL_COMMIT`, with no `(in monorepo)` / `(LOCAL — push pending)` annotations
-- [ ] `playos-refdistro` contains no committed C source under `src/`
-- [ ] `playos-init` is listed as a first-class repository in the spec's repository inventory
-- [ ] `playos-refdistro/AGENTS.md` no longer describes init/shell C source as committed in the distribution repo
+- [x] `PlayOS-Foundation/playos-init` exists, is seeded from the in-tree source (minus build artifacts), and is pushed to `main`
+- [x] `PlayOS-Foundation/playos-shell` `main` == `origin/main`, and its full SHA is recorded
+- [x] `git ls-files src/playos-init` and `git ls-files src/playos-shell` in `playos-refdistro` both return nothing
+- [x] `.gitignore` lists `src/playos-shell` (and still lists `src/playos-init`)
+- [x] `make setup` clones all five components into `src/` and checks out the pinned SHAs
+- [x] `playos-init` and `playos-shell` rebuild successfully from the clones
+- [x] `versions.lock` has real, non-empty, 40-char SHAs for both `PLAYOS_INIT_COMMIT` and `PLAYOS_SHELL_COMMIT`, with no `(in monorepo)` / `(LOCAL — push pending)` annotations
+- [x] `playos-refdistro` contains no committed C source under `src/`
+- [x] `playos-init` is listed as a first-class repository in the spec's repository inventory
+- [x] `playos-refdistro/AGENTS.md` no longer describes init/shell C source as committed in the distribution repo
 
 ---
 

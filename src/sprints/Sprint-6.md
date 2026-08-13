@@ -296,7 +296,7 @@ Sprint 7 should focus on the launch flow, lifecycle, and overlay — not on re-i
 
 Games installed in `/data/games/` are discovered and shown in the shell. Save and cache paths are correctly isolated per game. All data persists across reboots.
 
-*Previous: [Sprint 5](Sprint-5.md) | Next: [Sprint 7](Sprint-7.md)*
+*Previous: [Sprint 5.6](Sprint-5.6.md) | Next: [Sprint 7](Sprint-7.md)*
 
 ---
 
@@ -469,4 +469,4 @@ Each sample game must have a valid `manifest.json` and a compiled binary.
 
 Games installed in `/data/games/` are discovered and shown in the shell. Save and cache paths are correctly isolated per game. All data persists across reboots.
 
-*Previous: [Sprint 5](Sprint-5.md) | Next: [Sprint 7](Sprint-7.md)*
+*Previous: [Sprint 5.6](Sprint-5.6.md) | Next: [Sprint 7](Sprint-7.md)*

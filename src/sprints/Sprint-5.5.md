@@ -386,4 +386,4 @@ Sprint 6 should not need to touch the rendering layer except to display discover
 
 ---
 
-*Previous: [Sprint 5](Sprint-5.md) | Next: [Sprint 6](Sprint-6.md)*
+*Previous: [Sprint 5](Sprint-5.md) | Next: [Sprint 5.6](Sprint-5.6.md)*
