@@ -52,6 +52,7 @@ The first meaningful PlayOS MVP is complete when all of the following are true o
 | [12](Sprint-12.md) | Security Hardening | Hardened boundary between public Platform API, trusted runtime control, and games |
 | [13](Sprint-13.md) | Intel Expansion | Architecture and Platform API backend portable to Intel graphics |
 | [14](Sprint-14.md) | Production Readiness | Signed preview release with versioned public Platform API |
+| [15](Sprint-15.md) | Game Developer SDK | Self-contained `playos-sdk` (musl toolchain + `libplayos`/`libraylib`) with device/desktop/emulator testing |
 
 ---
 
