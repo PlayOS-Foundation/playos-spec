@@ -216,7 +216,7 @@ Requires Linux ≥ 5.13 (ROG Ally ships with kernels that support this). Falls b
 - `/data/games/<other-game-id>/` — other games
 - `/data/saves/<other-game-id>/` — other games' saves
 - `/data/config/` — system configuration
-- `/data/logs/` — system logs (games write via `playos_log()`, not direct fs access)
+- `/data/log/` — system logs (games write via `playos_log()`, not direct fs access)
 - `/run/playos/control.sock` — control IPC
 - `/run/playos/compositor.sock` — compositor control
 - `/sys/`, `/proc/<other-pid>/` — system and process snooping

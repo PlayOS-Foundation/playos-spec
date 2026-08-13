@@ -75,7 +75,7 @@ PlayOS Runtime (all in initramfs)
     │
     ▼
 Persistent Data Partition (/data)
-    games / saves / cache / logs / updates / config
+    games / saves / cache / log / updates / config
 ```
 
 ---
@@ -359,7 +359,7 @@ GPT disk
     cache/<game-id>/          shaders/, compiled-assets/, temporary/
     resources/
     downloads/
-    logs/
+    log/
     updates/
     screenshots/
     config/

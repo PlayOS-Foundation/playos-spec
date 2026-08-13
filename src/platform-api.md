@@ -287,7 +287,7 @@ const char *playos_storage_get_saves_path(void);    /* /data/saves/<game-id>  re
 const char *playos_storage_get_cache_path(void);    /* /data/cache/<game-id>  read-write */
 
 /* Shell-only: returns the games root path. Not available to game processes. */
-const char *playos_storage_get_games_root(void);
+const char *playos_storage_get_games_path(void);
 
 /* Free space on the data partition in bytes. */
 int64_t playos_storage_free_bytes(void);
@@ -399,7 +399,7 @@ void playos_log(PlayOSLogLevel level, const char *tag, const char *fmt, ...);
 void playos_log_crash_marker(const char *reason);
 ```
 
-Log output is written to `/data/logs/<game-id>/session-<timestamp>.log` and to the kernel ring buffer (for development builds).
+Log output is written to `/data/log/<game-id>/session-<timestamp>.log` and to the kernel ring buffer (for development builds).
 
 ---
 

@@ -115,7 +115,7 @@ Implement a minimal recovery UI (text or simple Raylib on SimpleDRM/framebuffer)
 - `playos-init` explicitly enters recovery after repeated compositor failure
 
 **Recovery menu options:**
-- View system logs (read from `/data/logs/`)
+- View system logs (read from `/data/log/`)
 - Factory reset (calls the factory reset logic from Sprint 10)
 - Rollback to previous system slot (if available)
 - Shutdown

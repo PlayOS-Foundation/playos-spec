@@ -411,7 +411,7 @@ FactoryReset {
   erase_saves: bool,      // deletes /data/saves/ contents  (DESTRUCTIVE — separate confirmation)
   erase_cache: bool,      // deletes /data/cache/ contents
   erase_config: bool,     // deletes /data/config/ contents
-  erase_logs: bool        // deletes /data/logs/ contents
+  erase_logs: bool        // deletes /data/log/ contents
 }
 ```
 
