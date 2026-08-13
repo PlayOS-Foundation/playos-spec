@@ -85,11 +85,12 @@ Persistent Data Partition (/data)
 | Repository | Owns |
 |---|---|
 | `playos-spec` | Architecture, public contracts, ADRs, schemas, roadmap |
+| `playos-init` | PID 1 process supervisor, boot lifecycle, storage mount, game launch/supervision |
 | `playos-platform-api` | Public `libplayos` C ABI, C++ wrappers, engine adapters |
 | `playos-runtime` | Internal IPC, lifecycle transport, private Wayland protocols, OS integration |
 | `playos-compositor` | wlroots compositor, DRM/KMS, surface/focus/input policy |
 | `playos-shell` | Raylib controller-first shell and trusted UX |
-| `playos-refdistro` | Buildroot integration, kernel config, `playos-init`, image assembly |
+| `playos-refdistro` | Buildroot integration, kernel config, image assembly |
 
 **Dependency direction:**
 
