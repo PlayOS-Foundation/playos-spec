@@ -226,6 +226,14 @@ Requires Linux ≥ 5.13 (ROG Ally ships with kernels that support this). Falls b
 
 ## 8. Input Security
 
+> **Current gap (pre-Sprint 12):** The target model below is **not yet
+> implemented**. Today reserved buttons are stripped only by a software
+> bitmask in `libplayos` (`playos_input.c`), and games are spawned via a plain
+> `fork()`+`exec()` from PID 1 (root) with no credential drop, so a game can
+> open `/dev/input/event*` directly and read the reserved buttons — bypassing
+> the mask. Sprint 12 closes this gap (see `Sprint-12.md` §Input Device
+> Isolation).
+
 **Reserved system actions** (`PLAYOS_BUTTON_SYSTEM`, `PLAYOS_BUTTON_QUICK_MENU`) are intercepted at the Wayland compositor's libinput layer before any event reaches a client. They are never present in the game's input stream.
 
 **Input routing hierarchy:**

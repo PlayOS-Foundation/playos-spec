@@ -28,6 +28,32 @@
 - `/dev/dri/renderD*` — needed for GPU rendering via Wayland; games connect through Wayland, not directly
 - Verify: `open("/dev/dri/card0", O_RDWR)` returns `EACCES` in the game process
 
+### Input Device Isolation (Reserved Buttons)
+
+**Current gap (pre-Sprint 12):** Reserved buttons (`SYSTEM`, `QUICK_MENU`) are
+stripped only by a software bitmask in `libplayos`
+(`playos_input_get_controller_state()` does
+`state->buttons &= ~(SYSTEM | QUICK_MENU)`). This is a cooperative convention,
+not an OS-enforced boundary. A game that opens `/dev/input/event*` directly —
+via a Raylib evdev backend or any raw evdev read — can see the reserved
+buttons. Today games are spawned with a plain `fork()`+`exec()` from PID 1
+(root) with no credential drop, so they *can* open the input devices.
+
+**Required enforcement (this sprint):**
+- Games run as `playos-game` (UID ~1000), **not** in the `input` group, so
+  `/dev/input/event*` (`root:input`, mode `0660`) is unopenable.
+- seccomp `open`/`openat` arg filter and the Landlock allowed-path set both
+  **explicitly deny** `/dev/input/event*` (see the seccomp + Landlock sections
+  below — the path must be named, not just implied).
+- Games receive input only through the Wayland seat; the compositor intercepts
+  reserved buttons at the libinput layer and never forwards them to clients
+  (see `security-model.md` §8).
+- The libplayos software mask becomes defense-in-depth, **not** the sole
+  mechanism — the boundary moves to seat/group/permission enforcement.
+
+**Verify:** from a `playos-game` process, `open("/dev/input/event0", O_RDONLY)`
+returns `EACCES`, and reserved buttons never appear in the game's input stream.
+
 ### seccomp Filter for Games
 
 Apply a seccomp-BPF allowlist to all game processes before exec.
@@ -47,7 +73,7 @@ Apply a seccomp-BPF allowlist to all game processes before exec.
 - `ptrace` — no process tracing of other processes
 - `reboot` — no direct reboot
 - `setuid`, `setgid`, `setcap` — no privilege escalation
-- `open`/`openat` with path to `/proc/*/mem`, `/dev/dri/card*`, control socket
+- `open`/`openat` with path to `/proc/*/mem`, `/dev/dri/card*`, `/dev/input/event*`, control socket
 
 Generate the seccomp filter at build time. Test with `libseccomp`.
 
@@ -70,6 +96,7 @@ Apply Landlock rules to game processes:
 /data/saves/<other-game>/        no access to other saves
 /data/config/                    no system config access
 /run/playos/control.sock         no access to control IPC
+/dev/input/event*                no raw input device access
 /proc/*/                         no process snooping
 ```
 
@@ -127,6 +154,8 @@ For this sprint: document the target Secure Boot chain and set up development si
 
 - [ ] Game process runs as `playos-game` user (verified via `playos_system.h` test call or logs)
 - [ ] `open("/dev/dri/card0", O_RDWR)` returns `EACCES` in a game process
+- [ ] `open("/dev/input/event0", O_RDONLY)` returns `EACCES` in a game process
+- [ ] Reserved buttons (`SYSTEM`/`QUICK_MENU`) never appear in a game's input stream (compositor-intercepted, not just libplayos-masked)
 - [ ] `connect()` to `/run/playos/control.sock` returns `EACCES` from a `playos-game` process
 - [ ] seccomp filter: `mount()` from game process returns `EPERM`
 - [ ] Landlock: game cannot `open()` another game's save directory
