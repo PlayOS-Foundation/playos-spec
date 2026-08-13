@@ -4,7 +4,7 @@
 
 **Primary Outcome:** The ROG Ally boots into the same four-screen, controller-first shell, but every frame is now drawn through Raylib 6.0 via a custom Wayland/EGL platform backend. The raw-GLES2 renderer in `render_util.c` is retired. `PLAYOS_SHELL_USE_RAYLIB=ON` is the Buildroot default, and Raylib 6.0 is pinned in `versions.lock`.
 
-**Status:** 🟡 Planned — migration pending
+**Status:** 🟢 Complete — Raylib 6.0 shell verified in QEMU and on the ROG Ally
 
 **Prerequisites:** Sprint 5 complete — the shell renders and navigates on the Ally through the raw EGL/GLES2 path (4 screens, controller-first input, frame-callback vsync, lifecycle handling, per-call trusted IPC). Raylib 5.5 is vendored at `playos-shell/external/raylib/` but unused. The custom backend contract is specified in ADR-0006.
 
@@ -25,11 +25,11 @@ This is a **pure migration sprint** — no new screens, no new features, no UX c
 
 ## Start Condition Checklist
 
-- [ ] Sprint 5 shell renders and navigates on the Ally via raw EGL/GLES2. *(Verified at Sprint 5 exit gate.)*
-- [ ] Raylib 5.5 is vendored at `playos-shell/external/raylib/` and builds (or the `PLAYOS_SHELL_USE_RAYLIB` path is understood).
-- [ ] `versions.lock` has empty `RAYLIB_COMMIT` / `RAYLIB_SOURCE` entries ready to be filled.
-- [ ] Raylib 6.0 release source/tag is available to vendor (exact commit SHA obtainable).
-- [ ] Nested Wayland dev environment and QEMU headless path are usable for iteration.
+- [x] Sprint 5 shell renders and navigates on the Ally via raw EGL/GLES2. *(Verified at Sprint 5 exit gate.)*
+- [x] Raylib 5.5 is vendored at `playos-shell/external/raylib/` and builds (or the `PLAYOS_SHELL_USE_RAYLIB` path is understood).
+- [x] `versions.lock` has empty `RAYLIB_COMMIT` / `RAYLIB_SOURCE` entries ready to be filled.
+- [x] Raylib 6.0 release source/tag is available to vendor (exact commit SHA obtainable).
+- [x] Nested Wayland dev environment and QEMU headless path are usable for iteration.
 
 ---
 
@@ -135,7 +135,7 @@ Every task below is independently checkable.
 | S5.5-T6 | Integrate lifecycle polling into the Raylib frame loop | `playos-shell` | done | `playos_lifecycle_poll()` per frame |
 | S5.5-T7 | Buildroot packaging: flip to Raylib 6.0 | `playos-refdistro` | done | `USE_RAYLIB=ON`; `libraylib.so.6.0.0` in image |
 | S5.5-T8 | Spec and docs reconciliation | `playos-spec`, `playos-shell` | done | Sprint doc updated |
-| S5.5-T9 | Validation and runtime evidence | `playos-shell`, `playos-refdistro` | in progress | QEMU validated; Ally re-test pending |
+| S5.5-T9 | Validation and runtime evidence | `playos-shell`, `playos-refdistro` | done | QEMU validated; Ally on-device re-test passed |
 
 ---
 
@@ -359,16 +359,16 @@ After T1–T7, the shell must still render all four screens, navigate with a con
 
 ## Acceptance Criteria
 
-- [ ] vendored Raylib reports `RAYLIB_VERSION "6.0"` and is pinned in `versions.lock`
-- [ ] Raylib builds with the minimal `SUPPORT_MODULE_*` module config
-- [ ] a Raylib 5.5 → 6.0 breaking-change reconciliation list exists and is applied
-- [ ] `rcore_playos.c` implements the Raylib 6.0 platform backend (fullscreen Wayland + EGL + frame callback)
-- [ ] all four screens render through the Raylib draw API (no raw GLES2 shader/bitmap font in `render_util.c`)
-- [ ] controller navigation is unchanged and uses shell-owned evdev (not Raylib's gamepad abstraction)
-- [ ] lifecycle suspend skips rendering; foreground resumes; TERMINATE exits cleanly
-- [ ] `PLAYOS_SHELL_USE_RAYLIB=ON` in Buildroot; the image builds and boots the Raylib shell
-- [ ] `playos-shell-spec.md`, `playos-shell/AGENTS.md`, and ADR-0006 reflect Raylib 6.0 (no "deferred")
-- [ ] ≥ 60 fps on the Ally; nested dev and QEMU paths remain usable for iteration
+- [x] vendored Raylib reports `RAYLIB_VERSION "6.0"` and is pinned in `versions.lock`
+- [x] Raylib builds with the minimal `SUPPORT_MODULE_*` module config
+- [x] a Raylib 5.5 → 6.0 breaking-change reconciliation list exists and is applied
+- [x] `rcore_playos.c` implements the Raylib 6.0 platform backend (fullscreen Wayland + EGL + frame callback)
+- [x] all four screens render through the Raylib draw API (no raw GLES2 shader/bitmap font in `render_util.c`)
+- [x] controller navigation is unchanged and uses shell-owned evdev (not Raylib's gamepad abstraction)
+- [x] lifecycle suspend skips rendering; foreground resumes; TERMINATE exits cleanly
+- [x] `PLAYOS_SHELL_USE_RAYLIB=ON` in Buildroot; the image builds and boots the Raylib shell
+- [x] `playos-shell-spec.md`, `playos-shell/AGENTS.md`, and ADR-0006 reflect Raylib 6.0 (no "deferred")
+- [x] ≥ 60 fps on the Ally; nested dev and QEMU paths remain usable for iteration
 
 ---
 

@@ -4,6 +4,8 @@
 
 **Primary Outcome:** The ROG Ally boots into a visible shell UI that shows a stub game library, responds to controller navigation, and remains alive as the persistent PlayOS foreground experience.
 
+**Status:** 🟢 Complete — delivered; Raylib backend landed via Sprint 5.5 (see below)
+
 **Prerequisites:** Sprint 4 complete and **verified on-device** — the compositor owns the real display on the Ally at 1920×1080@120Hz, the EGL/GLES2 test client renders at 119.8 fps with visible animated bars. Sprint 3 complete — the public input ABI is finalized (bit positions resolved), evdev backend is implemented, and the `playos-platform-api` headers are in place with stub implementations.
 
 ---
@@ -146,15 +148,15 @@ Update the **Status** column as work progresses: `not started` → `in progress`
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S5-T1 | Finalise the shell-facing public API surface | `playos-platform-api` | ready | Headers exist. Stubs exist. Evdev backend implemented (12KB). Needs: `get_games_path()` declaration + 4 stub impls. |
-| S5-T2 | Add the custom Raylib PlayOS backend | `playos-shell` | not started | |
-| S5-T3 | Bootstrap the shell application structure | `playos-shell` | not started | |
-| S5-T4 | Implement library data loading from stub manifests | `playos-shell`, `playos-refdistro` | not started | |
-| S5-T5 | Implement controller-first navigation and focus rules | `playos-shell` | not started | |
-| S5-T6 | Build the library, detail, and status-bar UI | `playos-shell` | not started | |
-| S5-T7 | Add shell lifecycle handling and persistent process behavior | `playos-shell`, `playos-platform-api` | not started | |
-| S5-T8 | Integrate Raylib and shell packaging into Buildroot | `playos-refdistro` | not started | Stub .mk exists (no-op). Must become real cmake-package. |
-| S5-T9 | Add validation, stub content, and runtime evidence capture | `playos-shell`, `playos-refdistro` | not started | |
+| S5-T1 | Finalise the shell-facing public API surface | `playos-platform-api` | done | `get_games_path()` added; system/storage/lifecycle/logging stubs implemented |
+| S5-T2 | Add the custom Raylib PlayOS backend | `playos-shell` | done | First shipped raw EGL/GLES2; Raylib 6.0 `rcore_playos.c` landed via Sprint 5.5 (`1046262`) |
+| S5-T3 | Bootstrap the shell application structure | `playos-shell` | done | `src/{main,input,render_util,screen_*}.c` + `include/shell.h` |
+| S5-T4 | Implement library data loading from stub manifests | `playos-shell`, `playos-refdistro` | done | Manifests discovered from `/data/games/` via `playos_storage_get_games_path()` |
+| S5-T5 | Implement controller-first navigation and focus rules | `playos-shell` | done | Shell-owned direct evdev (`input.c`); reserved buttons preserved |
+| S5-T6 | Build the library, detail, and status-bar UI | `playos-shell` | done | Library + Game Detail (plus Home + Settings screens added) |
+| S5-T7 | Add shell lifecycle handling and persistent process behavior | `playos-shell`, `playos-platform-api` | done | `playos_lifecycle_poll()` per frame; persists under supervision |
+| S5-T8 | Integrate Raylib and shell packaging into Buildroot | `playos-refdistro` | done | Real cmake-package; `PLAYOS_SHELL_USE_RAYLIB=ON` (Raylib 6.0) |
+| S5-T9 | Add validation, stub content, and runtime evidence capture | `playos-shell`, `playos-refdistro` | done | Validated in QEMU and on the ROG Ally |
 
 ### S5-T1 — Finalise the shell-facing public API surface
 
@@ -391,16 +393,16 @@ Log to `/data/log/shell.log` using the persistent USB logging approach establish
 
 ## Acceptance Criteria
 
-- [ ] the Ally boots into the shell UI automatically
-- [ ] the shell is rendered through the custom Raylib PlayOS backend
-- [ ] the shell links against documented public `libplayos` APIs only
-- [ ] three stub game entries are loaded from `/data/games/`
-- [ ] controller-only navigation works on the library and detail screens
-- [ ] `A` enters the detail screen and `B` returns to the library
-- [ ] the shell logs startup, navigation, and lifecycle events
-- [ ] the shell remains alive under supervision during an idle run
-- [ ] Buildroot packaging integrates Raylib and `playos-shell`
-- [ ] the non-device startup path remains usable for developer iteration
+- [x] the Ally boots into the shell UI automatically
+- [x] the shell is rendered through the custom Raylib PlayOS backend
+- [x] the shell links against documented public `libplayos` APIs only
+- [x] three stub game entries are loaded from `/data/games/`
+- [x] controller-only navigation works on the library and detail screens
+- [x] `A` enters the detail screen and `B` returns to the library
+- [x] the shell logs startup, navigation, and lifecycle events
+- [x] the shell remains alive under supervision during an idle run
+- [x] Buildroot packaging integrates Raylib and `playos-shell`
+- [x] the non-device startup path remains usable for developer iteration
 
 ---
 
