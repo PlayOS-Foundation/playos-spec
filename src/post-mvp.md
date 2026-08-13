@@ -75,7 +75,7 @@ These features are most commonly requested and have direct dependencies on shipp
 
 ### Game Developer SDK (`playos-sdk`)
 **Motivation:** Third parties can't build a PlayOS game today without running Buildroot. The game ABI requires musl (not glibc) and links the musl builds of `libplayos` (and `libraylib`), which only exist inside the Buildroot tree. A self-contained SDK lets developers compile on a regular x86_64 Ubuntu host and ship a runnable game.  
-**Stack:** Prebuilt `x86_64-buildroot-linux-musl` toolchain + `libplayos`/`libraylib` headers and static libs + a CMake toolchain file / `pkg-config` files.  
+**Stack:** Prebuilt `x86_64-buildroot-linux-musl` toolchain + `libplayos`/`libraylib` headers and static libs + a CMake toolchain file / `pkg-config` files. An Alpine Linux (musl-only) base image is a natural foundation: it already emits musl binaries natively, so the SDK only needs to add `libplayos`/`libraylib`.  
 **Scope:** Downloadable tarball (or container image) that turns standard `gcc`/`cmake` on an x86_64 Ubuntu host into a single `bin/game` + `manifest.json` + `assets/` artifact. Binary must be musl-linked (static where possible) and target x86_64.  
 **Depends on:** Versioned public Platform API (MVP); stable game ABI (Raylib backend + `libplayos` ABI)
 
