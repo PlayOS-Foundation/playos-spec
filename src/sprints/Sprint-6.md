@@ -138,7 +138,7 @@ schemas/game-manifest-v1.json
 | S6-T3 | Define game manifest v1 schema | `playos-spec` | done | `schemas/game-manifest-v1.json` created and JSON-valid |
 | S6-T4 | Implement real `playos_storage` API | `playos-platform-api` | done (Sprint 5) | Verified canonical signature; no new surface |
 | S6-T5 | Implement live game discovery in the shell | `playos-shell` | done (runtime pending) | Validation/icons/sort/skip-on-invalid added to `screen_library.c`; builds |
-| S6-T6 | Build and install three real sample games | `playos-samples`, `playos-refdistro` | partial (rendering deferred) | Three samples build+run on host and install to `/data/games`; triangle renders nothing (display-query placeholder) and input-debug logs one snapshot — Raylib GPU rendering + live controller display deferred to a later sprint; target cross-compile unverified |
+| S6-T6 | Build and install three real sample games | `playos-samples`, `playos-refdistro`, `playos-init` | partial (rendering deferred) | Three samples build+run on host and install to the read-only seed dir (`/usr/share/playos/games`), then `playos-init` seeds them into `/data/games` on first boot; triangle renders nothing (display-query placeholder) and input-debug logs one snapshot — Raylib GPU rendering + live controller display deferred to a later sprint; target cross-compile unverified |
 | S6-T7 | Add `FactoryReset` IPC command (cache/config scope) | `playos-init` | done (runtime pending) | JSON message per `runtime-ipc.md`; handler in `ipc_handler.c` + `ipc/ipc.h`; builds |
 | S6-T8 | Persistence and isolation validation | `playos-refdistro` | partial (source-verified) | Isolation verified in source; reboot/QEMU persistence unverified |
 
