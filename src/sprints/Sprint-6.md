@@ -4,7 +4,7 @@
 
 **Primary Outcome:** Games installed in `/data/games/` are discovered, displayed in the shell, and their save and cache paths are correctly isolated per game. Data survives reboot.
 
-**Status:** 🟡 Implemented on host — tasks S6-T1 through S6-T7 are code-complete and building; S6-T8 isolation is source-verified. Target runtime validation (QEMU/Ally boot, GPU/icon rendering, reboot persistence, live `FactoryReset` erase, cross-compiled samples) is still pending on hardware.
+**Status:** 🟡 Implemented on host — tasks S6-T1 through S6-T5 and S6-T7 are code-complete and building; S6-T6 ships three launchable samples but the GPU triangle rendering and live controller display are **deferred to a later sprint** (the samples currently prove only the launch + display/input query path); S6-T8 isolation is source-verified. Target runtime validation (QEMU/Ally boot, GPU/icon rendering, reboot persistence, live `FactoryReset` erase, cross-compiled samples) is still pending on hardware.
 
 **Prerequisites:** Sprint 5.6 complete — repository boundaries are clean and every component's C source lives in its own repository.
 
@@ -138,7 +138,7 @@ schemas/game-manifest-v1.json
 | S6-T3 | Define game manifest v1 schema | `playos-spec` | done | `schemas/game-manifest-v1.json` created and JSON-valid |
 | S6-T4 | Implement real `playos_storage` API | `playos-platform-api` | done (Sprint 5) | Verified canonical signature; no new surface |
 | S6-T5 | Implement live game discovery in the shell | `playos-shell` | done (runtime pending) | Validation/icons/sort/skip-on-invalid added to `screen_library.c`; builds |
-| S6-T6 | Build and install three real sample games | `playos-samples`, `playos-refdistro` | done (host build) | Three samples build+run on host; overlay installed (target cross-compile unverified) |
+| S6-T6 | Build and install three real sample games | `playos-samples`, `playos-refdistro` | partial (rendering deferred) | Three samples build+run on host and install to `/data/games`; triangle renders nothing (display-query placeholder) and input-debug logs one snapshot — Raylib GPU rendering + live controller display deferred to a later sprint; target cross-compile unverified |
 | S6-T7 | Add `FactoryReset` IPC command (cache/config scope) | `playos-init` | done (runtime pending) | JSON message per `runtime-ipc.md`; handler in `ipc_handler.c` + `ipc/ipc.h`; builds |
 | S6-T8 | Persistence and isolation validation | `playos-refdistro` | partial (source-verified) | Isolation verified in source; reboot/QEMU persistence unverified |
 
@@ -247,13 +247,13 @@ Current state: `playos-shell/src/screen_library.c` already calls `playos_storage
 
 ### S6-T6 — Build and install three real sample games
 
-- `com.playos.sample-triangle` — renders a Raylib triangle; proves GPU + Wayland path works
-- `com.playos.sample-input` — displays live controller state
+- `com.playos.sample-triangle` — placeholder that reports display info and exits; **Raylib GPU triangle rendering is deferred to a later sprint** (does not yet prove the GPU/Wayland rendering path)
+- `com.playos.sample-input` — reports a single controller snapshot and exits; **live controller display is deferred** to a later sprint
 - `com.playos.sample-audio` — placeholder binary; audio will be wired in Sprint 8
 
 Each must have a valid manifest and a compiled binary that at minimum starts without crashing. These are built in `playos-samples` and packaged/installed into the rootfs overlay by `playos-refdistro` (no C source in refdistro).
 
-**Done when:** all three appear in the shell library and can be selected in the detail screen.
+**Done when:** all three appear in the shell library and can be selected in the detail screen. *(Met for the launch/query path; GPU triangle rendering and live controller display are explicitly deferred and tracked above.)*
 
 ---
 
