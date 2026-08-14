@@ -89,7 +89,7 @@ extern "C" {
 ```c
 /* include/playos/playos.h — master version header */
 #define PLAYOS_API_VERSION_MAJOR  0
-#define PLAYOS_API_VERSION_MINOR  1
+#define PLAYOS_API_VERSION_MINOR  3
 #define PLAYOS_API_VERSION_PATCH  0
 #define PLAYOS_API_VERSION        1  /* integer for runtime checks */
 ```
