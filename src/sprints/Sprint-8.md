@@ -27,7 +27,7 @@ Sprint 7 delivers a working console lifecycle but with no audio. Games on a gami
 
 ## Decisions Locked for This Sprint
 
-- **ALSA only:** no PulseAudio, no PipeWire, no SDL audio; enable Raylib's miniaudio ALSA backend (`raudio.c` → `miniaudio.h`, vendored in `playos-shell`) and link `alsa-lib`
+- **ALSA only:** no PulseAudio, no PipeWire, no SDL audio; enable Raylib's miniaudio ALSA backend (`raudio.c` → `miniaudio.h`, vendored in `playos-shell`) and link `alsa-lib`. Raylib/miniaudio has no PipeWire backend (it supports only ALSA, PulseAudio, JACK), so this is the default — but compile out PulseAudio with `MA_NO_PULSEAUDIO` (alongside the existing `MA_NO_JACK`) to guarantee only ALSA is built in.
 - **Sample rate:** 44100 Hz (document this; do not change without an ADR)
 - **Format:** signed 16-bit little-endian stereo (`SND_PCM_FORMAT_S16_LE`, 2 channels)
 - **Volume ownership:** system-wide. The shell/overlay owns the volume UI and is always honored; a game's `playos_audio_set_master_volume()`/`set_muted()` request is honored only while that game is foreground. Games may always read state via `playos_audio_get_info()`.
@@ -121,7 +121,7 @@ audio-sine/manifest.json                   # already installed as com.playos.sam
 ### S8-T1 — Enable the ALSA audio backend in Raylib's miniaudio module
 
 **Enablement:**
-1. Set `SUPPORT_MODULE_RAUDIO=1` in `playos-shell`'s vendored Raylib build; add `alsa-lib` to the Buildroot target.
+1. Set `SUPPORT_MODULE_RAUDIO=1` in `playos-shell`'s vendored Raylib build; add `alsa-lib` to the Buildroot target. Also `#define MA_NO_PULSEAUDIO` next to the existing `MA_NO_JACK` in `raudio.c` so miniaudio compiles only the ALSA backend.
 2. Confirm miniaudio's ALSA backend opens the default playback device (`default`, or `PLAYOS_AUDIO_DEVICE` if set).
 3. If the default device fails: enumerate with `snd_device_name_hint()` and select the first stereo hardware output.
 4. Params: 44100 Hz, stereo `SND_PCM_FORMAT_S16_LE` (miniaudio resamples to the device native rate/format as needed).
