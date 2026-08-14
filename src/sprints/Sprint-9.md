@@ -16,8 +16,9 @@ Sprint 8 delivers audio but the device still has no power awareness — battery 
 
 ## Start Condition Checklist
 
-- ✅ Sprint 8 complete: audio verified on the Ally (rootfs/dmix fix); gamepad wired into raylib `CORE.Input.Gamepad.*`.
-- ⚠️ `CONFIG_X86_AMD_PSTATE=y` confirmed at `br2-external/board/ally/linux.config:138` (plus `ACPI_BATTERY`, `ACPI_AC`, `POWER_SUPPLY`, `THERMAL`), but `CONFIG_X86_AMD_PSTATE_EPP=y` is **missing** — it must be enabled for the `energy_performance_preference` sysfs node this sprint writes.
+- ✅ Sprint 8 complete: ALSA audio verified on the Ally (dmix + mute-via-switch fixes); audio diagnostics landed as `src/playos-init/src/audio_debug.c` (commits `512ae05`, `f80e44a`); gamepad wired into raylib `CORE.Input.Gamepad.*`.
+- ✅ Graphics stack upgraded to GLES 3.0 (`playos-shell` `4ad17f6`) — the S9-T8 sustained-load/thermal validation now exercises the ES3 path (EGL negotiates ES3.2 on RDNA3).
+- ⚠️ `CONFIG_X86_AMD_PSTATE=y` confirmed at `br2-external/board/ally/linux.config:190` (plus `ACPI_BATTERY`, `ACPI_AC`, `POWER_SUPPLY`, `THERMAL`), but `CONFIG_X86_AMD_PSTATE_EPP=y` is **missing** — it must be enabled for the `energy_performance_preference` sysfs node this sprint writes.
 - `/sys/class/power_supply/BAT0/` exists on the Ally (verify during bringup — cannot check without hardware).
 - ✅ `playos-overlay` exists with D-pad volume controls and already renders a hardcoded `Battery: 85%   Thermal: Normal` placeholder (main.c:386) to replace with live data.
 
@@ -64,7 +65,7 @@ Sprint 8 delivers audio but the device still has no power awareness — battery 
 | `playos-platform-api` | `playos_power.h`, sysfs-backed implementation |
 | `playos-refdistro` | `playos-init` thermal monitor, enable `CONFIG_X86_AMD_PSTATE_EPP=y` in `board/ally/linux.config`, thermal.json default |
 | `playos-shell` | Battery/thermal status bar |
-| `playos-overlay` | Temperature display, profile selector, power menu |
+| `playos-refdistro` (`src/playos-overlay`, committed in-tree) | Temperature display, profile selector, power menu |
 | `playos-runtime` | Add `SetPerfProfile` request + `ThermalStateChanged`/`PerfProfileChanged` events via the existing shell listener (`Shutdown`/`Reboot` already exist from Sprint 5) |
 | `playos-spec` | Thermal policy doc, power API spec |
 
@@ -100,7 +101,7 @@ br2-external/board/common/rootfs-overlay/data/config/thermal.json
 | S9-T3 | Implement AMD P-state EPP write and profile IPC | `playos-refdistro`, `playos-runtime` | not started | requires `CONFIG_X86_AMD_PSTATE_EPP=y` first |
 | S9-T4 | Implement thermal monitoring loop in `playos-init` | `playos-refdistro` | not started | `src/playos-init/src/thermal.c` absent |
 | S9-T5 | Update shell status bar (battery, thermal indicator) | `playos-shell` | not started | no power/thermal code in shell yet |
-| S9-T6 | Update overlay (temps, profile selector, power menu) | `playos-overlay` | scaffolded | volume controls done; hardcoded `Battery: 85%  Thermal: Normal` placeholder to replace |
+| S9-T6 | Update overlay (temps, profile selector, power menu) | `playos-refdistro` (`src/playos-overlay`) | scaffolded | volume controls done; hardcoded `Battery: 85%  Thermal: Normal` placeholder to replace |
 | S9-T7 | Implement suspend/resume skeleton | `playos-refdistro`, `playos-platform-api` | not started | `PLAYOS_LIFECYCLE_SUSPEND/RESUME` already defined (0x02/0x03) |
 | S9-T8 | Power and thermal validation on Ally | `playos-refdistro` | not started | requires Ally hardware |
 
