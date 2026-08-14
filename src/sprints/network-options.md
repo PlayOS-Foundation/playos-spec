@@ -156,3 +156,5 @@ CONFIG_BT_RFCOMM=y          # HID profile
 - **Bluetooth:** defer. When it lands, introduce a private `dbus-broker` scoped to the trusted zone for BlueZ — the one subsystem that genuinely requires D-Bus.
 
 **Open decision:** `post-mvp.md` currently specifies `iwd` as the Wi-Fi stack. Choosing Option B requires updating that stack (and ideally capturing the decision as a new ADR, e.g. "ADR-0009 — Wi-Fi stack: wpa_supplicant over iwd to avoid D-Bus").
+
+**Work package:** the chosen stack is decomposed as **[Sprint 16 — `playos-net`](Sprint-16.md)**.

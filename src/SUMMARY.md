@@ -53,6 +53,8 @@
 - [Sprint 12 — Security Hardening](sprints/Sprint-12.md)
 - [Sprint 13 — Intel Expansion](sprints/Sprint-13.md)
 - [Sprint 14 — Production Readiness](sprints/Sprint-14.md)
+- [Sprint 15 — Game Developer SDK](sprints/Sprint-15.md)
+- [Sprint 16 — `playos-net` (Wi-Fi)](sprints/Sprint-16.md)
 - [Post-MVP Features](post-mvp.md)
 - [Networking Options — Wi-Fi & Bluetooth](sprints/network-options.md)
 
