@@ -1,6 +1,6 @@
 # PlayOS
 
-> A console operating environment for the ROG Ally — built on Linux, presented as a dedicated gaming console.
+> A console operating environment for handheld gaming PCs — built on Linux, presented as a dedicated gaming console.
 
 PlayOS boots directly from UEFI into a controller-first shell. A custom compositor permanently owns the display. One hardware-accelerated game runs at a time. The player never sees a Linux desktop, terminal, or login screen.
 

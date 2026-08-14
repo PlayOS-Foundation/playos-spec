@@ -1,6 +1,6 @@
 [book]
 title = "PlayOS Specification"
-description = "Architecture, API contracts, component specifications, and delivery plan for PlayOS — a console operating system for the ASUS ROG Ally."
+description = "Architecture, API contracts, component specifications, and delivery plan for PlayOS — a console operating system for handheld gaming PCs."
 authors = ["PlayOS Contributors"]
 language = "en"
 src = "src"
