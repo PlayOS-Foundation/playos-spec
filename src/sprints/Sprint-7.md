@@ -141,6 +141,8 @@ src/playos-overlay/
 6. Spawn game executable; track PID
 7. Emit `GameStarted { game_id, pid, launch_token }` to the shell over `control.sock`
 
+> **Note:** the `GameStarted` / `GameExited` / `GameCrashed` message types are already declared in `ipc/ipc.h`, but `playos-init` currently **never emits them** — `playos_supervisor_game_exited` only writes to `init.log`. S7-T1 wires up `GameStarted`; S7-T7 wires up the exit/crash emissions. Do not add new protocol types.
+
 **Done when:** `com.playos.sample-input` launches from the shell, receives the environment variables, the compositor logs `SetExpectedGame`, and the shell receives `GameStarted`.
 
 ### S7-T2 — Implement full compositor state machine
@@ -244,14 +246,16 @@ Regenerate Wayland scanner outputs. Only the trusted `playos-overlay` client use
 
 **Clean exit:**
 1. `playos-init` records exit status; closes lifecycle pipe write-end
-2. Compositor detects Wayland client disconnect; transitions to `SHELL_FOREGROUND`
-3. Shell surface is unhidden and refocused; library scroll position restored
-4. Shell shows no notification on clean exit
+2. `playos-init` emits `GameExited { game_id, exit_code }` to the shell over `control.sock` (types already declared in `ipc/ipc.h` — no new protocol)
+3. Compositor detects Wayland client disconnect; transitions to `SHELL_FOREGROUND`
+4. Shell surface is unhidden and refocused; library scroll position restored
+5. Shell shows no notification on clean exit
 
 **Crash (non-zero exit or signal):**
 1. Same compositor recovery
-2. Shell shows a non-intrusive toast notification: "Game exited unexpectedly"
-3. Options: "Restart" (re-sends `LaunchGame`) or "Back to Library" (dismiss)
+2. `playos-init` emits `GameCrashed { game_id, exit_code, signal }` to the shell over `control.sock`
+3. Shell shows a non-intrusive toast notification: "Game exited unexpectedly"
+4. Options: "Restart" (re-sends `LaunchGame`) or "Back to Library" (dismiss)
 
 **Invariant:** A game crash must NEVER reveal a Linux terminal, leave the display black for >500ms, or require reboot.
 
@@ -292,6 +296,16 @@ The shell surface must remain visible until the game's first Wayland buffer is c
 ### Game cooperative behavior on background
 
 On `PLAYOS_LIFECYCLE_BACKGROUND`, a cooperative game should pause gameplay, stop/mute audio, reduce rendering (0 FPS acceptable while backgrounded), and write an autosave if implemented. If CPU does not drop within `GAME_PAUSE_TIMEOUT_MS` (default 500ms), `playos-init` falls back to `SIGSTOP`.
+
+### Code hygiene (deferred cleanup)
+
+While touching `playos-init` for S7-T1/S7-T7, remove the dead code that Sprint 6 left behind so the launch/lifecycle path has a single obvious implementation:
+
+- `playos_spawn_child()` in `src/child_process.c` — unused; the supervisor spawns everything directly.
+- `playos_supervisor_spawn_test_client()` / `spawn_test_client()` in `src/supervisor.c` — unused; the `ipc-test-client` self-test is spawned from `main.c`.
+- `playos_recovery_enter()` / `playos_recovery_loop()` in `src/recovery.c` — unused; the live recovery path is `playos_enter_recovery()` in `src/supervisor.c`. Delete `recovery.c` (and its header) or fold the banner into `playos_enter_recovery()`.
+
+**Done when:** `grep` finds no callers of the above and the tree still builds/tests green.
 
 ---
 
