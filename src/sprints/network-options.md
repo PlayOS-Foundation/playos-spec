@@ -41,7 +41,29 @@ A system-wide D-Bus bus is a **second, parallel internal IPC mechanism**, which 
 
 ---
 
-## 4. Option A — `iwd` + private D-Bus
+## 4. Reusing the Existing IPC as the Control Plane
+
+A common question: PlayOS already has an IPC mechanism (`control.sock` / `compositor.sock`) — can it be used for networking instead of introducing anything new?
+
+**Yes — but transport and implementation are distinct:**
+
+| Concern | Owner |
+|---|---|
+| Carry messages between trusted components | `playos-runtime` (`control.sock`) — already exists |
+| Actually do Wi-Fi (scan, associate, WPA2/WPA3 4-way handshake over `nl80211`) | `wpa_supplicant` (or `iwd`) — a daemon |
+
+These are orthogonal. `playos-runtime` cannot speak `nl80211` without reimplementing a supplicant (Option C), so a supplicant daemon is still required underneath. The IPC mechanism is the **control plane**; the supplicant is the **engine**.
+
+**The bridge/glue:** `wpa_supplicant` has its own control protocol over its own private socket (`libwpa_client`/`wpa_ctrl`). Something must translate between that and PlayOS's JSON frames. The glue lives in one of two places:
+
+1. **A dedicated `playos-net` daemon** (recommended) — links `libwpa_client`, exposes new `playos-runtime` messages (`Scan`, `Connect`, `Status`) on `control.sock`. Matches the `playos-net` naming in `post-mvp.md` and keeps `playos-init` scoped to supervision (`architecture.md` already says init "Does NOT own: network").
+2. **Folded into `playos-init`** — one fewer daemon, but muddies init's supervision charter.
+
+**Result with `wpa_supplicant` (Option B):** D-Bus disappears entirely. The only sockets are the existing `control.sock`/`compositor.sock` plus `wpa_supplicant`'s and `dhcpcd`'s private sockets — all `root:playos-trusted` `0660`, invisible to games. The shell already sends `LaunchGame` over `control.sock`; it would send `Connect` the same way.
+
+---
+
+## 5. Option A — `iwd` + private D-Bus
 
 `iwd` is modern, minimal, has cleaner WPA3 handling, and bundles its own DHCP client (so it needs no separate client and no BusyBox). But it is **D-Bus-only** — there is no non-D-Bus build.
 
@@ -59,7 +81,7 @@ To make it fit, D-Bus would be scoped as follows:
 
 ---
 
-## 5. Option B — `wpa_supplicant` + `dhcpcd` (D-Bus-free) — recommended
+## 6. Option B — `wpa_supplicant` + `dhcpcd` (D-Bus-free) — recommended
 
 `wpa_supplicant` talks to the kernel over `nl80211` and exposes a **plain Unix socket control interface**. It can be built with D-Bus entirely disabled:
 
@@ -84,13 +106,13 @@ The wpa_supplicant control socket becomes just another `root:playos-trusted` `06
 
 ---
 
-## 6. Option C — Custom `nl80211` supplicant (rejected)
+## 7. Option C — Custom `nl80211` supplicant (rejected)
 
 Writing a minimal Wi-Fi manager that talks `nl80211` directly avoids all daemons, but re-implements the WPA2/WPA3 4-way handshake, EAP, and crypto. This is weeks of correctness- and security-critical work for zero user-visible benefit. Rejected.
 
 ---
 
-## 7. Bluetooth
+## 8. Bluetooth
 
 Bluetooth is the harder case: **BlueZ is D-Bus-only, and there is no D-Bus-free alternative** for modern controller/audio use.
 
@@ -104,11 +126,11 @@ Two paths:
 | Land Wi-Fi D-Bus-free now (Option B); introduce a private `dbus-broker` later when BT lands | Wi-Fi ships without D-Bus; BT justifies the single private bus later |
 | Accept private D-Bus up front (Option A) for both | One IPC addition amortised across Wi-Fi + BT, at the cost of D-Bus presence earlier |
 
-Either way, the D-Bus bus — if introduced for BlueZ — must be scoped exactly as in §4: private, `root:playos-trusted`, invisible to games.
+Either way, the D-Bus bus — if introduced for BlueZ — must be scoped exactly as in §5: private, `root:playos-trusted`, invisible to games.
 
 ---
 
-## 8. Kernel & Firmware
+## 9. Kernel & Firmware
 
 ```kconfig
 # Wi-Fi (post-MVP enablement)
@@ -128,7 +150,7 @@ CONFIG_BT_RFCOMM=y          # HID profile
 
 ---
 
-## 9. Recommendation
+## 10. Recommendation
 
 - **Wi-Fi:** Option B — `wpa_supplicant` (D-Bus-free) + `dhcpcd` + a trusted `playos-net` bridge. It lands networking with zero D-Bus and zero BusyBox, fully consistent with the existing IPC model.
 - **Bluetooth:** defer. When it lands, introduce a private `dbus-broker` scoped to the trusted zone for BlueZ — the one subsystem that genuinely requires D-Bus.
