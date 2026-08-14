@@ -75,6 +75,13 @@ These features are most commonly requested and have direct dependencies on shipp
 **Depends on:** Vulkan Support (RADV / ANV) landing first, so the wlroots Vulkan renderer and WSI path exist; Sprint 13 backend abstraction proven on Intel.  
 **Note:** Deferred past Sprint 13 deliberately — Intel (`i915`) is the cheapest portability proof, and Nouveau power/reclocking maturity lags `amdgpu`, a real battery concern for a handheld.
 
+### PPSSPP (PSP) Emulator Sample via libretro
+**Motivation:** Ship a real PSP ISO game as a Sample Application, launched from `playos-shell` through a libretro PPSSPP core — a strong end-to-end proof of the sample/shell/SDK story using a real, redistributable game payload.  
+**Stack:** libretro PPSSPP core (`ppsspp_libretro`) — GPLv2, `hw_render=true`, requires OpenGL ES ≥ 2.0, `needs_fullpath=true`, plus its asset pack (`ppge_atlas.zim`, `lang/`, `flash0/`; redistributable, not a BIOS).  
+**Scope:** A libretro frontend shipped as a `bin/game` sample that hands off the GL context to the core, feeds input through the `libplayos` controller ABI, and maps save data to `/data/saves/<game-id>/`.  
+**Dependency to resolve:** GL-context hand-off. Raylib's `PLATFORM_PLAYOS` backend (`rcore_playos.c`) owns the EGL/GLES context; the frontend must either expose that context (small additive change) or drive raw EGL/GLES + `libplayos` directly, bypassing raylib for this one sample. This is a libretro requirement, not a raylib limitation — emulator frontends sit on raw GL, not a game library.  
+**Depends on:** Stable game ABI (raylib backend + `libplayos`), SDK build profile that can cross-compile the libretro frontend, and the context-exposure decision above.
+
 ### VRR and HDR
 **Motivation:** ROG Ally display supports high refresh rates; future external displays may support VRR/HDR  
 **Stack:** DRM VRR (`drm_connector.vrr_capable`); KMS HDR metadata  
