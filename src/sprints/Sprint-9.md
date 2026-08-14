@@ -4,7 +4,7 @@
 
 **Primary Outcome:** Shell and overlay show live battery level and thermal state. A performance profile can be requested. Thermal throttling kicks in before dangerous temperatures. The ROG Ally does not overheat under sustained load.
 
-**Prerequisites:** Sprint 8 complete — full audio and lifecycle working.
+**Prerequisites:** Sprint 8 complete — full audio and lifecycle working. ✅ Satisfied (audio verified on Ally; gamepad wired into raylib).
 
 ---
 
@@ -16,10 +16,10 @@ Sprint 8 delivers audio but the device still has no power awareness — battery 
 
 ## Start Condition Checklist
 
-- Sprint 8 complete: audio and full lifecycle working on the Ally.
-- Kernel config includes `CONFIG_X86_AMD_PSTATE` (confirm in Sprint 1 defconfig).
-- `/sys/class/power_supply/BAT0/` exists on the Ally (verify during Sprint 9 bringup).
-- `playos-overlay` exists with volume controls; this sprint extends it.
+- ✅ Sprint 8 complete: audio verified on the Ally (rootfs/dmix fix); gamepad wired into raylib `CORE.Input.Gamepad.*`.
+- ⚠️ `CONFIG_X86_AMD_PSTATE=y` confirmed at `br2-external/board/ally/linux.config:138` (plus `ACPI_BATTERY`, `ACPI_AC`, `POWER_SUPPLY`, `THERMAL`), but `CONFIG_X86_AMD_PSTATE_EPP=y` is **missing** — it must be enabled for the `energy_performance_preference` sysfs node this sprint writes.
+- `/sys/class/power_supply/BAT0/` exists on the Ally (verify during bringup — cannot check without hardware).
+- ✅ `playos-overlay` exists with D-pad volume controls and already renders a hardcoded `Battery: 85%   Thermal: Normal` placeholder (main.c:386) to replace with live data.
 
 ---
 
@@ -31,6 +31,8 @@ Sprint 8 delivers audio but the device still has no power awareness — battery 
 - **Thermal thresholds:** values defined here are the locked defaults for MVP; overridable via `/data/config/thermal.json`
 - **Suspend:** skeleton only — deliver lifecycle events, attempt `echo mem > /sys/power/state`; stability is post-MVP
 - **TDP tuning:** defer vendor WMI/ACPI TDP control unless the device runs critically hot at `balance_performance`
+- **Kernel P-state support:** enable `CONFIG_X86_AMD_PSTATE_EPP=y` in `br2-external/board/ally/linux.config` so `energy_performance_preference` exists (today only `CONFIG_X86_AMD_PSTATE=y` is set).
+- **Event channel:** `ThermalStateChanged` and `PerfProfileChanged` reuse the existing Sprint-7 shell listener (`playos_trusted_register_shell` / `playos_trusted_shell_poll`); no new IPC transport.
 
 ---
 
@@ -60,10 +62,10 @@ Sprint 8 delivers audio but the device still has no power awareness — battery 
 | Repo | Required work |
 |---|---|
 | `playos-platform-api` | `playos_power.h`, sysfs-backed implementation |
-| `playos-refdistro` | `playos-init` thermal monitor, AMD P-state in kernel defconfig, thermal.json default |
+| `playos-refdistro` | `playos-init` thermal monitor, enable `CONFIG_X86_AMD_PSTATE_EPP=y` in `board/ally/linux.config`, thermal.json default |
 | `playos-shell` | Battery/thermal status bar |
 | `playos-overlay` | Temperature display, profile selector, power menu |
-| `playos-runtime` | `SetPerfProfile`, `ThermalStateChanged`, `Shutdown`, `Reboot` IPC commands |
+| `playos-runtime` | Add `SetPerfProfile` request + `ThermalStateChanged`/`PerfProfileChanged` events via the existing shell listener (`Shutdown`/`Reboot` already exist from Sprint 5) |
 | `playos-spec` | Thermal policy doc, power API spec |
 
 ---
@@ -80,7 +82,8 @@ src/playos_power.c           # sysfs reader, IPC request for profile changes
 ### `playos-refdistro`
 
 ```text
-src/playos-init/src/thermal.c    # 1 Hz monitor loop, P-state writer, IPC notifier
+src/playos-init/src/thermal.c                      # 1 Hz monitor loop, P-state writer, IPC notifier
+br2-external/board/ally/linux.config               # add CONFIG_X86_AMD_PSTATE_EPP=y
 br2-external/board/common/rootfs-overlay/data/config/thermal.json
 ```
 
@@ -92,16 +95,18 @@ br2-external/board/common/rootfs-overlay/data/config/thermal.json
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S9-T1 | Define and implement `playos_power.h` API | `playos-platform-api` | not started | |
-| S9-T2 | Implement sysfs-backed battery and temperature reads | `playos-platform-api` | not started | |
-| S9-T3 | Implement AMD P-state EPP write and profile IPC | `playos-refdistro`, `playos-runtime` | not started | |
-| S9-T4 | Implement thermal monitoring loop in `playos-init` | `playos-refdistro` | not started | |
-| S9-T5 | Update shell status bar (battery, thermal indicator) | `playos-shell` | not started | |
-| S9-T6 | Update overlay (temps, profile selector, power menu) | `playos-overlay` | not started | |
-| S9-T7 | Implement suspend/resume skeleton | `playos-refdistro`, `playos-platform-api` | not started | |
-| S9-T8 | Power and thermal validation on Ally | `playos-refdistro` | not started | |
+| S9-T1 | Define and implement `playos_power.h` API | `playos-platform-api` | header done | `playos_power.h` exists and matches spec; `playos_power.c` is a stub returning -1 |
+| S9-T2 | Implement sysfs-backed battery and temperature reads | `playos-platform-api` | not started | stub returns -1; no sysfs reads yet |
+| S9-T3 | Implement AMD P-state EPP write and profile IPC | `playos-refdistro`, `playos-runtime` | not started | requires `CONFIG_X86_AMD_PSTATE_EPP=y` first |
+| S9-T4 | Implement thermal monitoring loop in `playos-init` | `playos-refdistro` | not started | `src/playos-init/src/thermal.c` absent |
+| S9-T5 | Update shell status bar (battery, thermal indicator) | `playos-shell` | not started | no power/thermal code in shell yet |
+| S9-T6 | Update overlay (temps, profile selector, power menu) | `playos-overlay` | scaffolded | volume controls done; hardcoded `Battery: 85%  Thermal: Normal` placeholder to replace |
+| S9-T7 | Implement suspend/resume skeleton | `playos-refdistro`, `playos-platform-api` | not started | `PLAYOS_LIFECYCLE_SUSPEND/RESUME` already defined (0x02/0x03) |
+| S9-T8 | Power and thermal validation on Ally | `playos-refdistro` | not started | requires Ally hardware |
 
 ### S9-T1 — Define and implement `playos_power.h` API
+
+> **Status:** `include/playos/playos_power.h` already exists and matches this spec exactly; `src/playos_power.c` is a stub returning -1. Remaining work is the implementation, not the API surface.
 
 ```c
 typedef enum { PLAYOS_POWER_STATE_ON_BATTERY, PLAYOS_POWER_STATE_CHARGING,
@@ -147,6 +152,8 @@ int playos_power_request_profile(PlayOSPerfProfile profile);
 
 ### S9-T3 — Implement AMD P-state EPP write and profile IPC
 
+> **Prereq:** `energy_performance_preference` only exists when `CONFIG_X86_AMD_PSTATE_EPP=y`. Add it to `br2-external/board/ally/linux.config` first; without it the driver exposes only `scaling_governor`.
+
 Profile → EPP mapping:
 
 | PlayOS profile | AMD EPP value |
@@ -158,7 +165,7 @@ Profile → EPP mapping:
 - `playos-init` receives `SetPerfProfile { profile }` IPC
 - Validates the request against current thermal state (reject `PERFORMANCE` if `HOT` or `CRITICAL`)
 - Writes EPP string to all online CPUs: `/sys/devices/system/cpu/cpuN/cpufreq/energy_performance_preference`
-- Emits `PerfProfileChanged { profile }` event to subscribers
+- Emits `PerfProfileChanged { profile }` event over the Sprint-7 shell listener
 
 **Done when:** `SetPerfProfile { PLAYOS_PERF_PERFORMANCE }` is accepted when thermal state is NORMAL; rejected when HOT.
 
@@ -187,11 +194,13 @@ Add to the shell's bottom status bar:
 - Battery percentage + charging indicator (⚡ when charging)
 - Thermal state color indicator (green = NORMAL, yellow = WARM, red = HOT/CRITICAL)
 - Active performance profile indicator
-- Refresh every 30 seconds (or immediately on `ThermalStateChanged` / `PerfProfileChanged` IPC event)
+- Refresh every 30 seconds (or immediately on a `ThermalStateChanged` / `PerfProfileChanged` event from the Sprint-7 shell listener)
 
 **Done when:** plugging and unplugging the charger updates the charging indicator within 30 s; running a stress test changes the thermal indicator to yellow.
 
 ### S9-T6 — Update overlay (temperatures, profile selector, power menu)
+
+> **Status:** overlay already renders a hardcoded `Battery: 85%   Thermal: Normal` line (main.c:386) and D-pad volume controls; replace the placeholder with live `playos_power_get_info()` data. The profile selector's D-pad + A confirm is now available via the Sprint-8 gamepad wiring.
 
 Add to `playos-overlay`:
 - Battery percentage and estimated time remaining
@@ -205,7 +214,7 @@ Add to `playos-overlay`:
 
 ### S9-T7 — Implement suspend/resume skeleton
 
-- Add `PLAYOS_LIFECYCLE_SUSPEND` and `PLAYOS_LIFECYCLE_RESUME` to the enum (already defined — ensure they are handled without crash in all lifecycle consumers)
+- `PLAYOS_LIFECYCLE_SUSPEND` (0x02) and `PLAYOS_LIFECYCLE_RESUME` (0x03) are already defined in `playos-init/ipc/ipc.h`; this task only ensures every lifecycle consumer handles them without crashing
 - On lid close event or suspend button: deliver `PLAYOS_LIFECYCLE_SUSPEND` to any running game; attempt `echo mem > /sys/power/state`
 - If the write fails: log the error; continue running
 - On resume (if successful): deliver `PLAYOS_LIFECYCLE_RESUME`
@@ -286,179 +295,6 @@ Sprint 10 may assume:
 - Thermal thresholds are configurable via `/data/config/thermal.json`
 - Suspend skeleton exists; the event lifecycle is complete
 - The overlay is a stable client that can receive further extension (update progress UI, Sprint 11)
-
----
-
-## Exit Gate
-
-Battery, thermal, and power status are live in the shell and overlay. Thermal throttling prevents dangerous temperatures. Performance profiles can be requested by games and set via the overlay.
-
-*Previous: [Sprint 8](Sprint-8.md) | Next: [Sprint 10](Sprint-10.md)*
-
-Define `include/playos/playos_power.h`:
-
-```c
-typedef enum {
-    PLAYOS_POWER_STATE_ON_BATTERY,
-    PLAYOS_POWER_STATE_CHARGING,
-    PLAYOS_POWER_STATE_CHARGED,
-    PLAYOS_POWER_STATE_UNKNOWN
-} PlayOSPowerState;
-
-typedef enum {
-    PLAYOS_THERMAL_NORMAL,
-    PLAYOS_THERMAL_WARM,
-    PLAYOS_THERMAL_HOT,
-    PLAYOS_THERMAL_CRITICAL
-} PlayOSThermalState;
-
-typedef enum {
-    PLAYOS_PERF_BALANCED,       /* Default — system-managed */
-    PLAYOS_PERF_POWER_SAVE,     /* Low TDP — extend battery */
-    PLAYOS_PERF_PERFORMANCE,    /* High TDP — better GPU/CPU, shorter battery */
-} PlayOSPerfProfile;
-
-typedef struct {
-    PlayOSPowerState   power_state;
-    int                battery_percent;   /* 0–100; -1 if unknown */
-    int                minutes_remaining; /* -1 if unknown or charging */
-    PlayOSThermalState thermal_state;
-    int                cpu_temp_c;        /* -1 if unknown */
-    int                gpu_temp_c;        /* -1 if unknown */
-    PlayOSPerfProfile  active_profile;
-} PlayOSPowerInfo;
-
-int playos_power_get_info(PlayOSPowerInfo *info);
-
-/* Request a performance profile. PlayOS may reject or delay the change.
-   Returns 0 if the request was accepted, -1 if denied. */
-int playos_power_request_profile(PlayOSPerfProfile profile);
-```
-
-**Implementation — read from sysfs:**
-
-| Data | sysfs path |
-|---|---|
-| Battery capacity | `/sys/class/power_supply/BAT0/capacity` |
-| Charging state | `/sys/class/power_supply/BAT0/status` |
-| Time to empty | `/sys/class/power_supply/BAT0/time_to_empty_now` (if available) |
-| CPU temperature | `/sys/class/thermal/thermal_zone*/temp` (find "x86_pkg_temp") |
-| GPU temperature | `/sys/class/drm/card*/device/hwmon/hwmon*/temp1_input` |
-| AMD P-state | `/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference` |
-
-### AMD P-state Integration
-
-The ROG Ally uses AMD CPU with P-state support (`CONFIG_X86_AMD_PSTATE`).
-
-**Profile mapping to AMD P-state hints:**
-
-| PlayOS profile | AMD EPP value |
-|---|---|
-| `PLAYOS_PERF_BALANCED` | `balance_performance` |
-| `PLAYOS_PERF_POWER_SAVE` | `power` |
-| `PLAYOS_PERF_PERFORMANCE` | `performance` |
-
-Write the EPP string to all online CPUs:
-```
-/sys/devices/system/cpu/cpuN/cpufreq/energy_performance_preference
-```
-
-Only `playos-init` (root) may write to these sysfs paths. Games request a profile through `playos_power_request_profile()`, which goes via IPC to `playos-init` for validation and application.
-
-**TDP control (if supported by the Ally firmware via ACPI/WMI):**
-- Defer vendor-specific TDP tuning to post-MVP unless it is required for safe operation
-- If the device runs dangerously hot at max P-state, apply a safe TDP cap by default
-
-### Thermal Management
-
-**Thermal zones to monitor:**
-- CPU package temperature
-- GPU temperature
-- SoC/APU composite (if available)
-
-**Thermal state thresholds (tunable via `/data/config/thermal.json`):**
-
-| State | CPU/GPU temp |
-|---|---|
-| NORMAL | < 75°C |
-| WARM | 75–85°C |
-| HOT | 85–95°C |
-| CRITICAL | ≥ 95°C |
-
-**Thermal actions:**
-
-| State | Action |
-|---|---|
-| WARM | Log; show thermal indicator in overlay status bar |
-| HOT | Switch to `PLAYOS_PERF_BALANCED`; log; notify shell |
-| CRITICAL | Force `PLAYOS_PERF_POWER_SAVE`; display warning in overlay; if unresolved in 10s, graceful shutdown |
-
-`playos-init` owns the thermal monitoring loop (1 Hz poll). It applies P-state changes. The compositor/shell are notified via IPC events.
-
-### Shell and Overlay Updates
-
-**Shell status bar (bottom):**
-- Battery percentage + charging indicator (⚡)
-- Thermal state indicator (color: green/yellow/red)
-- Active performance profile indicator
-
-**Overlay additions:**
-- Battery percentage, estimated time remaining
-- Current GPU and CPU temperatures
-- Performance profile selector (D-pad to cycle, A to confirm)
-- Power menu: "Sleep" (disabled — placeholder), "Restart", "Shutdown"
-
-**Shutdown/Reboot from overlay:** Call `playos-init`'s `Shutdown` or `Reboot` IPC command.
-
-### Suspend/Resume Foundations (Skeleton Only)
-
-Full suspend/resume is a post-MVP feature, but lay the foundations:
-- Add `PLAYOS_LIFECYCLE_SUSPEND` and `PLAYOS_LIFECYCLE_RESUME` to the lifecycle enum (already defined, now ensure they are handled gracefully)
-- On lid close or suspend key press: deliver `PLAYOS_LIFECYCLE_SUSPEND` to the game, then attempt a system suspend via `/sys/power/state = mem`
-- If suspend fails: log the error; remain running
-- On resume: deliver `PLAYOS_LIFECYCLE_RESUME`
-
-For this sprint: test that lifecycle events are delivered correctly. Actual suspend/resume stability is post-MVP.
-
----
-
-## Acceptance Criteria
-
-- [ ] Shell status bar shows live battery percentage; updates every 30 seconds
-- [ ] Charging state is reflected correctly (shows ⚡ when plugged in)
-- [ ] CPU and GPU temperatures visible in overlay
-- [ ] Thermal state changes from NORMAL → WARM at 75°C (simulate by running a stress test)
-- [ ] At HOT state: system switches to balanced P-state; overlay shows warning
-- [ ] `playos_power_request_profile(PLAYOS_PERF_PERFORMANCE)` is honored when thermal state is NORMAL
-- [ ] `playos_power_request_profile(PLAYOS_PERF_PERFORMANCE)` is denied or overridden when thermal state is HOT
-- [ ] Shutdown from overlay: system shuts down cleanly (filesystems synced)
-- [ ] Restart from overlay: system reboots cleanly
-- [ ] `PLAYOS_LIFECYCLE_SUSPEND` and `PLAYOS_LIFECYCLE_RESUME` are delivered without crashing
-- [ ] Running `com.playos.sample-triangle` under sustained load does not cause GPU hang or kernel panic
-- [ ] CI passes
-
----
-
-## Repositories Primarily Involved
-
-| Repo | Work |
-|---|---|
-| `playos-platform-api` | `playos_power.h` API, sysfs-backed implementation |
-| `playos-refdistro` | Thermal config, AMD P-state in kernel config, `playos-init` thermal monitor |
-| `playos-shell` | Battery/thermal status bar |
-| `playos-overlay` | Temperature, profile selector, power menu |
-| `playos-runtime` | `SetPerfProfile`, `ThermalStateChanged` IPC events |
-| `playos-spec` | Thermal policy document, power API spec |
-
----
-
-## Testing Approach
-
-- Physical ROG Ally required
-- Battery test: run sample game for 10 minutes; verify percentage decreases on battery
-- Thermal test: run a CPU/GPU stress tool; verify thermal state progression and P-state downgrade
-- Shutdown/restart: verify via overlay controls; verify filesystem integrity after restart
-- Suspend skeleton: deliver suspend event; verify game pauses; resume; verify game continues
 
 ---
 
