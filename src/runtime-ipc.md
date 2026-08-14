@@ -236,10 +236,18 @@ Requires no active game. Erases selected `/data/` subdirectories and recreates t
   "v": 1,
   "type": "GameExited",
   "game_id": "com.example.game",
-  "pid": 456,
-  "exit_code": 0,
-  "signal": 0,
-  "crashed": false
+  "exit_code": 0
+}
+```
+
+#### `GameCrashed`
+```json
+{
+  "v": 1,
+  "type": "GameCrashed",
+  "game_id": "com.example.game",
+  "exit_code": 134,
+  "signal": 6
 }
 ```
 
