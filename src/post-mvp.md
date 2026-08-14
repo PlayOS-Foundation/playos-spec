@@ -15,7 +15,8 @@ These features are most commonly requested and have direct dependencies on shipp
 **Motivation:** Users need network access for future store downloads, cloud saves, and updates.  
 **Stack:** `iwd` (iNet Wireless Daemon) — minimal, no NetworkManager  
 **Scope:** Connect to WPA2/WPA3 networks; Wi-Fi settings screen in shell  
-**Depends on:** Networking enabled in kernel config (deferred in MVP)
+**Depends on:** Networking enabled in kernel config (deferred in MVP)  
+**Options:** See [networking options](sprints/network-options.md) for the D-Bus trade-off and the D-Bus-free `wpa_supplicant` alternative.
 
 ### SSH Developer Mode (Dropbear)
 **Motivation:** Developers need remote access for debugging without a physical serial connection.  

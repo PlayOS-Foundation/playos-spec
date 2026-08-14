@@ -54,6 +54,7 @@
 - [Sprint 13 — Intel Expansion](sprints/Sprint-13.md)
 - [Sprint 14 — Production Readiness](sprints/Sprint-14.md)
 - [Post-MVP Features](post-mvp.md)
+- [Networking Options — Wi-Fi & Bluetooth](sprints/network-options.md)
 
 ---
 
