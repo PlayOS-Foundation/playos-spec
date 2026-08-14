@@ -55,6 +55,7 @@
 - [Sprint 14 — Production Readiness](sprints/Sprint-14.md)
 - [Sprint 15 — Game Developer SDK](sprints/Sprint-15.md)
 - [Sprint 16 — `playos-net` (Wi-Fi)](sprints/Sprint-16.md)
+- [Sprint 17 — Touch Input + On-Screen Keyboard (OSK)](sprints/Sprint-17.md)
 - [Post-MVP Features](post-mvp.md)
 - [Networking Options — Wi-Fi & Bluetooth](sprints/network-options.md)
 

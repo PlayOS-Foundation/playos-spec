@@ -18,6 +18,13 @@ These features are most commonly requested and have direct dependencies on shipp
 **Depends on:** Networking enabled in kernel config (deferred in MVP)  
 **Options:** See [networking options](sprints/network-options.md) for the D-Bus trade-off and the D-Bus-free `wpa_supplicant` alternative.
 
+### Touch + On-Screen Keyboard (OSK)
+**Motivation:** The ROG Ally touchscreen is currently inert (no `wl_touch` forwarding), and every text-entry flow (Wi-Fi passphrase, search, save naming, profiles) needs a keyboard.  
+**Stack:** Touch/pointer via the Wayland seat (`wl_pointer`/`wl_touch` + `wlr_scene` hit-testing); text input via upstream `zwp_text_input_v3` (`wlr_text_input_v3`); OSK UI rendered by `playos-overlay` as a raylib component.  
+**Scope:** Touch reaches the focused surface (`GetTouchPosition`); a single system OSK is invokable by both the shell and games and delivers `commit_string` to the focused client.  
+**Depends on:** MVP input API stable; Sprint 7 overlay architecture; Sprint 8 gamepad-input precedent.  
+**Sprint:** [Sprint 17](sprints/Sprint-17.md)
+
 ### SSH Developer Mode (Dropbear)
 **Motivation:** Developers need remote access for debugging without a physical serial connection.  
 **Policy:** SSH is present only in Developer Mode, which requires explicit user opt-in. Not enabled by default. Absent from retail builds.  
