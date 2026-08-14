@@ -68,6 +68,13 @@ These features are most commonly requested and have direct dependencies on shipp
 **Scope:** Add RADV to the ROG Ally Buildroot config; add Vulkan WSI path to the Raylib backend or expose raw Vulkan surface to games  
 **Depends on:** MVP graphics stack stable; no compositor ownership change needed
 
+### NVIDIA Backend (Nouveau + NVK + Zink)
+**Motivation:** Extend the Sprint 13 portability proof (PCI enumeration + `playos-platform-api` backend abstraction) to a third vendor. NVIDIA's *open-source* stack is musl-compatible, unlike the proprietary userspace, which is glibc-only and off-limits for PlayOS (ADR-0003 musl).  
+**Stack:** Nouveau (in-kernel DRM/KMS) + Mesa NVK (Vulkan) + Zink (GL/GLES on Vulkan); signed GSP firmware for Turing+ (redistributable via linux-firmware).  
+**Scope:** Add a `nouveau` DRM/KMS + NVK + Zink Buildroot config and a third `libplayos` backend variant. Requires the wlroots **Vulkan** renderer (current renderer is GLES2/EGL, and Nouveau's Gallium GL is weak — NVK→Zink is the mature path).  
+**Depends on:** Vulkan Support (RADV / ANV) landing first, so the wlroots Vulkan renderer and WSI path exist; Sprint 13 backend abstraction proven on Intel.  
+**Note:** Deferred past Sprint 13 deliberately — Intel (`i915`) is the cheapest portability proof, and Nouveau power/reclocking maturity lags `amdgpu`, a real battery concern for a handheld.
+
 ### VRR and HDR
 **Motivation:** ROG Ally display supports high refresh rates; future external displays may support VRR/HDR  
 **Stack:** DRM VRR (`drm_connector.vrr_capable`); KMS HDR metadata  
