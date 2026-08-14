@@ -10,27 +10,29 @@
 
 ## Why This Sprint Exists
 
-Sprint 7 delivers a working console lifecycle but with no audio. Games on a gaming device must have audio. Sprint 8 wires ALSA directly into the Raylib backend already established in `rcore_playos.c`, making audio a first-class feature that works correctly across all lifecycle transitions.
+Sprint 7 delivers a working console lifecycle but with no audio. Games on a gaming device must have audio. Sprint 8 enables ALSA audio through Raylib's miniaudio backend and implements the system audio controls, making audio a first-class feature that works correctly across all lifecycle transitions.
 
 ---
 
 ## Start Condition Checklist
 
 - Sprint 7 complete: full lifecycle (launch/background/resume/quit/crash) working on the Ally.
-- `rcore_playos.c` exists in `playos-shell` from Sprint 5.
-- `playos-overlay` exists with volume control placeholder from Sprint 7.
+- Raylib 6.0 vendored in `playos-shell`; miniaudio audio module present but disabled (`SUPPORT_MODULE_RAUDIO=0`).
+- `playos_audio.h`/`playos_audio.c` stub exists in `playos-platform-api`.
+- `com.playos.sample-audio` placeholder exists in `playos-samples/audio-sine`.
+- `playos-overlay` source lives in `playos-refdistro/src/playos-overlay/` (Sprint 7).
 - ROG Ally audio hardware confirmed working in Linux (ALSA recognizes the device).
 
 ---
 
 ## Decisions Locked for This Sprint
 
-- **ALSA only:** no PulseAudio, no PipeWire, no SDL audio; direct ALSA PCM in `rcore_playos.c`
+- **ALSA only:** no PulseAudio, no PipeWire, no SDL audio; enable Raylib's miniaudio ALSA backend (`raudio.c` → `miniaudio.h`, vendored in `playos-shell`) and link `alsa-lib`
 - **Sample rate:** 44100 Hz (document this; do not change without an ADR)
 - **Format:** signed 16-bit little-endian stereo (`SND_PCM_FORMAT_S16_LE`, 2 channels)
-- **Volume ownership:** system-wide; only the shell/overlay may call `playos_audio_set_master_volume()`; games cannot change master volume
+- **Volume ownership:** system-wide. The shell/overlay owns the volume UI and is always honored; a game's `playos_audio_set_master_volume()`/`set_muted()` request is honored only while that game is foreground. Games may always read state via `playos_audio_get_info()`.
 - **Device priority:** `PLAYOS_AUDIO_DEVICE` env var → headphone jack → built-in speakers
-- **Audio thread policy:** `SCHED_FIFO` or `SCHED_RR` with a safe priority; document the chosen value
+- **Audio thread policy:** miniaudio owns the mixing thread; if a real-time class is needed use `SCHED_FIFO`/`SCHED_RR` at a safe priority and document the value
 
 ---
 
@@ -38,9 +40,9 @@ Sprint 7 delivers a working console lifecycle but with no audio. Games on a gami
 
 ### In Scope
 
-- ALSA PCM backend in `rcore_playos.c`
-- `playos_audio.h` public API
-- Audio lifecycle behavior (pause on BACKGROUND, resume on FOREGROUND, stop on TERMINATE)
+- ALSA PCM backend via Raylib's miniaudio module (`raudio.c`), enabled in `playos-shell`
+- `playos_audio.h` public API — implement the existing `playos-platform-api` stub
+- Audio lifecycle behavior (pause on BACKGROUND/SUSPEND, resume on FOREGROUND/RESUME, stop on TERMINATE)
 - Headphone jack detection and routing switch
 - Volume control in overlay
 - `com.playos.sample-audio` sample game
@@ -60,10 +62,10 @@ Sprint 7 delivers a working console lifecycle but with no audio. Games on a gami
 
 | Repo | Required work |
 |---|---|
-| `playos-platform-api` | `rcore_playos.c` ALSA backend, `playos_audio.h` |
-| `playos-shell` | Shell audio (startup/UI sounds) |
-| `playos-overlay` | Volume display + D-pad control |
-| `playos-refdistro` | ALSA libs in Buildroot config, `com.playos.sample-audio` package |
+| `playos-shell` | Enable Raylib miniaudio ALSA backend (`SUPPORT_MODULE_RAUDIO=1`); shell UI sounds |
+| `playos-platform-api` | Implement `playos_audio.c` (system state, master volume/mute) — replace stub |
+| `playos-refdistro` | `alsa-lib` in Buildroot config; overlay volume control in `src/playos-overlay/` |
+| `playos-samples` | Finish `com.playos.sample-audio` (actual sine playback) |
 | `playos-spec` | Audio policy doc (lifecycle behavior, volume model) |
 
 ---
@@ -73,17 +75,30 @@ Sprint 7 delivers a working console lifecycle but with no audio. Games on a gami
 ### `playos-platform-api`
 
 ```text
-include/playos/playos_audio.h
-src/rcore_playos.c           # ALSA backend (already exists from Sprint 5; extend here)
-src/playos_audio.c           # playos_audio_get_info, set_master_volume, set_muted
+include/playos/playos_audio.h   # exists (stub declarations) — finalize contract
+src/playos_audio.c              # implement playos_audio_get_info, set_master_volume, set_muted
+```
+
+### `playos-shell`
+
+```text
+external/raylib/src/config.h    # SUPPORT_MODULE_RAUDIO 0 → 1
+external/raylib/src/raudio.c    # miniaudio ALSA backend (enable + link alsa-lib)
+src/*.c                         # shell UI sounds (startup chime, navigation clicks)
 ```
 
 ### `playos-refdistro`
 
 ```text
-br2-external/board/common/rootfs-overlay/data/games/com.playos.sample-audio/
-    manifest.json
-    bin/audio-sample
+br2-external/package/playos-raylib/        # link alsa-lib
+src/playos-overlay/                        # volume display + D-pad control
+```
+
+### `playos-samples`
+
+```text
+audio-sine/src/main.c                      # actual 440 Hz sine playback (placeholder today)
+audio-sine/manifest.json                   # already installed as com.playos.sample-audio
 ```
 
 ---
@@ -94,30 +109,27 @@ br2-external/board/common/rootfs-overlay/data/games/com.playos.sample-audio/
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S8-T1 | Implement ALSA PCM backend in `rcore_playos.c` | `playos-platform-api` | not started | |
-| S8-T2 | Define and implement `playos_audio.h` API | `playos-platform-api` | not started | |
-| S8-T3 | Implement audio lifecycle behavior (background/foreground/terminate) | `playos-platform-api` | not started | |
+| S8-T1 | Enable ALSA audio via Raylib miniaudio backend | `playos-shell` | not started | `SUPPORT_MODULE_RAUDIO` currently 0 |
+| S8-T2 | Define and implement `playos_audio.h` API | `playos-platform-api` | in progress | Stub header + `playos_audio.c` exist; finalize contract + implement |
+| S8-T3 | Implement audio lifecycle behavior (background/foreground/suspend/resume/terminate) | `playos-platform-api` | not started | |
 | S8-T4 | Implement headphone jack detection and routing | `playos-platform-api` | not started | |
-| S8-T5 | Add volume control to `playos-overlay` | `playos-overlay` | not started | |
+| S8-T5 | Add volume control to `playos-overlay` | `playos-refdistro` | not started | Lives in `src/playos-overlay/` |
 | S8-T6 | Add shell UI sounds | `playos-shell` | not started | |
-| S8-T7 | Build `com.playos.sample-audio` sample game | `playos-refdistro` | not started | |
+| S8-T7 | Build `com.playos.sample-audio` sample game | `playos-samples` | in progress | Placeholder exists (`audio-sine`); actual sine playback pending |
 | S8-T8 | Audio validation on Ally | `playos-refdistro` | not started | |
 
-### S8-T1 — Implement ALSA PCM backend in `rcore_playos.c`
+### S8-T1 — Enable the ALSA audio backend in Raylib's miniaudio module
 
-**Initialization:**
-1. `snd_pcm_open()` on the resolved device name (see device priority)
-2. If default fails: enumerate with `snd_device_name_hint()`, select first stereo hardware output
-3. Hardware params: 2 ch, `SND_PCM_FORMAT_S16_LE`, 44100 Hz, buffer/period sized for stable playback
-4. Software params: set start threshold, avail-min
-5. Prepare PCM handle; start the audio thread
+**Enablement:**
+1. Set `SUPPORT_MODULE_RAUDIO=1` in `playos-shell`'s vendored Raylib build; add `alsa-lib` to the Buildroot target.
+2. Confirm miniaudio's ALSA backend opens the default playback device (`default`, or `PLAYOS_AUDIO_DEVICE` if set).
+3. If the default device fails: enumerate with `snd_device_name_hint()` and select the first stereo hardware output.
+4. Params: 44100 Hz, stereo `SND_PCM_FORMAT_S16_LE` (miniaudio resamples to the device native rate/format as needed).
+5. Prepare and start playback; miniaudio owns the mixing thread.
 
-**Audio thread:**
-- `SCHED_FIFO` or `SCHED_RR` at a documented priority
-- Call Raylib audio mixing callback
-- Write to ALSA via `snd_pcm_writei()`
-- On `EPIPE` (underrun): `snd_pcm_prepare()` + continue
-- On `ESTRPIPE` (suspend): wait and retry
+**Audio thread / underrun handling:**
+- Set a documented `SCHED_FIFO`/`SCHED_RR` priority only if a real-time class is needed.
+- Handle underrun (`EPIPE`) and suspend (`ESTRPIPE`) recovery; log device switches.
 
 **Done when:** `com.playos.sample-audio` produces audible output from the built-in speakers.
 
@@ -137,7 +149,7 @@ int playos_audio_set_master_volume(float volume);
 int playos_audio_set_muted(int muted);
 ```
 
-Volume and mute are system-wide; only the shell/overlay may call the setters. Games may call `playos_audio_get_info()` to read current state.
+Volume and mute are system-wide. The shell/overlay owns the volume UI and its calls are always honored. A game's setter calls are requests, honored only while the game is foreground; games may always call `playos_audio_get_info()` to read state.
 
 **Done when:** API compiles, `playos_audio_get_info()` returns a populated struct, and `set_master_volume(0.5f)` produces an audible volume change.
 
@@ -147,7 +159,9 @@ Volume and mute are system-wide; only the shell/overlay may call the setters. Ga
 |---|---|
 | `PLAYOS_LIFECYCLE_FOREGROUND` | Resume ALSA playback at previous volume |
 | `PLAYOS_LIFECYCLE_BACKGROUND` | Drain buffer; block writes (thread pauses) |
-| `PLAYOS_LIFECYCLE_TERMINATE` | Stop thread; `snd_pcm_close()` |
+| `PLAYOS_LIFECYCLE_SUSPEND` | Pause playback (same as background; flush before returning) |
+| `PLAYOS_LIFECYCLE_RESUME` | Resume playback |
+| `PLAYOS_LIFECYCLE_TERMINATE` | Stop thread; close PCM handle |
 
 Shell behavior: while shell is foreground, its audio is active; when game starts, shell audio pauses; when game exits, shell audio resumes.
 
@@ -180,10 +194,10 @@ Shell behavior: while shell is foreground, its audio is active; when game starts
 
 **Done when:** navigating the shell produces audible feedback sounds.
 
-### S8-T7 — Build `com.playos.sample-audio` sample game
+### S8-T7 — Finish `com.playos.sample-audio` sample game
 
-- Generates a 440 Hz sine wave via Raylib audio API
-- Plays as a looping 2-second buffer
+- Finish the existing `playos-samples/audio-sine` placeholder (already installed as `com.playos.sample-audio`)
+- Generates a 440 Hz sine wave via Raylib audio API, played as a looping 2-second buffer
 - Shows on-screen: frequency, volume, device name, current lifecycle state
 - Responds to lifecycle events: pauses sine tone when backgrounded
 - Uses `playos_audio_get_info()` to display device info
@@ -207,7 +221,7 @@ Shell behavior: while shell is foreground, its audio is active; when game starts
 
 ### ALSA period sizing
 
-Tune buffer size and period size empirically on the Ally. Start with `buffer_size = 4096 frames`, `period_size = 1024 frames`. Adjust if underruns occur. Document the final values in a comment in `rcore_playos.c`.
+Tune miniaudio's buffer and period size empirically on the Ally (Raylib exposes the device buffer/period size in `config.h`). Start with a small buffer and increase if underruns occur. Document the final values.
 
 ### SIGSTOP and audio
 
@@ -257,140 +271,6 @@ Sprint 9 may assume:
 - `playos-overlay` can be extended with new status displays and controls
 - `playos-init` thermal monitoring loop can be added without conflicting with audio
 - The full lifecycle including `SIGSTOP`/`SIGCONT` is stable
-
----
-
-## Exit Gate
-
-Games and the shell play audio on the ROG Ally. Audio transitions correctly across all lifecycle events. Volume is controlled through the overlay.
-
-*Previous: [Sprint 7](Sprint-7.md) | Next: [Sprint 9](Sprint-9.md)*
-
-Replace any SDL or non-ALSA audio path with a direct ALSA PCM implementation.
-
-**Initialization:**
-1. Call `snd_pcm_open()` — open the default playback device (`default` or a PlayOS-configured device name)
-2. If the default fails, enumerate with `snd_device_name_hint()` and select the first hardware stereo output
-3. Set hardware parameters: stereo (2 ch), signed 16-bit little-endian, 44100 Hz (or 48000 Hz — pick one and document)
-4. Set software parameters: buffer size, period size (tune for stable low-latency playback)
-5. Prepare the PCM handle; start the audio thread
-
-**Audio thread:**
-- Runs at real-time or high priority (use `sched_setscheduler(SCHED_FIFO)` or `SCHED_RR` with a safe priority)
-- Calls the Raylib audio mixing callback
-- Writes mixed PCM to ALSA via `snd_pcm_writei()`
-- Handles `EPIPE` (underrun): call `snd_pcm_prepare()` and continue
-- Handles `ESTRPIPE` (suspend): wait and retry
-
-**Device selection priority:**
-1. `PLAYOS_AUDIO_DEVICE` environment variable (for testing)
-2. Headphone jack if plugged in (detect via ALSA mixer or `/proc/asound/`)
-3. Built-in speakers
-
-**Device change handling:**
-- Monitor ALSA for device add/remove (use inotify on `/dev/snd/` or ALSA's async notification)
-- On headphone plug/unplug: close old PCM, open new device, resume audio stream seamlessly (or with brief gap)
-
-### `playos-platform-api` — Audio API
-
-Define `include/playos/playos_audio.h`:
-
-```c
-typedef struct {
-    int     sample_rate;     /* e.g. 44100 or 48000 */
-    int     channels;        /* 1 or 2 */
-    int     bits_per_sample; /* 16 */
-    float   master_volume;   /* 0.0 – 1.0 */
-    int     muted;
-} PlayOSAudioInfo;
-
-/* Get current audio device info. Returns 0 on success. */
-int playos_audio_get_info(PlayOSAudioInfo *info);
-
-/* Set master volume [0.0, 1.0]. */
-int playos_audio_set_master_volume(float volume);
-
-/* Mute/unmute. */
-int playos_audio_set_muted(int muted);
-```
-
-Volume and mute are system-wide and controlled by PlayOS (shell and overlay), not by individual games.
-
-### Audio Lifecycle Behavior
-
-Implement the following policy in the Raylib PlayOS backend:
-
-| Lifecycle Event | Audio action |
-|---|---|
-| `PLAYOS_LIFECYCLE_FOREGROUND` | Resume ALSA playback at previous volume |
-| `PLAYOS_LIFECYCLE_BACKGROUND` | Pause ALSA thread (drain buffer, then block writes) |
-| `PLAYOS_LIFECYCLE_TERMINATE` | Stop ALSA thread, close PCM handle |
-
-**Shell audio behavior:**
-- Shell plays UI sounds (button press feedback) while it is the foreground client
-- When game becomes foreground, shell stops its audio stream
-- When game backgrounds or exits, shell resumes audio
-
-**No PulseAudio or PipeWire required.** If future multi-application mixing is needed, a `playos-audio` service is introduced (post-MVP).
-
-### Volume Control in Overlay
-
-Add volume control to `playos-overlay`:
-- Show current volume percentage
-- D-pad Up/Down adjusts volume (calls `playos_audio_set_master_volume()`)
-- Mute/unmute toggle (L1/R1 or a dedicated button)
-- Volume change is reflected immediately (no lag)
-
-### `com.playos.sample-audio` — Audio Sample Game
-
-A minimal sample game that:
-- Generates a 440 Hz sine wave using Raylib's audio API
-- Plays it as a looping 2-second buffer
-- Shows frequency and volume on screen
-- Responds to lifecycle events (stops when backgrounded)
-- Uses `playos_audio_get_info()` to display device info
-
-Add this sample to the test image in `playos-refdistro`.
-
----
-
-## Acceptance Criteria
-
-- [ ] Shell plays audio (a short startup chime or UI click sounds) on the Ally speakers
-- [ ] `com.playos.sample-audio` plays a continuous sine tone through built-in speakers
-- [ ] Plugging in headphones routes audio to headphones
-- [ ] Unplugging headphones routes audio back to speakers (may have brief gap)
-- [ ] System button → overlay: game audio stops (or mutes) within 200ms
-- [ ] Overlay "Resume": game audio resumes within 200ms
-- [ ] Quit game: audio stops; shell audio resumes if applicable
-- [ ] No audio underruns during normal gameplay (< 1 per 60 seconds is acceptable)
-- [ ] `playos_audio_set_master_volume(0.5f)` sets volume to 50%; audible change confirmed
-- [ ] `playos_audio_set_muted(1)` silences all audio
-- [ ] Volume overlay shows current level; D-pad adjusts it
-- [ ] CI passes (QEMU: audio backend compiles; no runtime audio test in CI)
-
----
-
-## Repositories Primarily Involved
-
-| Repo | Work |
-|---|---|
-| `playos-platform-api` | ALSA backend in `rcore_playos.c`, `playos_audio.h` API |
-| `playos-shell` | Shell audio integration (startup sound, UI clicks) |
-| `playos-overlay` | Volume/mute controls |
-| `playos-refdistro` | ALSA libs in Buildroot, `com.playos.sample-audio` package |
-| `playos-spec` | Audio policy document (one owner, lifecycle behavior, volume model) |
-
----
-
-## Testing Approach
-
-- Physical ROG Ally required for all audio tests
-- Automated: boot, play sine sample, measure for underruns over 2 minutes
-- Headphone detection: plug/unplug USB-C audio adapter or 3.5mm; verify routing
-- Lifecycle: launch sample-audio, press System button, verify silence; resume, verify audio
-- Volume: test min/max/mid settings; verify no clipping at max
-- QEMU CI: audio library compiles, ALSA backend initializes without crashing (device open will fail gracefully)
 
 ---
 
