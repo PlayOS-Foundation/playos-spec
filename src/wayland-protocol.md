@@ -13,7 +13,6 @@ Standard Wayland protocols are used wherever possible. The private PlayOS protoc
 
 **In-scope for this protocol:**
 - Registering the trusted shell and overlay roles
-- Reporting the expected game launch identity
 - Surface readiness signals
 - Foreground/background transition notifications
 - PlayOS-specific output information
@@ -172,40 +171,6 @@ Located at: `playos-runtime/protocols/playos-v1.xml`
     </event>
   </interface>
 
-  <!-- ─────────────────────────────────────────────────────── -->
-  <!-- playos_game_launch_v1                                    -->
-  <!-- Notifies compositor of an incoming game connection       -->
-  <!-- Only accessible to playos-runtime trusted service client -->
-  <!-- ─────────────────────────────────────────────────────── -->
-
-  <interface name="playos_game_launch_v1" version="1">
-    <description summary="Interface for setting the expected game launch identity"/>
-
-    <!-- runtime → compositor: set expected game before spawn -->
-    <request name="set_expected_game">
-      <description summary="Tell compositor which token to expect from the next game client"/>
-      <arg name="launch_token" type="string" summary="One-time UUID matching PLAYOS_LAUNCH_TOKEN env var"/>
-      <arg name="game_id"      type="string"/>
-    </request>
-
-    <request name="clear_expected_game">
-      <description summary="Cancel the pending expected game (e.g. launch was aborted)"/>
-    </request>
-
-    <!-- compositor → runtime: game connected and committed first frame -->
-    <event name="game_surface_ready">
-      <description summary="Game committed its first valid buffer; compositor switching foreground"/>
-      <arg name="launch_token" type="string"/>
-      <arg name="game_id"      type="string"/>
-    </event>
-
-    <!-- compositor → runtime: game surface was destroyed -->
-    <event name="game_surface_destroyed">
-      <description summary="Game Wayland surface was destroyed or client disconnected"/>
-      <arg name="game_id" type="string"/>
-    </event>
-  </interface>
-
 </protocol>
 ```
 
@@ -219,10 +184,9 @@ The compositor enforces trust at connection time, not through Wayland protocol n
 |---|---|---|
 | Trusted shell | `PLAYOS_TRUSTED_SHELL=1` in env | `playos_manager_v1`, `playos_shell_v1`, standard Wayland |
 | Trusted overlay | `PLAYOS_TRUSTED_OVERLAY=1` in env | `playos_manager_v1`, `playos_overlay_v1`, standard Wayland |
-| Runtime service client | `PLAYOS_TRUSTED_RUNTIME=1` + UNIX group | `playos_game_launch_v1` |
 | Active game | No trust flag | Standard Wayland only (`wl_compositor`, `wl_seat`, `xdg_wm_base`) |
 
-The compositor does **not** advertise `playos_manager_v1` or `playos_game_launch_v1` in the global registry. Trusted clients must explicitly bind by name. Untrusted clients that attempt to bind privileged interfaces receive a `wl_display.error` and are disconnected.
+The compositor does **not** advertise `playos_manager_v1` in the global registry. Trusted clients must explicitly bind by name. Untrusted clients that attempt to bind privileged interfaces receive a `wl_display.error` and are disconnected.
 
 ---
 

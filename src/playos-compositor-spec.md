@@ -45,7 +45,7 @@ main()
     ├── xdg_wm_base setup
     ├── wlr_seat_create()
     ├── libinput backend setup (reserved key interception)
-    ├── PlayOS private protocol setup (playos_manager_v1, playos_game_launch_v1)
+    ├── PlayOS private protocol setup (playos_manager_v1, playos_shell_v1, playos_overlay_v1)
     ├── wl_display_add_socket_auto() → "playos-0"
     ├── wlr_backend_start()
     ├── Write readiness token to PLAYOS_COMPOSITOR_READY_FD
@@ -87,7 +87,7 @@ The state machine is the central PlayOS contract. **Must be explicitly tested.**
 
 ```
 SHELL_FOREGROUND
-    │  launch accepted (SetExpectedGame received + GameStarted from init)
+    │  launch accepted (SetExpectedGame received via compositor socket)
     ▼
 GAME_STARTING
     │  game commits first valid wl_buffer (first-frame rule)
@@ -203,7 +203,6 @@ The compositor implements the **server side** of:
 - `playos_manager_v1` — global, binds trusted client roles
 - `playos_shell_v1` — emits lifecycle events and game state to the shell
 - `playos_overlay_v1` — notifies overlay of show/hide; receives dismiss requests
-- `playos_game_launch_v1` — receives expected game token from runtime; emits surface-ready events
 
 ---
 

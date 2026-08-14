@@ -31,10 +31,10 @@ The overlay may later be merged into a multi-surface `playos-shell` backend if R
 ## Overlay Lifecycle
 
 ```
-playos-compositor starts playos-overlay at startup
+playos-init spawns and supervises playos-overlay at boot
     │
     ├── Overlay creates xdg_toplevel surface (transparent background)
-    ├── Registers as trusted overlay via playos_overlay_v1
+    ├── Registers as trusted overlay via playos_manager_v1::register_overlay
     ├── Receives about_to_show / about_to_hide events from compositor
     │
 [System button pressed — compositor sends about_to_show]

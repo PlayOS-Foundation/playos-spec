@@ -33,6 +33,21 @@ Sprint 6 established a working game library. Sprint 7 turns selection into a rea
 - **Non-cooperative fallback:** `SIGSTOP`/`SIGCONT` — only `playos-init` sends signals; compositor requests via IPC
 - **Crash recovery deadline:** display must return to shell within 500ms of game process exit
 - **Overlay z-order:** game surface → dim layer → overlay surface — this order is locked
+- **Compositor control transport:** Unix socket `/run/playos/compositor.sock` only — the private Wayland `playos_compositor_control_v1` interface is removed from this sprint; `playos_overlay_v1` remains for the overlay client
+- **Process ownership:** `playos-init` spawns and supervises `playos-compositor`, `playos-shell`, and `playos-overlay`; the compositor maps/unmaps surfaces but never spawns processes
+
+---
+
+## Decision Locked: Compositor Control Transport
+
+`playos-init` / `playos-runtime` control the compositor exclusively over the Unix socket **`/run/playos/compositor.sock`** (`SOCK_SEQPACKET`, `root:playos-trusted`, `0660`), as specified in [`runtime-ipc.md`](../runtime-ipc.md) §2 and §7. Messages: `SetExpectedGame`, `ClearExpectedGame`, `ForceTerminateGame`, `ShowOverlay`, `HideOverlay` (init → compositor) and `GameSurfaceReady`, `CompositorStateChanged` (compositor → init). [`playos-init-spec.md`](../playos-init-spec.md) binds this socket at boot and routes the non-cooperative `SIGSTOP`/`SIGCONT` request through it.
+
+The private Wayland interface **`playos_compositor_control_v1` is removed** from this sprint — it duplicated the socket's control surface over the Wayland wire. **`playos_overlay_v1` is kept**: the overlay is a Wayland client, so its role registration (`playos_manager_v1::register_overlay`) and its `set_surface` / `surface_ready` / `request_dismiss` requests plus `about_to_show` / `about_to_hide` / `output_info` events belong on the Wayland protocol.
+
+Follow-up reconciliation:
+
+- Remove the Wayland interface `playos_game_launch_v1` from `playos-v1.xml` (currently declared in `playos-runtime`, `playos-compositor`, and vendored copies). It duplicates the socket's `SetExpectedGame` / `ClearExpectedGame` / `GameSurfaceReady` control surface, and is currently only declared in the XML — not implemented server-side (`playos-compositor/README.md`). The compositor must drive this path over `/run/playos/compositor.sock` using the `playos_ipc_*` framing library in `playos-init/ipc/`.
+- `playos-compositor` does not yet connect to `/run/playos/compositor.sock` (its readiness handshake is currently a file). Add the socket client and retire the Wayland game-launch interface this sprint.
 
 ---
 
@@ -46,7 +61,7 @@ Sprint 6 established a working game library. Sprint 7 turns selection into a rea
 - `playos-overlay` trusted client (minimal: resume, quit, battery, thermal)
 - Real lifecycle event delivery via `PLAYOS_LIFECYCLE_FD`
 - Game exit (clean and crash) with shell recovery
-- Private Wayland protocol Sprint 7 additions
+- Private Wayland protocol Sprint 7 changes (overlay retained; game-launch removed)
 - Non-cooperative game SIGSTOP fallback
 
 ### Explicitly Out of Scope
@@ -62,11 +77,12 @@ Sprint 6 established a working game library. Sprint 7 turns selection into a rea
 
 | Repo | Required work |
 |---|---|
-| `playos-compositor` | Full state machine, first-frame rule, system button intercept, overlay surface management |
+| `playos-compositor` | Full state machine, first-frame rule, system button intercept, overlay surface management, compositor socket client |
 | `playos-shell` | Launch IPC, launching-state spinner UI, crash notification, library restore |
-| `playos-runtime` | Launch IPC transport, `FactoryReset` additions, private Wayland protocol extensions, `playos-overlay` package |
+| `playos-runtime` | Lifecycle transport, compositor control IPC client (`SetExpectedGame`), `playos_overlay_v1` Wayland extension |
 | `playos-platform-api` | Real lifecycle event delivery (fd-backed) |
-| `playos-refdistro` | `playos-overlay` Buildroot package |
+| `playos-refdistro` | `playos-overlay` trusted Raylib client + Buildroot package |
+| `playos-spec` | Lifecycle event spec, state machine diagram update |
 
 ---
 
@@ -75,17 +91,17 @@ Sprint 6 established a working game library. Sprint 7 turns selection into a rea
 ### `playos-compositor`
 
 ```text
-src/state_machine.c       # all states and transitions
-src/system_button.c       # input intercept at seat level
-src/overlay_manager.c     # z-order, show/hide logic
+src/compositor_ipc.c       # client for /run/playos/compositor.sock
+src/state_machine.c        # all states and transitions
+src/system_button.c        # input intercept at seat level
+src/overlay_manager.c      # z-order, show/hide logic
 ```
 
 ### `playos-runtime`
 
 ```text
-protocols/playos-v1.xml   # Sprint 7 additions (compositor_control, overlay_v1)
-src/lifecycle_transport.c # fd creation, event write
-src/overlay_process.c     # spawn/manage overlay client
+protocols/playos-v1.xml    # Sprint 7: keep playos_overlay_v1, remove playos_game_launch_v1
+src/lifecycle_transport.c  # fd creation, event write
 ```
 
 ### `playos-refdistro`
@@ -95,7 +111,7 @@ br2-external/package/playos-overlay/
     playos-overlay.mk
     Config.in
 src/playos-overlay/
-    main.c                # Raylib overlay UI
+    main.c                 # Raylib overlay UI
 ```
 
 ---
@@ -106,12 +122,12 @@ src/playos-overlay/
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S7-T1 | Implement full game launch flow in `playos-init` | `playos-refdistro` | not started | |
+| S7-T1 | Implement full game launch flow in `playos-init` | `playos-init` | not started | |
 | S7-T2 | Implement full compositor state machine | `playos-compositor` | not started | |
 | S7-T3 | Implement system button intercept at seat level | `playos-compositor` | not started | |
-| S7-T4 | Build `playos-overlay` trusted Raylib client | `playos-runtime`, `playos-refdistro` | not started | |
+| S7-T4 | Build `playos-overlay` trusted Raylib client | `playos-refdistro` | not started | |
 | S7-T5 | Implement lifecycle fd delivery in platform-api | `playos-platform-api` | not started | |
-| S7-T6 | Extend private Wayland protocol (Sprint 7 interfaces) | `playos-runtime` | not started | |
+| S7-T6 | Finalize private Wayland protocol (overlay kept, game-launch removed) | `playos-runtime` | not started | |
 | S7-T7 | Implement game exit and crash recovery | `playos-compositor`, `playos-refdistro` | not started | |
 | S7-T8 | Integration and lifecycle validation on Ally | `playos-refdistro` | not started | |
 
@@ -121,10 +137,11 @@ src/playos-overlay/
 2. Validate: manifest exists, executable exists, `api_version` ≤ current system version
 3. Prepare environment variables: `PLAYOS_GAME_ID`, `PLAYOS_INSTALL_PATH`, `PLAYOS_SAVE_PATH`, `PLAYOS_CACHE_PATH`, `WAYLAND_DISPLAY=playos-0`, `PLAYOS_LIFECYCLE_FD`, `PLAYOS_LAUNCH_TOKEN`
 4. Create lifecycle pipe; store write-end in `playos-init`, pass read-end as `PLAYOS_LIFECYCLE_FD`
-5. Spawn game executable; track PID
-6. Emit `GameStarted { game_id, pid, launch_token }` to compositor and shell via runtime IPC
+5. Emit `SetExpectedGame { launch_token, game_id }` to the compositor over `/run/playos/compositor.sock`
+6. Spawn game executable; track PID
+7. Emit `GameStarted { game_id, pid, launch_token }` to the shell over `control.sock`
 
-**Done when:** `com.playos.sample-input` launches from the shell, receives the environment variables, and a `GameStarted` event is logged in the compositor.
+**Done when:** `com.playos.sample-input` launches from the shell, receives the environment variables, the compositor logs `SetExpectedGame`, and the shell receives `GameStarted`.
 
 ### S7-T2 — Implement full compositor state machine
 
@@ -132,7 +149,7 @@ Implement all five states and all transitions:
 
 ```
 SHELL_FOREGROUND
-  → (LaunchGame accepted)         → GAME_STARTING
+  → (SetExpectedGame received)    → GAME_STARTING
 GAME_STARTING
   → (first committed buffer)      → GAME_FOREGROUND
   → (launch timeout/crash)        → SHELL_FOREGROUND
@@ -153,7 +170,7 @@ Log all transitions: `state_machine: GAME_STARTING → GAME_FOREGROUND`.
 ### S7-T3 — Implement system button intercept at seat level
 
 - Register an input filter at the wlroots seat level that consumes `PLAYOS_BUTTON_SYSTEM` before any client can receive it
-- When in `GAME_FOREGROUND`: remove input focus from game, write `PLAYOS_LIFECYCLE_BACKGROUND` to lifecycle fd, transition to overlay state
+- When in `GAME_FOREGROUND`: remove input focus from the game, emit `CompositorStateChanged` (`PLAYOS_UI_FOREGROUND_WITH_GAME_BACKGROUND`) to `playos-init`, and transition to the overlay state; `playos-init` then writes `PLAYOS_LIFECYCLE_BACKGROUND` to the lifecycle fd and arms the non-cooperative `SIGSTOP` timer
 - Verify via `evtest` and a game that logs all key events — `PLAYOS_BUTTON_SYSTEM` must never appear in the game log
 
 **Done when:** pressing the system button in-game activates the overlay and the game never sees the key event.
@@ -162,15 +179,15 @@ Log all transitions: `state_machine: GAME_STARTING → GAME_FOREGROUND`.
 
 Initial overlay content:
 - Game title and elapsed running time
-- "Resume Game" (A button) — sends resume request to compositor via private protocol
+- "Resume Game" (A button) — sends `playos_overlay_v1::request_dismiss` to the compositor (the compositor hides the overlay and returns focus to the game)
 - "Quit Game" (B or menu) — sends `TerminateGame` IPC to `playos-init`
 - Battery percentage (stub value acceptable this sprint)
 - Thermal status (stub value acceptable this sprint)
 
 Surface policy:
 - Pre-spawned at boot, hidden; compositor shows/hides it via `playos_overlay_v1`
-- Overlay uses `playos_overlay_v1::register_as_overlay` to identify itself
-- Overlay must implement `about_to_show` / `about_to_hide` to reset state cleanly
+- Overlay registers as the trusted overlay via `playos_manager_v1::register_overlay`
+- Overlay implements `playos_overlay_v1::set_surface` / `surface_ready` / `request_dismiss` and handles `about_to_show` / `about_to_hide` to reset state cleanly
 
 **Done when:** overlay is visible above a running game when system button is pressed, and both Resume and Quit work.
 
@@ -191,30 +208,37 @@ Non-cooperative fallback: if `playos-init` receives no CPU reduction signal with
 
 **Done when:** `com.playos.sample-input` logs lifecycle events it receives and the sequence is correct across the full launch/background/resume/quit cycle.
 
-### S7-T6 — Extend private Wayland protocol
+### S7-T6 — Finalize private Wayland protocol (overlay kept, game-launch removed)
 
-Add to `playos-runtime/protocols/playos-v1.xml`:
+Compositor control stays on `/run/playos/compositor.sock` (see the decision locked above); no Wayland control interface is added this sprint.
+
+`playos-overlay` remains a Wayland client, so `playos_overlay_v1` is retained with its correct interface shape in `playos-runtime/protocols/playos-v1.xml`:
 
 ```xml
-<interface name="playos_compositor_control_v1" version="1">
-  <request name="set_expected_game">
-    <arg name="launch_token" type="string"/>
-  </request>
-  <request name="terminate_game"/>
-  <request name="show_overlay"/>
-  <request name="hide_overlay"/>
-</interface>
-
 <interface name="playos_overlay_v1" version="1">
-  <request name="register_as_overlay"/>
+  <request name="set_surface">
+    <arg name="surface" type="object" interface="wl_surface"/>
+  </request>
+  <request name="surface_ready"/>
+  <request name="request_dismiss"/>
   <event name="about_to_show"/>
   <event name="about_to_hide"/>
+  <event name="output_info">
+    <arg name="width"        type="int"/>
+    <arg name="height"       type="int"/>
+    <arg name="refresh_mhz"  type="uint"/>
+    <arg name="scale_100"    type="uint"/>
+  </event>
 </interface>
 ```
 
-Regenerate Wayland scanner outputs. Only `playos-runtime` processes may use `playos_compositor_control_v1`.
+The overlay's trusted role is registered through `playos_manager_v1::register_overlay`, not a `register_as_overlay` request on the overlay interface.
 
-**Done when:** compositor binds both interfaces; overlay registers itself; CI protocol scanner passes.
+Remove the `playos_game_launch_v1` interface from the XML. Its four operations — `set_expected_game`, `clear_expected_game`, `game_surface_ready`, `game_surface_destroyed` — duplicate the socket's three messages `SetExpectedGame` / `ClearExpectedGame` / `GameSurfaceReady`, so this path belongs on `/run/playos/compositor.sock`, not the Wayland wire.
+
+Regenerate Wayland scanner outputs. Only the trusted `playos-overlay` client uses `playos_overlay_v1`.
+
+**Done when:** compositor binds `playos_overlay_v1`; overlay registers via `playos_manager_v1::register_overlay`; `playos_game_launch_v1` is gone from the protocol; CI protocol scanner passes.
 
 ### S7-T7 — Implement game exit and crash recovery
 
@@ -245,6 +269,8 @@ Run the full test matrix on the ROG Ally:
 6. Launch → background → game ignores lifecycle → `SIGSTOP` fires within 500ms
 7. Repeat items 1–3 three cycles in a row → no state leaks
 
+Compositor state-machine transitions are additionally covered by QEMU unit tests (no physical GPU required).
+
 **Done when:** all 7 test cases pass on the Ally with evidence logged.
 
 ---
@@ -261,7 +287,11 @@ The shell surface must remain visible until the game's first Wayland buffer is c
 
 ### Overlay pre-spawn
 
-`playos-overlay` must be spawned at compositor startup, not on first use. This avoids visible latency when the system button is pressed. Map/unmap the surface; do not spawn/kill the process per use.
+`playos-overlay` is pre-spawned by `playos-init` at boot (like `playos-shell`) and supervised with restart-on-exit. The compositor maps/unmaps its surface; it never spawns or kills the overlay process. This avoids visible latency when the system button is pressed.
+
+### Game cooperative behavior on background
+
+On `PLAYOS_LIFECYCLE_BACKGROUND`, a cooperative game should pause gameplay, stop/mute audio, reduce rendering (0 FPS acceptable while backgrounded), and write an autosave if implemented. If CPU does not drop within `GAME_PAUSE_TIMEOUT_MS` (default 500ms), `playos-init` falls back to `SIGSTOP`.
 
 ---
 
@@ -291,7 +321,9 @@ The shell surface must remain visible until the game's first Wayland buffer is c
 - [ ] Second launch attempt while game is running is rejected; first game unaffected
 - [ ] `PLAYOS_BUTTON_SYSTEM` never appears in any game client's input stream
 - [ ] Non-cooperative game receives `SIGSTOP` within 500ms of `BACKGROUND` event
+- [ ] Compositor state transitions are logged
 - [ ] Full 3-cycle lifecycle test passes without state leaks
+- [ ] CI passes
 
 ---
 
@@ -310,199 +342,5 @@ Sprint 8 may assume:
 ## Exit Gate
 
 The complete console lifecycle works on the ROG Ally: launch, system button overlay, resume, clean exit, and crash recovery all behave correctly. The player never sees a Linux prompt.
-
-*Previous: [Sprint 6](Sprint-6.md) | Next: [Sprint 8](Sprint-8.md)*
-
-**`playos-shell` side:**
-1. Player presses A on a game → shell enters Launching state (spinner UI)
-2. Shell sends `LaunchGame { game_id, manifest_path }` over control IPC
-3. Shell hides or throttles its rendering while game starts
-
-**`playos-init` side:**
-1. Validate: one-game rule (reject if game already running)
-2. Validate: manifest exists, executable exists, `api_version` supported
-3. Prepare per-game environment:
-   ```
-   PLAYOS_GAME_ID=<game-id>
-   PLAYOS_INSTALL_PATH=/data/games/<game-id>
-   PLAYOS_SAVE_PATH=/data/saves/<game-id>
-   PLAYOS_CACHE_PATH=/data/cache/<game-id>
-   WAYLAND_DISPLAY=playos-0
-   PLAYOS_LIFECYCLE_FD=<fd>     # lifecycle event pipe
-   PLAYOS_LAUNCH_TOKEN=<uuid>   # one-time identity token
-   ```
-4. Spawn game executable; track PID
-5. Emit `GameStarted { game_id, pid, launch_token }` event to compositor and shell
-
-**`playos-compositor` side:**
-1. Receive `GameStarted` event from runtime transport
-2. Store `expected_launch_token`
-3. When a new Wayland client connects: check its `PLAYOS_LAUNCH_TOKEN` environment
-4. Reject clients with no or wrong token during the launch window
-5. Wait for the game's **first committed buffer** (first-frame rule)
-6. Only then: transition state to `GAME_FOREGROUND`; hide the shell surface
-
-### Compositor State Machine (Full Implementation)
-
-Implement all states from the architecture:
-
-```
-SHELL_FOREGROUND
-  → (launch accepted)         → GAME_STARTING
-GAME_STARTING
-  → (first valid frame)       → GAME_FOREGROUND
-GAME_FOREGROUND
-  → (PLAYOS_BUTTON_SYSTEM)    → PLAYOS_UI_FOREGROUND_WITH_GAME_BACKGROUND
-  → (game exit or crash)      → SHELL_FOREGROUND
-PLAYOS_UI_FOREGROUND_WITH_GAME_BACKGROUND
-  → (Resume)                  → GAME_FOREGROUND
-  → (Quit → TerminateGame)    → TERMINATING_GAME → SHELL_FOREGROUND
-```
-
-### Reserved System Button
-
-`PLAYOS_BUTTON_SYSTEM` is mapped to the ROG Ally's Armory Crate / ROG button (identify via `evtest` in Sprint 3).
-
-**Compositor intercepts this key at the seat level — it is never forwarded to any client.**
-
-When pressed in `GAME_FOREGROUND`:
-1. Remove input focus from game
-2. Send `PLAYOS_LIFECYCLE_BACKGROUND` through lifecycle pipe to game
-3. Transition to `PLAYOS_UI_FOREGROUND_WITH_GAME_BACKGROUND`
-4. Map the overlay surface above the game
-
-### `playos-overlay` — System Overlay Client
-
-Create a minimal trusted Raylib overlay client.
-
-**Initial overlay content:**
-- Game title and running time
-- "Resume Game" option (A button) — sends resume to compositor
-- "Quit Game" option — sends `TerminateGame` IPC to `playos-init`
-- Battery percentage and thermal status
-
-**Overlay surface policy:**
-- The overlay is always pre-spawned but hidden
-- Compositor maps it above the game surface when `PLAYOS_BUTTON_SYSTEM` is pressed
-- The overlay uses a private Wayland protocol role: `playos_overlay_v1`
-
-**Scene z-order:**
-```
-1. active game surface
-2. dimming layer (semi-transparent black)
-3. overlay surface
-4. notifications (future)
-```
-
-### `playos-platform-api` — Lifecycle Events (Real Implementation)
-
-Replace the stub with a real implementation backed by `playos-runtime`.
-
-**Delivery mechanism:** `playos-init` passes a file descriptor (`PLAYOS_LIFECYCLE_FD`) to the game at launch. The runtime reads from this fd and delivers events to `playos_lifecycle_poll()`.
-
-```c
-/* Non-blocking. Returns 1 if event available, 0 if not, -1 on error. */
-int playos_lifecycle_poll(PlayOSLifecycleEvent *event);
-```
-
-**Game cooperative behavior on `PLAYOS_LIFECYCLE_BACKGROUND`:**
-- Pause gameplay
-- Stop or mute audio
-- Reduce rendering (0 FPS acceptable while backgrounded)
-- Write autosave if implemented
-
-**Non-cooperative fallback:** `playos-init` sends `SIGSTOP` to the game process if it does not reduce CPU to near-zero within a timeout (configurable, default: 500ms). `SIGCONT` resumes it. The compositor requests this action; it does not signal processes directly.
-
-### Private Wayland Protocol (Sprint 7 additions)
-
-Extend `playos-runtime/protocols/playos-v1.xml`:
-
-```xml
-<interface name="playos_compositor_control_v1" version="1">
-  <!-- Sent by trusted runtime to compositor -->
-  <request name="set_expected_game">
-    <arg name="launch_token" type="string"/>
-  </request>
-  <request name="terminate_game"/>
-  <request name="show_overlay"/>
-  <request name="hide_overlay"/>
-</interface>
-
-<interface name="playos_overlay_v1" version="1">
-  <!-- Identify this client as the trusted overlay -->
-  <request name="register_as_overlay"/>
-  <!-- Compositor notifies overlay it is about to be shown -->
-  <event name="about_to_show"/>
-  <event name="about_to_hide"/>
-</interface>
-```
-
-### Game Exit and Crash Recovery
-
-**Clean exit:**
-1. `playos-init` records exit status
-2. Compositor destroys or ignores the stale game surface
-3. Compositor transitions to `SHELL_FOREGROUND`; unhides and refocuses shell
-4. Shell restores previous library position
-
-**Crash (non-zero exit / signal):**
-1. Same compositor recovery flow
-2. Shell shows a non-intrusive notification: "Game exited unexpectedly"
-3. Option: "Restart" (re-sends `LaunchGame`) or "Back to library"
-
-**Invariant:** A game crash must never:
-- Reveal a Linux terminal
-- Leave the display black for more than 500ms
-- Require user to reboot
-
----
-
-## Acceptance Criteria
-
-- [ ] Selecting a game in the shell launches it; first-frame switch happens (no black flash)
-- [ ] Game receives `PLAYOS_LIFECYCLE_FOREGROUND` event at launch
-- [ ] System button press shows overlay above the game (dim + overlay visible)
-- [ ] Game receives `PLAYOS_LIFECYCLE_BACKGROUND` on System button
-- [ ] Overlay "Resume" returns to game; `PLAYOS_LIFECYCLE_FOREGROUND` delivered
-- [ ] Overlay "Quit" terminates the game cleanly; shell is shown
-- [ ] Clean game exit returns to shell in ≤500ms
-- [ ] Simulated crash (`kill -9 <game_pid>`): display returns to shell in ≤500ms, no black screen
-- [ ] Second game cannot launch while first is running (one-game rule enforced)
-- [ ] `PLAYOS_BUTTON_SYSTEM` key events never appear in the game's input stream
-- [ ] Non-cooperative game receives `SIGSTOP`/`SIGCONT` as fallback
-- [ ] Compositor state transitions are logged
-- [ ] `com.playos.sample-input` game can be launched, used, and exited via the full flow
-- [ ] CI passes
-
----
-
-## Repositories Primarily Involved
-
-| Repo | Work |
-|---|---|
-| `playos-compositor` | Full state machine, first-frame switching, reserved button, overlay z-order |
-| `playos-shell` | Launch request, launcher state UI, crash notification, resume after background |
-| `playos-overlay` | Minimal overlay client (resume, quit, battery, thermal) |
-| `playos-platform-api` | Real lifecycle event delivery via fd/pipe |
-| `playos-runtime` | Lifecycle transport, `set_expected_game` IPC, private Wayland protocol extensions |
-| `playos-refdistro` | `playos-overlay` Buildroot package |
-| `playos-spec` | Lifecycle event spec, state machine diagram update |
-
----
-
-## Testing Approach
-
-- Physical ROG Ally for all lifecycle tests
-- Lifecycle test matrix: launch → background → resume → quit (×3 cycles)
-- Crash test: `kill -9` the game mid-render; verify display recovery time and no terminal
-- Non-cooperative test: game that ignores lifecycle events; verify `SIGSTOP` fallback fires
-- One-game rule: attempt concurrent `LaunchGame` calls; verify second is rejected
-- QEMU: compositor state machine unit tests (no physical GPU required)
-
----
-
-## Exit Gate
-
-The complete console lifecycle works on the ROG Ally: launch, System button overlay, resume, clean exit, and crash recovery all behave correctly. The player never sees a Linux prompt.
 
 *Previous: [Sprint 6](Sprint-6.md) | Next: [Sprint 8](Sprint-8.md)*

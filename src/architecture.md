@@ -122,17 +122,15 @@ playos-refdistro  ──  pins and assembles all runtime components
 ```
 playos-init  (PID 1)
     │
-    ├── playos-compositor
+    ├── playos-compositor        (DRM/KMS owner, Wayland display)
     │       ├── playos-shell      (trusted Wayland client, always alive)
     │       └── playos-overlay    (trusted Wayland client, shown on demand)
     │
     └── active-game               (isolated Wayland client, one at a time)
 ```
 
-- `playos-init` spawns and supervises `playos-compositor`.
-- The compositor launches `playos-shell` and `playos-overlay` as trusted clients.
-- `playos-init` spawns games upon validated request from the shell.
-- The compositor controls which surface is foreground; it does not spawn processes.
+- `playos-init` spawns and supervises `playos-compositor`, `playos-shell`, `playos-overlay`, and `active-game`.
+- The compositor owns the Wayland display and surface presentation for its trusted clients; it does not spawn processes.
 
 ---
 
@@ -149,7 +147,7 @@ playos-init  (PID 1)
 | 7 | `playos-init` | Discovers and mounts the PlayOS data partition |
 | 8 | `playos-init` | Starts `playos-compositor` |
 | 9 | `playos-compositor` | Initializes wlroots backend, DRM/KMS, renderer, Wayland socket |
-| 10 | `playos-compositor` | Launches `playos-shell` with trusted identity |
+| 10 | `playos-init` | Launches `playos-shell` and `playos-overlay` with trusted identity |
 | 11 | `playos-shell` | Maps fullscreen surface; shows game library |
 | → | User | Selects a game |
 | 12 | `playos-shell` | Sends `LaunchGame(game_id)` over control IPC |
