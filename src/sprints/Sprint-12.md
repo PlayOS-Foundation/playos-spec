@@ -8,145 +8,210 @@
 
 ---
 
-## Key Deliverables
+## Why This Sprint Exists
 
-### Game Process Privilege Reduction
+Before Sprint 12, the security boundary is mostly a convention. Games are spawned by `playos-init` (PID 1, root) with a plain `fork()` + `exec()` and no credential drop, so a game can open `/dev/input/event*` directly and read reserved buttons, and the reserved-button protection is only a cooperative bitmask in `libplayos`. Production builds still carry a shell and debug tools. This sprint moves the boundary from convention to OS enforcement: an unprivileged game identity, capability and syscall restrictions, filesystem isolation, hardened control IPC, and debug-free production images.
 
-**Run games as an unprivileged identity:**
-- `playos-init` spawns games as `playos-game` user (UID ~1000, no supplementary groups)
-- Games do not have access to `playos-trusted` group (which owns the control IPC socket)
-- Verify: `id` inside the game process shows `uid=playos-game`
+---
 
-**Capability dropping:**
-- `playos-init` calls `prctl(PR_SET_NO_NEW_PRIVS, 1)` on the game process
-- Drop all capabilities from the game's effective and permitted sets before exec
-- Preserve only: none required for a normal Raylib game
-- `playos-compositor` requires: `CAP_SYS_ADMIN` (DRM master), but games never inherit this
+## Start Condition Checklist
 
-**DRM node access:**
-- `/dev/dri/card*` — owned by `drm` group; games are not in `drm` group
-- `/dev/dri/renderD*` — needed for GPU rendering via Wayland; games connect through Wayland, not directly
-- Verify: `open("/dev/dri/card0", O_RDWR)` returns `EACCES` in the game process
+- Sprint 11 complete: the system image is read-only and A/B updates work.
+- `playos-init` currently spawns games as root with no credential drop (verified gap).
+- Reserved buttons are currently stripped only by a software mask in `libplayos` (`playos_input_get_controller_state()`), not OS-enforced.
+- `/run/playos/control.sock` exists and is the trusted control path.
+- Production `defconfig` still includes debug tools (BusyBox, `gdbserver`, `strace`, etc.).
+- ROG Ally kernel version is checked for Landlock support (kernel ≥ 5.13).
 
-### Input Device Isolation (Reserved Buttons)
+---
 
-**Current gap (pre-Sprint 12):** Reserved buttons (`SYSTEM`, `QUICK_MENU`) are
-stripped only by a software bitmask in `libplayos`
-(`playos_input_get_controller_state()` does
-`state->buttons &= ~(SYSTEM | QUICK_MENU)`). This is a cooperative convention,
-not an OS-enforced boundary. A game that opens `/dev/input/event*` directly —
-via a Raylib evdev backend or any raw evdev read — can see the reserved
-buttons. Today games are spawned with a plain `fork()`+`exec()` from PID 1
-(root) with no credential drop, so they *can* open the input devices.
+## Decisions Locked for This Sprint
 
-**Required enforcement (this sprint):**
-- Games run as `playos-game` (UID ~1000), **not** in the `input` group, so
-  `/dev/input/event*` (`root:input`, mode `0660`) is unopenable.
-- seccomp `open`/`openat` arg filter and the Landlock allowed-path set both
-  **explicitly deny** `/dev/input/event*` (see the seccomp + Landlock sections
-  below — the path must be named, not just implied).
-- Games receive input only through the Wayland seat; the compositor intercepts
-  reserved buttons at the libinput layer and never forwards them to clients
-  (see `security-model.md` §8).
-- The libplayos software mask becomes defense-in-depth, **not** the sole
-  mechanism — the boundary moves to seat/group/permission enforcement.
+- **Game identity:** games run as `playos-game` (UID ~1000) with no supplementary groups.
+- **Capability set:** games start with no capabilities; `prctl(PR_SET_NO_NEW_PRIVS, 1)` is set before exec.
+- **DRM access:** games connect through the Wayland seat; direct `/dev/dri/card*` access is denied.
+- **Input boundary:** reserved buttons are intercepted at the libinput/seat layer and never forwarded; the `libplayos` mask is defense-in-depth only.
+- **Sandbox mechanism:** a seccomp-BPF syscall allowlist plus a Landlock filesystem allowlist, both applied before game exec.
+- **Control socket:** `/run/playos/control.sock` is `root:playos-trusted`, mode `0660`; only `playos-shell` and `playos-overlay` are in `playos-trusted`.
+- **Manifest signing:** Ed25519 detached signature alongside `manifest.json`; verification is warn-only this sprint.
+- **Secure Boot:** documentation plus development signing keys only; production HSM-backed signing is post-MVP.
 
-**Verify:** from a `playos-game` process, `open("/dev/input/event0", O_RDONLY)`
-returns `EACCES`, and reserved buttons never appear in the game's input stream.
+---
 
-### seccomp Filter for Games
+## Scope
 
-Apply a seccomp-BPF allowlist to all game processes before exec.
+### In Scope
 
-**Allowed syscalls (core set):**
-- Memory: `mmap`, `munmap`, `mprotect`, `brk`
-- I/O: `read`, `write`, `open`, `openat`, `close`, `stat`, `fstat`, `lseek`, `ioctl` (restricted)
-- Sockets: `socket` (AF_UNIX only for Wayland), `connect`, `sendmsg`, `recvmsg`
-- Process: `exit`, `exit_group`, `futex`, `clone`, `getpid`, `gettid`
-- Signals: `rt_sigaction`, `rt_sigprocmask`, `sigaltstack`
-- Time: `clock_gettime`, `clock_nanosleep`
-- Misc: `getrandom`, `prctl` (limited)
+- Game process privilege reduction and credential drop in `playos-init`.
+- seccomp syscall allowlist and Landlock filesystem allowlist for games.
+- Denial of direct DRM primary-node and raw input-device access.
+- Control IPC socket ownership and permission hardening.
+- Removal of debug tools/services from the production image plus CI lint.
+- Signed-manifest foundations (warn-only verification).
+- Secure Boot chain documentation and development signing keys.
 
-**Denied syscalls (trigger SIGSYS or EPERM):**
-- `mount`, `umount2` — no filesystem mounting
-- `init_module`, `finit_module` — no kernel modules
-- `ptrace` — no process tracing of other processes
-- `reboot` — no direct reboot
-- `setuid`, `setgid`, `setcap` — no privilege escalation
-- `open`/`openat` with path to `/proc/*/mem`, `/dev/dri/card*`, `/dev/input/event*`, control socket
+### Explicitly Out of Scope
 
-Generate the seccomp filter at build time. Test with `libseccomp`.
+- Hard enforcement of signed game manifests (post-MVP).
+- Production HSM-backed Secure Boot signing (post-MVP).
+- Full dm-verity/IMA verified-boot implementation (documented as a target only).
+- Network sandboxing (no network stack in the MVP).
+- Store-level signing and distribution.
 
-### Landlock Filesystem Restrictions
+---
 
-Apply Landlock rules to game processes:
+## Required Repository Changes
 
-**Allowed paths:**
-```
-/data/games/<game-id>/           read-only
-/data/saves/<game-id>/           read-write
-/data/cache/<game-id>/           read-write
-/tmp/ (or /run/game-<id>/)       read-write (scratch space)
-/run/playos/ (Wayland socket)    execute only
+| Repo | Required work |
+|---|---|
+| `playos-init` | Spawn games as `playos-game` with `PR_SET_NO_NEW_PRIVS` and no capabilities; apply seccomp allowlist and Landlock ruleset; verify manifest signatures in warn-only mode |
+| `playos-compositor` | Intercept reserved buttons at the libinput/seat layer and never forward them to clients |
+| `playos-runtime` | Enforce control socket ownership and permissions (`root:playos-trusted`, `0660`) |
+| `playos-refdistro` | Create `playos-game` user, integrate seccomp/Landlock into the game spawn path, remove debug tools from the production `defconfig`, add post-build lint, wire `sbsign`/`pesign` and development EFI keys |
+| `playos-spec` | Document the security model, Secure Boot chain, and manifest signing scheme |
+
+---
+
+## Expected Files and Directories
+
+### `playos-init`
+
+```text
+src/security/
+    sandbox.c                   # PR_SET_NO_NEW_PRIVS, capability drop, setuid to playos-game
+    seccomp_filter.c            # build-time generated seccomp-BPF allowlist
+    landlock.c                  # Landlock allowed/denied path ruleset
+    manifest_verify.c           # Ed25519 detached-signature check (warn-only)
 ```
 
-**Denied (by Landlock default — not in allowed set):**
-```
-/data/games/<other-game>/        no access to other games
-/data/saves/<other-game>/        no access to other saves
-/data/config/                    no system config access
-/run/playos/control.sock         no access to control IPC
-/dev/input/event*                no raw input device access
-/proc/*/                         no process snooping
+### `playos-compositor`
+
+```text
+src/system_button.c             # reserved-button interception at the libinput/seat layer
 ```
 
-Landlock requires kernel ≥ 5.13. Verify the ROG Ally kernel version supports it. Fall back to logging-only enforcement if the kernel does not support Landlock (with an alert).
+### `playos-refdistro`
 
-### Control IPC Socket Hardening
+```text
+br2-external/board/ally/users-table.txt          # playos-game UID ~1000, no supplementary groups
+br2-external/board/ally/post-build.sh            # production lint: assert no debug binaries
+br2-external/configs/playos_ally_production_defconfig
+scripts/sign-efi.sh                              # sbsign/pesign with the development key
+keys/dev/                                        # development EFI signing key (not production HSM)
+```
 
-- `/run/playos/control.sock` — owned `root:playos-trusted`, mode `0660`
-- Only `playos-shell` and `playos-overlay` are in the `playos-trusted` group
-- Game processes are never in `playos-trusted`
-- Verify: a process running as `playos-game` cannot connect to the control socket
+### `playos-spec`
 
-### Production Build — Remove Debug Services
+```text
+src/security-model.md           # updated: §8 reserved-button boundary, sandbox, Secure Boot chain
+```
 
-**Must not be present in production builds:**
-- BusyBox shell (`/bin/sh`, `/bin/busybox`)
-- SSH daemon
-- `gdbserver`, `strace`, `ltrace`
-- `evtest`, `modetest`, graphics diagnostic tools
-- Any open listening TCP/UDP socket
+---
 
-**Build enforcement:**
-- Production `defconfig` does not include `BR2_PACKAGE_BUSYBOX` or debug packages
-- Post-build script asserts the absence of debug binaries
-- CI has a separate "production image lint" step that fails if debug artifacts are present
+## Agent Task Breakdown
 
-**Development image retains all debug tools** (behind `BR2_PACKAGE_PLAYOS_DEV_TOOLS`).
+### Task Status Grid
 
-### Signed Manifests (Foundations)
+| Task ID | Task | Primary repo | Status | Notes / evidence |
+|---|---|---|---|---|
+| S12-T1 | Drop game privileges at spawn: UID ~1000, `PR_SET_NO_NEW_PRIVS`, capability drop | `playos-init` | not started | |
+| S12-T2 | Apply Landlock allowed/denied path policy to game processes | `playos-init` | not started | |
+| S12-T3 | Apply seccomp syscall allowlist to game processes | `playos-init` | not started | |
+| S12-T4 | Grant only DRM render-node access; deny privileged KMS/master | `playos-init` | not started | |
+| S12-T5 | Enforce reserved-button input isolation end-to-end | `playos-compositor`, `playos-platform-api`, `playos-init` | not started | |
+| S12-T6 | Harden `control.sock` trusted-client auth and permission checks | `playos-runtime`, `playos-init` | not started | |
+| S12-T7 | Strip debug tools/services from the production image | `playos-refdistro` | not started | |
+| S12-T8 | Verify signed game manifests (warn-only in MVP) | `playos-init`, `playos-runtime` | not started | |
+| S12-T9 | Document Secure Boot chain; create and rotate dev signing keys in image build | `playos-refdistro`, `playos-spec` | not started | |
 
-Define the manifest signing scheme (full enforcement deferred to post-MVP):
-- Games will eventually require a signed `manifest.json`
-- For this sprint: define the signing format (Ed25519 detached signature alongside `manifest.json`)
-- Implement signature verification in `playos-init` but run in warn-only mode (log if missing/invalid, do not block launch)
-- Upgrade to hard-enforcement in a future sprint or post-MVP
+Update the **Status** column as work progresses: `not started` → `in progress` → `blocked` or `done`.
 
-### Secure Boot Chain (Documentation + Key Infrastructure)
+### S12-T1 — Drop game privileges at spawn
 
-For this sprint: document the target Secure Boot chain and set up development signing keys.
+`playos-init` spawns games as the `playos-game` user (UID ~1000, no supplementary groups), calls `prctl(PR_SET_NO_NEW_PRIVS, 1)` on the game process, and drops all capabilities from the effective and permitted sets before `exec`. The `playos-compositor` keeps `CAP_SYS_ADMIN` (DRM master), but games never inherit it.
 
-**Target signed chain:**
-1. UEFI Secure Boot — signs `BOOTX64.EFI`
-2. `BOOTX64.EFI` — signs or contains the kernel
-3. Kernel — verifies the initramfs (dm-verity or IMA)
-4. A/B update bundles — signed with PlayOS update key
+**Done when:** from inside a running game, `id` shows `uid=playos-game`, `/proc/self/status` shows `NoNewPrivs: 1`, and `CapEff: 0000000000000000`.
 
-**Development key setup:**
-- Generate a development EFI signing key (self-signed, not trusted by default UEFI)
-- Add `sbsign`/`pesign` to the build pipeline
-- Production signing uses an HSM-backed key (post-MVP)
+### S12-T2 — Apply Landlock filesystem restrictions
+
+Build a Landlock ruleset granting exactly the paths a game needs and default-deny everything else: `/data/games/<game-id>/` read-only, `/data/saves/<game-id>/` and `/data/cache/<game-id>/` read-write, `/tmp` or `/run/game-<id>/` read-write scratch, and `/run/playos/` execute-only for the Wayland socket. Deny other games' data, `/data/config/`, `/run/playos/control.sock`, `/dev/input/event*`, and `/proc/*/`. If the kernel is older than 5.13, fall back to logging-only enforcement with an alert.
+
+**Done when:** a game process cannot `open()` another game's save directory or read `/data/config/`; the unsupported-kernel fallback logs an alert without blocking launch.
+
+### S12-T3 — Apply seccomp syscall allowlist
+
+Generate a seccomp-BPF allowlist at build time covering the core syscall set (memory, file I/O, AF_UNIX sockets, process, signals, time, `getrandom`, limited `prctl`). Deny `mount`, `umount2`, `init_module`, `finit_module`, `ptrace`, `reboot`, `setuid`, `setgid`, `setcap`, and `open`/`openat` on `/proc/*/mem`, `/dev/dri/card*`, `/dev/input/event*`, and the control socket. Use `libseccomp` to generate and test the filter.
+
+**Done when:** `mount()` from a game process returns `EPERM`, and `open()` of `/proc/*/mem`, `/dev/dri/card*`, `/dev/input/event*`, or the control socket is denied.
+
+### S12-T4 — Restrict DRM node access
+
+`/dev/dri/card*` is owned by the `drm` group; games are not in `drm`. Games reach the GPU through the Wayland seat rather than by opening device nodes directly. Verify the primary node is unopenable from the game identity.
+
+**Done when:** `open("/dev/dri/card0", O_RDWR)` from a game process returns `EACCES`.
+
+### S12-T5 — Enforce reserved-button input isolation
+
+Reserved buttons (`SYSTEM`, `QUICK_MENU`) are intercepted by the compositor at the libinput/seat layer and never forwarded to clients. Games run outside the `input` group, so `/dev/input/event*` is unopenable; Landlock and seccomp also name those paths explicitly. The existing `libplayos` software mask remains as defense-in-depth, not the sole mechanism.
+
+**Done when:** `open("/dev/input/event0", O_RDONLY)` from a game process returns `EACCES`, and `SYSTEM`/`QUICK_MENU` never appear in a game's input stream.
+
+### S12-T6 — Harden control socket
+
+`/run/playos/control.sock` is owned by `root:playos-trusted` with mode `0660`. Only `playos-shell` and `playos-overlay` are in the `playos-trusted` group; game processes are never in that group.
+
+**Done when:** `connect()` to `/run/playos/control.sock` from a `playos-game` process returns `EACCES`.
+
+### S12-T7 — Remove debug tools from production build
+
+The production `defconfig` excludes BusyBox (`/bin/sh`, `/bin/busybox`), the SSH daemon, `gdbserver`/`strace`/`ltrace`, `evtest`/`modetest` and graphics diagnostic tools, and ships with no open listening TCP/UDP sockets. A post-build script asserts their absence, and CI has a production-image lint step that fails if debug artifacts are present. The development image retains all debug tools behind `BR2_PACKAGE_PLAYOS_DEV_TOOLS`.
+
+**Done when:** the production image contains no `busybox`, `gdbserver`, or `strace` and no open sockets; the CI lint step fails if any of these appear.
+
+### S12-T8 — Verify signed game manifests (warn-only)
+
+Define the manifest signing format: an Ed25519 detached signature alongside `manifest.json`. Implement signature verification in `playos-init`, but run it in warn-only mode — log a warning if the signature is missing or invalid, and do not block launch. Hard enforcement is deferred to a later sprint or post-MVP.
+
+**Done when:** an unsigned manifest produces a warning in the log and the game still launches.
+
+### S12-T9 — Document Secure Boot chain and development keys
+
+Document the target signed chain: UEFI Secure Boot signs `BOOTX64.EFI`; `BOOTX64.EFI` signs or contains the kernel; the kernel verifies the initramfs via dm-verity or IMA; A/B update bundles are signed with the PlayOS update key. Generate a self-signed development EFI signing key and add `sbsign`/`pesign` to the build pipeline. Production signing uses an HSM-backed key (post-MVP).
+
+**Done when:** the development EFI key exists under `keys/dev/` and is used by CI builds, `security-model.md` documents the chain, and production HSM signing is explicitly deferred.
+
+---
+
+## Implementation Guidance
+
+**Drop privileges before exec, not after.** The game must never execute with root credentials; perform the credential drop and `PR_SET_NO_NEW_PRIVS` in the child process before `execve`.
+
+**Name the denied paths explicitly.** Both the seccomp `open`/`openat` filter and the Landlock ruleset must name `/dev/input/event*`, `/dev/dri/card*`, `/proc/*/mem`, and the control socket. Do not rely on default-deny alone.
+
+**Treat the `libplayos` mask as defense-in-depth.** The real boundary is the seat plus group permissions plus Landlock plus seccomp; the software bitmask is a convenience, not the enforcement point.
+
+**Landlock fallback must be loud, not silent.** If the kernel is too old, log an alert and continue, but record it as an unresolved hardening gap rather than failing the whole launch path.
+
+**Production lint fails the build.** Debug-artifact absence is enforced in CI, not checked manually.
+
+**Keep Secure Boot scoped this sprint.** Ship documentation and development keys only; do not attempt production key management.
+
+---
+
+## Verification and Evidence
+
+| Evidence | How it is produced |
+|---|---|
+| Game runs as `playos-game` with no capabilities | `id` and `/proc/self/status` captured inside a test game |
+| Primary DRM node denied | Security test binary attempts `open("/dev/dri/card0", O_RDWR)` |
+| Raw input device denied | Security test binary attempts `open("/dev/input/event0", O_RDONLY)` |
+| Reserved buttons absent | Input-stream dump while `SYSTEM`/`QUICK_MENU` are pressed |
+| Control socket denied | Security test binary attempts `connect()` to `control.sock` |
+| seccomp active | Security test binary attempts `mount()` and observes `EPERM` |
+| Landlock active | Security test binary reads another game's save directory and is denied |
+| Production image is debug-free | CI production lint log and post-build script output |
+| Manifest warn-only behavior | Launch log for an unsigned manifest |
+| Secure Boot chain documented | `security-model.md` plus `keys/dev/` in CI artifacts |
 
 ---
 
@@ -169,23 +234,15 @@ For this sprint: document the target Secure Boot chain and set up development si
 
 ---
 
-## Repositories Primarily Involved
+## Handoff to Sprint 13
 
-| Repo | Work |
-|---|---|
-| `playos-refdistro` | Game user setup, seccomp filter, Landlock integration, production build lint, debug package gating |
-| `playos-platform-api` | `libseccomp` integration, Landlock application before game exec |
-| `playos-spec` | Security model documentation, Secure Boot chain spec, manifest signing spec |
-| `playos-runtime` | IPC socket permission hardening |
+Sprint 13 may assume:
 
----
-
-## Testing Approach
-
-- Security test suite: small C programs that attempt each forbidden operation; assert they are blocked
-- Production build lint: automated check for debug binaries
-- Full regression: run all previous acceptance criteria after hardening
-- Physical ROG Ally: verify game still launches and functions correctly under all restrictions
+- Games run as `playos-game` with no capabilities and `NoNewPrivs` set.
+- The control socket is `root:playos-trusted` mode `0660`; games cannot connect.
+- Production images are debug-tool-free; development images retain debug tools.
+- The Landlock/seccomp sandbox is active on the AMD ROG Ally path.
+- Manifest verification and Secure Boot are foundations only, not hard enforcement.
 
 ---
 

@@ -173,6 +173,61 @@ On `Shutdown` or `Reboot` IPC:
 
 ---
 
+## Thermal & Power Management
+
+`playos-init` owns the thermal safety and performance-profile policy. It runs a 1 Hz tick folded into the existing supervisor loop (no dedicated thread).
+
+### Sensors
+
+| Reading | Source (in order) |
+|---|---|
+| CPU temperature | `/sys/class/thermal/thermal_zone*/type` = `x86_pkg_temp`, then `cpu_thermal` |
+| GPU temperature | `/sys/class/hwmon/hwmon*/` with a `name` of `amdgpu`, reading `temp1_input` |
+| Battery state | Delegated to `playos-platform-api` (`playos_power_get_info`) |
+
+### Thermal states
+
+| State | Range (default) | Action |
+|---|---|---|
+| `NORMAL` | < 75 °C | None |
+| `WARM` | 75–85 °C | None (monitor) |
+| `HOT` | 85–95 °C | Reject/back off `PERFORMANCE` profile |
+| `CRITICAL` | ≥ 95 °C | Force `POWER_SAVE`; shut down after 10 s without recovery |
+
+Thresholds are read from `/data/config/thermal.json`:
+```json
+{ "warm_c": 75, "hot_c": 85, "critical_c": 95 }
+```
+Missing or invalid values fall back to the defaults above.
+
+On every state transition, `playos-init` emits a `ThermalStateChanged` IPC event.
+
+### Performance profiles
+
+Profiles map to amd-pstate EPP values and are written to each online CPU's `energy_performance_preference` sysfs node:
+
+| Profile | Wire name | EPP value |
+|---|---|---|
+| `BALANCED` (0) | `balanced` | `balance_performance` |
+| `POWER_SAVE` (1) | `power_save` | `power` |
+| `PERFORMANCE` (2) | `performance` | `performance` |
+
+`SetPerfProfile` IPC requests are honored except that a `PERFORMANCE` request is denied while the thermal state is `HOT` or `CRITICAL`. A rejected request carries `"accepted": false` with a `"reason"` of `thermal_denied`, `epp_write_failed`, or `invalid_profile`. A successful change emits `PerfProfileChanged`.
+
+The active profile is synchronized from the kernel at boot when EPP is available.
+
+### Suspend
+
+A `Suspend` IPC request (fire-and-forget) triggers:
+
+1. Deliver `PLAYOS_LIFECYCLE_SUSPEND` to the active game via the lifecycle fd
+2. Write `mem` to `/sys/power/state`
+3. After resume (or immediately on failure), deliver `PLAYOS_LIFECYCLE_RESUME`
+
+Suspend is best-effort and never fatal.
+
+---
+
 ## Recovery Mode
 
 Entered when:

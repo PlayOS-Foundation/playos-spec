@@ -16,11 +16,11 @@ Sprint 10 delivers an installable system but the installed image is mutable — 
 
 ## Start Condition Checklist
 
-- Sprint 10 complete: installer creates a 3-partition layout; Ally boots from internal NVMe.
-- `playos-init` reads and mounts the system partition.
+- Sprint 10 complete: installer creates a 3-partition layout (EFI, system, data); Ally boots from internal NVMe via the ESP EFI artifact.
+- The system partition exists, formatted ext4 and empty.
 - The EFI boot path (BOOTX64.EFI) is stable.
 - An update key pair is generated for development use.
-- RAUC evaluated and chosen or a custom updater decision is documented in an ADR.
+- ADR-0005 (RAUC for A/B System Updates) is Accepted; the RAUC-vs-custom criteria are recorded.
 
 ---
 
@@ -63,7 +63,8 @@ Sprint 10 delivers an installable system but the installed image is mutable — 
 
 | Repo | Required work |
 |---|---|
-| `playos-refdistro` | A/B partition layout in installer, `playos-init` boot.json management, RAUC integration, update bundle build target |
+| `playos-refdistro` | A/B partition layout in installer, RAUC integration, update bundle build target |
+| `playos-init` | Read-only system mount, `boot.json` management, boot counting and rollback, update application flow |
 | `playos-shell` | Update UI in settings screen |
 | `playos-platform-api` | `playos_system_os_version()` returns active slot version |
 | `playos-spec` | A/B boot protocol spec, update flow ADR (RAUC vs custom) |
@@ -72,10 +73,15 @@ Sprint 10 delivers an installable system but the installed image is mutable — 
 
 ## Expected Files and Directories
 
+### `playos-init`
+
+```text
+src/boot_slot.c                      # boot.json reader/writer, slot selection, boot counting
+```
+
 ### `playos-refdistro`
 
 ```text
-src/playos-init/src/boot_slot.c      # boot.json reader/writer, slot selection, boot counting
 br2-external/configs/playos_ally_defconfig   # updated: 4-partition layout
 br2-external/configs/playos_ally_installer_defconfig   # updated: 4-partition installer
 br2-external/package/rauc/           # RAUC Buildroot package (or custom updater)
@@ -85,7 +91,7 @@ scripts/create-update-bundle.sh      # development key signing
 ### `playos-spec`
 
 ```text
-adr/ADR-0006-update-mechanism.md     # RAUC vs custom decision
+adr/ADR-0005-update-engine.md        # exists — RAUC vs custom decision; supersede if revised
 ```
 
 ---
@@ -96,12 +102,12 @@ adr/ADR-0006-update-mechanism.md     # RAUC vs custom decision
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S11-T1 | Implement read-only system partition mount | `playos-refdistro` | not started | |
-| S11-T2 | Update installer and `playos-init` for A/B partition layout | `playos-refdistro` | not started | |
-| S11-T3 | Implement `boot.json` read/write and active slot selection | `playos-refdistro` | not started | |
-| S11-T4 | Implement boot counting and automatic rollback | `playos-refdistro` | not started | |
-| S11-T5 | Integrate RAUC (or equivalent) and update application flow | `playos-refdistro` | not started | |
-| S11-T6 | Implement update bundle signature verification | `playos-refdistro` | not started | |
+| S11-T1 | Implement read-only system partition mount | `playos-init` | not started | |
+| S11-T2 | Update installer and `playos-init` for A/B partition layout | `playos-refdistro`, `playos-init` | not started | |
+| S11-T3 | Implement `boot.json` read/write and active slot selection | `playos-init` | not started | |
+| S11-T4 | Implement boot counting and automatic rollback | `playos-init` | not started | |
+| S11-T5 | Integrate RAUC (or equivalent) and update application flow | `playos-refdistro`, `playos-init` | not started | |
+| S11-T6 | Implement update bundle signature verification | `playos-init` | not started | |
 | S11-T7 | Add shell update UI | `playos-shell` | not started | |
 | S11-T8 | Add `playos_system_os_version()` API | `playos-platform-api` | not started | |
 | S11-T9 | A/B update and rollback validation | `playos-refdistro` | not started | |
@@ -284,161 +290,14 @@ If RAUC's Buildroot package is not available or too complex to integrate, implem
 
 ---
 
-## Handoff (MVP Complete)
+## Handoff to Sprint 12
 
-Sprint 11 is the final MVP sprint. After this sprint:
+Sprint 12 (Security Hardening) may assume:
 
-- The system is immutable, installable, and self-updating
-- A/B updates with automatic rollback are functional
-- All sprints 0–11 are complete
-- Post-MVP work begins: network update download, dm-verity, Bluetooth, cloud saves, marketplace
-
----
-
-## Exit Gate
-
-The system image is immutable at runtime. A/B updates can be applied, verified, and automatically rolled back on failure. Games and user data are unaffected by updates and rollbacks.
-
-*Previous: [Sprint 10](Sprint-10.md) | Next: [Sprint 12](Sprint-12.md)*
-
-**Make the system partition read-only:**
-
-Option A: Mount with `ro` flag in `playos-init`
-```c
-mount(system_dev, "/", "ext4", MS_RDONLY, NULL);
-```
-
-Option B: Use dm-verity (preferred for production — detects tampering):
-- Append a verity hash tree to the system image at build time (`veritysetup format`)
-- `playos-init` sets up the dm-verity device and mounts it read-only
-- Any modification attempt returns `EROFS`
-- dm-verity failures cause `playos-init` to refuse to boot that slot
-
-For this sprint: implement Option A (simple read-only mount). Document Option B (dm-verity) as a Sprint 12/production requirement.
-
-**Consequences:**
-- Kernel, initramfs, compositor, shell, `libplayos`, firmware, and core assets are read-only at runtime
-- All runtime writes go to `/data` (already enforced by architecture)
-- Verify: `touch /usr/test` returns `EROFS` or permission denied
-- Games, saves, logs, cache, config — all on `/data` — are unaffected
-
-### A/B Partition Layout
-
-Expand the Sprint 10 layout to A/B:
-
-```
-GPT disk
-├── Part 1: EFI System Partition    FAT32    512 MB    label: EFI
-├── Part 2: PlayOS system A         ext4     2 GB      label: playos-system-a
-├── Part 3: PlayOS system B         ext4     2 GB      label: playos-system-b
-└── Part 4: PlayOS data             ext4     remainder  label: playos-data
-```
-
-**ESP contains two boot entries:**
-```
-/EFI/BOOT/BOOTX64.EFI         → delegates to active slot
-/EFI/playos/slotA.efi         → slot A kernel + initramfs
-/EFI/playos/slotB.efi         → slot B kernel + initramfs
-```
-
-Or: Use a single EFI artifact with a slot variable stored in UEFI NVRAM or a flag file on the ESP.
-
-**Active slot tracking:**
-Store in `/EFI/playos/boot.json` on the ESP (writable from `playos-init` for boot counting):
-
-```json
-{
-  "active_slot": "a",
-  "slot_a": { "version": "0.1.0", "boot_count": 0, "health": "good" },
-  "slot_b": { "version": "", "boot_count": 0, "health": "empty" }
-}
-```
-
-`playos-init` reads `boot.json` at boot to determine which slot to mount.
-
-### Boot Counting and Automatic Rollback
-
-**On every boot:**
-1. `playos-init` reads `boot.json`
-2. Increments `boot_count` for the active slot
-3. If `boot_count >= 3` and `health != "good"`: mark slot as `"health": "bad"`, switch active slot to the other one, reboot
-4. After a successful boot (shell rendered and user interacted OR 60-second timer): `playos-init` marks `health = "good"` and resets `boot_count = 0`
-
-This provides automatic rollback after up to 3 failed boot attempts.
-
-### Update Flow
-
-**Update engine:** Use RAUC unless a simpler EFI-image-specific updater is sufficient. Document the choice as an ADR.
-
-**Full update flow:**
-1. Download signed update bundle to `/data/updates/`
-2. Verify signature (public key embedded in current system image)
-3. Identify the inactive slot (opposite of `active_slot` in `boot.json`)
-4. Write new system image to inactive slot's partition
-5. Update `boot.json`: set `active_slot` to the new slot, `boot_count = 0`, `health = "pending"`
-6. Display "Update ready — restart to apply" in the shell/overlay
-7. User triggers restart (or automatic)
-8. System boots from new slot
-9. If successful: `health = "good"` after 60 seconds
-10. If boot fails 3 times: rollback to previous slot
-
-**Update bundle format (RAUC):**
-- Signed with a PlayOS update key
-- Contains: kernel+initramfs EFI artifact + system partition image OR delta
-- Bundle metadata: version, min supported current version, changelog
-
-**Update key management:**
-- Development builds: use a development key (not secret, used for testing)
-- Production builds: use a production HSM-backed key (post-MVP)
-- The verification public key is embedded in `libplayos` or the initramfs
-
-### Shell and Overlay Update UI
-
-**Shell settings screen → "System Update":**
-- Current version, last check time
-- "Check for Update" button (stub — manual trigger for this sprint)
-- Download and apply progress
-- "Restart to Apply" button after download
-
-**For this sprint:** Trigger updates manually via a USB-placed update bundle or a local file. Network update download is post-MVP.
-
----
-
-## Acceptance Criteria
-
-- [ ] Running system partition is mounted read-only; `touch /usr/test` fails with `EROFS`
-- [ ] A/B partition layout created by updated installer
-- [ ] `boot.json` on ESP reflects active slot and health state
-- [ ] Update applied to inactive slot does not affect the running system
-- [ ] After reboot, system boots from the newly updated slot
-- [ ] New slot boots successfully → `health = "good"` written after 60 seconds
-- [ ] Simulated boot failure (corrupt initramfs in new slot): boot count reaches 3, rolls back to old slot
-- [ ] Rollback boots the old slot; system is functional
-- [ ] Games and saves on `/data` are untouched by the update and rollback
-- [ ] System version reported by `playos_system_os_version()` reflects the active slot version
-- [ ] Installer creates A/B layout on fresh NVMe install
-- [ ] CI: update bundle creation and signature verification tested on host
-
----
-
-## Repositories Primarily Involved
-
-| Repo | Work |
-|---|---|
-| `playos-refdistro` | A/B partition layout, boot.json management in `playos-init`, RAUC integration, update bundle build target |
-| `playos-shell` | Update UI in settings screen |
-| `playos-platform-api` | `playos_system_os_version()` returns active slot version |
-| `playos-spec` | Update flow ADR (RAUC vs custom), A/B boot protocol spec |
-
----
-
-## Testing Approach
-
-- Physical ROG Ally: full A/B update cycle
-- Rollback test: corrupt the new slot's initramfs; verify 3-strike rollback to old slot
-- Data persistence test: create files in `/data` before update; verify they survive
-- QEMU: A/B boot logic, boot counting, rollback on loopback disks
-- Signature test: verify a bundle with an invalid signature is rejected before any write
+- The system image is immutable at runtime (read-only system mount)
+- Signed A/B updates with automatic rollback are functional
+- `boot.json` on the ESP tracks the active slot, slot health, and boot count
+- Games and user data live on `/data` and are unaffected by updates and rollback
 
 ---
 

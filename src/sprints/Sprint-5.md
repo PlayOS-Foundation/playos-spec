@@ -253,7 +253,7 @@ Desktop-only features must be disabled or become no-ops:
 - focus must always remain visible and unambiguous
 - no mouse is required for normal operation
 
-> **⚠️ Trusted vs untrusted input:** The shell is a **trusted** system component — it needs the SYSTEM (Xbox Guide) and QUICK_MENU (Ally Armoury Crate) buttons. The public `playos_input_get_controller_state()` function strips these reserved buttons before returning (since games must never see them). The shell must either:
+> **⚠️ Trusted vs untrusted input:** The shell is a **trusted** system component — it needs the SYSTEM (Xbox Guide / Ally Armoury Crate) and QUICK_MENU (Ally Command Center) buttons. The public `playos_input_get_controller_state()` function strips these reserved buttons before returning (since games must never see them). The shell must either:
 >   1. Link the evdev backend directly (bypassing `libplayos` for input), **or**
 >   2. Consume input through a compositor protocol (e.g., the future `session_manager` protocol in `playos-v1.xml`)
 >

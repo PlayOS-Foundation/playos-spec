@@ -17,7 +17,7 @@ Sprint 9 completes the feature set. Sprint 10 makes PlayOS installable to real h
 ## Start Condition Checklist
 
 - Sprint 9 complete: full feature set running on the ROG Ally from USB.
-- `FactoryReset { erase_cache, erase_config }` is implemented (Sprint 6); `erase_games` and `erase_saves` are stubs.
+- `FactoryReset { erase_cache, erase_config }` is implemented (Sprint 6); `erase_games`, `erase_saves`, and `erase_logs` are deferred to this sprint.
 - `playos-refdistro` produces a bootable USB image (`make playos-image`).
 - QEMU can boot the USB image on the host for testing.
 - A spare NVMe or a test-only Ally is available for destructive disk tests.
@@ -63,9 +63,9 @@ Sprint 9 completes the feature set. Sprint 10 makes PlayOS installable to real h
 
 | Repo | Required work |
 |---|---|
-| `playos-refdistro` | Installer source, Buildroot package, installer image target, disk ops |
-| `playos-runtime` | Complete `FactoryReset` IPC, install-mode signaling |
-| `playos-overlay` | Factory reset UI flow in power menu |
+| `playos-refdistro` | `playos-installer` source, Buildroot package, installer image target, disk ops; overlay factory-reset UI flow |
+| `playos-init` | Complete `FactoryReset` server handler (games/saves/logs erasure); installer trigger mode |
+| `playos-runtime` | `playos_trusted_factory_reset()` client helper |
 | `playos-spec` | Installation guide, partition layout doc |
 
 ---
@@ -99,12 +99,12 @@ br2-external/configs/playos_ally_installer_defconfig
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S10-T1 | Implement installer trigger mode in `playos-init` | `playos-refdistro` | not started | |
+| S10-T1 | Implement installer trigger mode in `playos-init` | `playos-init` | not started | |
 | S10-T2 | Build installer screen state machine (Raylib UI) | `playos-refdistro` | not started | |
 | S10-T3 | Implement disk partitioning and formatting | `playos-refdistro` | not started | |
 | S10-T4 | Implement EFI artifact write and UEFI boot entry | `playos-refdistro` | not started | |
-| S10-T5 | Implement first-boot from internal disk | `playos-refdistro` | not started | |
-| S10-T6 | Complete `FactoryReset` IPC (all five options) | `playos-runtime`, `playos-overlay` | not started | |
+| S10-T5 | Implement first-boot from internal disk | `playos-init` | not started | |
+| S10-T6 | Complete `FactoryReset` IPC (all five options) | `playos-init`, `playos-runtime`, `playos-refdistro` | not started | |
 | S10-T7 | Create `make installer-image` Buildroot target | `playos-refdistro` | not started | |
 | S10-T8 | Installer validation (QEMU loopback + Ally) | `playos-refdistro` | not started | |
 
@@ -159,7 +159,7 @@ Using `libfdisk`:
 
 Format:
 - ESP: call `mkfs.fat -F32 -n EFI <part1>`
-- System: call `mkfs.ext4 -L playos-system <part2>` (blank; will be written in S10-T4)
+- System: call `mkfs.ext4 -L playos-system <part2>` (empty ext4; becomes the read-only root in Sprint 11)
 - Data: call `mkfs.ext4 -L playos-data <part3>`
 
 Each step must check the return code. On any failure: transition to ERROR screen with the error code and step name.
@@ -187,21 +187,31 @@ On first boot from internal disk (empty `/data`):
 
 ### S10-T6 — Complete `FactoryReset` IPC
 
-Extend the Sprint 6 stub to support all five options:
+Extend the Sprint 6 handler (which already erases `cache` and `config`) to act on all five flags:
 
-```
-FactoryReset {
-  erase_games:  bool,   // delete /data/games/ contents
-  erase_saves:  bool,   // DESTRUCTIVE — requires separate confirmation
-  erase_cache:  bool,
-  erase_config: bool,
-  erase_logs:   bool
+```json
+{
+  "v": 1,
+  "type": "FactoryReset",
+  "erase_games": false,
+  "erase_saves": false,
+  "erase_cache": true,
+  "erase_config": true,
+  "erase_logs": false
 }
 ```
 
-- `erase_saves` is destructive: overlay must show a second confirmation before sending the IPC
-- Factory reset with `erase_games = true` and `erase_saves = true` leaves the system bootable with an empty, valid data partition
-- Access: Overlay → Power menu → "Factory Reset" → option selection → confirmation
+- `erase_games`  → delete contents of `/data/games/`
+- `erase_saves`  → delete contents of `/data/saves/` (DESTRUCTIVE)
+- `erase_cache`  → delete contents of `/data/cache/`
+- `erase_config` → delete contents of `/data/config/`
+- `erase_logs`   → delete contents of `/data/log/`
+
+- Requires no active game; if a game is running, reply `FactoryResetError` with `"reason": "game_running"` (matches `runtime-ipc.md`).
+- Success replies `FactoryResetComplete`; the erased directories are recreated empty.
+- `erase_saves` is destructive: overlay must show a second confirmation before sending the IPC.
+- Factory reset with `erase_games = true` and `erase_saves = true` leaves the system bootable with an empty game library and a valid `/data` tree.
+- Access: Overlay → Power menu → "Factory Reset" → option selection → confirmation.
 
 **Done when:** full factory reset (all true) leaves a bootable system with an empty shell library.
 
@@ -286,175 +296,11 @@ The installer runs as root inside the initramfs. Use `libfdisk` directly — do 
 
 Sprint 11 may assume:
 
-- The installer creates a working 3-partition layout
-- `playos-init` reads the system partition and boots from it
+- The installer creates a working 3-partition layout (EFI, system, data)
+- The system partition is created and formatted empty, ready for Sprint 11 to populate and mount read-only
+- `playos-init` boots from the ESP EFI artifact (BOOTX64.EFI) and provisions `/data`
 - `/data` provisioning is stable and tested
-- The EFI boot path is established (BOOTX64.EFI)
 - Sprint 11 will expand the partition layout to A/B; the installer will be updated accordingly
-
----
-
-## Exit Gate
-
-A PlayOS USB installer image successfully installs PlayOS to the ROG Ally internal NVMe. After removal of the USB drive, the Ally boots PlayOS from internal storage and shows the shell.
-
-*Previous: [Sprint 9](Sprint-9.md) | Next: [Sprint 11](Sprint-11.md)*
-
-The installer runs as a special `playos-init` mode, triggered when:
-- A kernel command line flag `playos.mode=install` is present, OR
-- No existing PlayOS data partition is found and the device is running from a USB/removable medium
-
-**Installer must never silently format.** The user must:
-1. See the target disk, its model name, current partitions, and total size
-2. Be warned that all data on the target disk will be erased
-3. Explicitly confirm using the controller (hold A for 3 seconds, or confirm through a multi-step dialog)
-
-### Installer Flow
-
-```
-Boot installer image from USB
-    │
-    ▼
-playos-init detects install mode
-    │
-    ▼
-Launch playos-installer (trusted Raylib client or direct Raylib app)
-    │
-    ▼
-Disk Discovery Screen
-    - Enumerate NVMe and SATA disks (via /sys/block/)
-    - Show: model, size, current partition table
-    - Exclude the boot USB device
-    - User selects target disk (D-pad + A)
-    │
-    ▼
-Confirmation Screen
-    - "WARNING: All data on <disk model> (<size>) will be erased"
-    - Controller: hold A for 3 seconds to confirm
-    - B to cancel and return to disk selection
-    │
-    ▼
-Installation Progress Screen
-    1. Create GPT partition table
-    2. Create EFI System Partition (FAT32, ~512MB)
-    3. Create PlayOS system A partition (ext2/squashfs, ~2GB) [placeholder for A/B in Sprint 11]
-    4. Create PlayOS data partition (ext4, remainder)
-    5. Write /EFI/BOOT/BOOTX64.EFI to ESP
-    6. Format data partition, create directory tree
-    7. Write storage-version marker
-    8. Sync filesystems
-    - Progress bar (0–100%)
-    │
-    ▼
-Success Screen
-    - "Installation complete. Remove USB and press A to restart."
-    - A button → system reboots
-    │
-    ▼ (USB removed)
-ROG Ally boots from internal NVMe → PlayOS
-```
-
-### `playos-installer` — Raylib Installer UI
-
-Create as a trusted Raylib client in `playos-refdistro/src/installer/`.
-
-**Screens:** Disk discovery → confirmation → progress → success/failure
-
-**Disk operations (run as root via `playos-init`):**
-- Use `libfdisk` or raw `ioctl` for partition table manipulation
-- Use `mkfs.fat` for ESP, `mkfs.ext4` for data partition
-- Use `cp` or `dd` to write the boot artifact to ESP
-- Verify each step; abort with a detailed error on any failure
-
-**Error screen:**
-- Show the failed step and error message
-- Options: "Retry" (start over) or "Shutdown"
-- Never drop to a shell
-
-### Partition Layout
-
-For this sprint, use a simple 3-partition layout (A/B expanded in Sprint 11):
-
-```
-GPT disk (ROG Ally NVMe)
-├── Part 1: EFI System Partition   FAT32      512 MB    label: EFI
-├── Part 2: PlayOS system          ext4/raw   2 GB      label: playos-system  (single slot for now)
-└── Part 3: PlayOS data            ext4       remainder  label: playos-data
-```
-
-Note: Sprint 11 will expand `playos-system` to A/B slots.
-
-### UEFI Boot Entry
-
-After writing the ESP, optionally register an UEFI boot entry via `efibootmgr`:
-```
-efibootmgr --create --disk <nvme_dev> --part 1 --label "PlayOS" --loader /EFI/BOOT/BOOTX64.EFI
-```
-
-The fallback path `/EFI/BOOT/BOOTX64.EFI` works without a registered entry on most UEFI firmware.
-
-### First-Boot After Installation
-
-When PlayOS boots from the internal disk for the first time:
-- `playos-init` finds no data content (empty `/data`)
-- Creates the full directory tree
-- Writes `.playos-storage-version`
-- Boots normally into the shell (no games installed yet — empty library)
-
-### Factory Reset (Complete Implementation)
-
-Complete the `FactoryReset` IPC command from Sprint 6:
-
-```
-FactoryReset {
-  erase_games: bool,      // deletes /data/games/ contents
-  erase_saves: bool,      // deletes /data/saves/ contents  (DESTRUCTIVE — separate confirmation)
-  erase_cache: bool,      // deletes /data/cache/ contents
-  erase_config: bool,     // deletes /data/config/ contents
-  erase_logs: bool        // deletes /data/log/ contents
-}
-```
-
-Access via: Overlay → Power menu → "Factory Reset" → confirmation screen
-
----
-
-## Acceptance Criteria
-
-- [ ] Installer boots from USB and shows the disk discovery screen
-- [ ] Only internal NVMe disks are listed; USB boot device is excluded
-- [ ] Disk model, size, and partition table are shown correctly
-- [ ] Confirmation requires holding A for 3 seconds (no accidental erase)
-- [ ] B on confirmation screen returns to disk selection
-- [ ] Installation completes without error on a clean NVMe
-- [ ] Progress bar reaches 100% and success screen appears
-- [ ] After USB removal and reboot: PlayOS boots from NVMe
-- [ ] Empty game library is shown on first boot from internal disk
-- [ ] A file written to `/data/` on the internal disk persists after restart
-- [ ] Installing a game manually (copying to `/data/games/`) and restarting shows it in the shell
-- [ ] Factory reset (all options) leaves the system bootable with an empty but valid data partition
-- [ ] Error screen is shown if installation fails at any step (simulate by write-protecting target)
-- [ ] CI passes (installer compiles; disk operations tested on a loopback device in QEMU)
-
----
-
-## Repositories Primarily Involved
-
-| Repo | Work |
-|---|---|
-| `playos-refdistro` | `playos-installer` source, Buildroot package, installer image target (`make installer-image`) |
-| `playos-runtime` | `FactoryReset` IPC full implementation, install-mode signaling |
-| `playos-overlay` | Factory reset UI flow |
-| `playos-spec` | Installation guide, partition layout documentation |
-
----
-
-## Testing Approach
-
-- Physical ROG Ally: full install flow from USB to NVMe
-- Loopback test in QEMU: installer writes to a virtual disk; verify partition layout and filesystem
-- Abort test: kill installer mid-progress; verify device is in a known (recoverable) state
-- Re-install test: run installer on an already-installed device; verify it works correctly
 
 ---
 

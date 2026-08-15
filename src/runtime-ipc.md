@@ -211,9 +211,18 @@ Requires no active game. Erases selected `/data/` subdirectories and recreates t
 
 **Response:**
 ```json
-{ "v": 1, "type": "SetPerfProfileAck", "active_profile": "balanced" }
-{ "v": 1, "type": "SetPerfProfileError", "reason": "thermal_override" }
+{ "v": 1, "type": "SetPerfProfile", "accepted": true }
+{ "v": 1, "type": "SetPerfProfile", "accepted": false, "reason": "thermal_denied" }
 ```
+`reason` values: `thermal_denied`, `invalid_profile`, `epp_write_failed`
+
+---
+
+#### `Suspend`
+```json
+{ "v": 1, "type": "Suspend" }
+```
+Fire-and-forget. `playos-init` delivers `PLAYOS_LIFECYCLE_SUSPEND` to the active game, attempts S3 suspend (`mem` to `/sys/power/state`), then delivers `PLAYOS_LIFECYCLE_RESUME` after resume (or immediately on failure). No response is sent.
 
 ---
 
@@ -253,9 +262,15 @@ Requires no active game. Erases selected `/data/` subdirectories and recreates t
 
 #### `ThermalStateChanged`
 ```json
-{ "v": 1, "type": "ThermalStateChanged", "state": "hot", "cpu_temp_c": 88, "gpu_temp_c": 91 }
+{ "v": 1, "type": "ThermalStateChanged", "state": 2 }
 ```
-`state` values: `"normal"`, `"warm"`, `"hot"`, `"critical"`
+`state` values (integer): `0` normal, `1` warm, `2` hot, `3` critical
+
+#### `PerfProfileChanged`
+```json
+{ "v": 1, "type": "PerfProfileChanged", "profile": 1 }
+```
+`profile` values (integer): `0` balanced, `1` power_save, `2` performance
 
 ---
 
