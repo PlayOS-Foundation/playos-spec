@@ -1,38 +1,137 @@
-/* PlayOS brand overrides for mdBook coal theme */
+/* PlayOS brand theme for mdBook — mirrors the playos-foundation website */
 
-:root {
-    --playos-accent: #e53e3e;      /* ROG red */
-    --playos-accent-dim: #9b2335;
-    --playos-code-bg: #1a1a2e;
+/* ---------- Global typography & chrome ---------- */
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* Sidebar accent bar */
-.sidebar .sidebar-scrollbox {
-    border-right: 2px solid var(--playos-accent-dim);
+::selection {
+  background: rgba(125, 211, 252, 0.12);
+  color: #e7eaee;
 }
 
-/* Active chapter highlight */
-.chapter li.chapter-item.expanded > a,
-.chapter li.chapter-item > a.active {
-    color: var(--playos-accent) !important;
-    font-weight: 600;
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
 }
 
-/* Section dividers in nav */
-.chapter li.part-title {
-    color: var(--playos-accent);
-    font-size: 0.75rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-top: 1.2em;
+.menu-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
-/* Code blocks */
-pre code {
-    background: var(--playos-code-bg) !important;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
-/* Top menu bar */
-#menu-bar {
-    border-bottom: 2px solid var(--playos-accent-dim);
+/* ---------- PlayOS dark palette (applies to the default Coal theme) ---------- */
+
+.coal {
+  --bg: #0b0c0f;
+  --fg: #e7eaee;
+
+  --sidebar-bg: #0f1115;
+  --sidebar-fg: #98a0ab;
+  --sidebar-non-existant: #7c8694;
+  --sidebar-active: #7dd3fc;
+  --sidebar-spacer: #23262d;
+
+  --scrollbar: #7c8694;
+
+  --icons: #7c8694;
+  --icons-hover: #e7eaee;
+
+  --links: #7dd3fc;
+
+  --inline-code-color: #7dd3fc;
+
+  --theme-popup-bg: #14161b;
+  --theme-popup-border: #2e323a;
+  --theme-hover: #191c22;
+
+  --quote-bg: #0f1115;
+  --quote-border: #23262d;
+
+  --warning-border: #f59e0b;
+
+  --table-border-color: #23262d;
+  --table-header-bg: #191c22;
+  --table-alternate-bg: #0f1115;
+
+  --searchbar-border-color: #2e323a;
+  --searchbar-bg: #14161b;
+  --searchbar-fg: #e7eaee;
+  --searchbar-shadow-color: rgba(56, 189, 248, 0.35);
+  --searchresults-header-fg: #7c8694;
+  --searchresults-border-color: #2e323a;
+  --searchresults-li-bg: #14161b;
+  --search-mark-bg: rgba(56, 189, 248, 0.35);
+
+  --color-scheme: dark;
+
+  --footnote-highlight: rgba(56, 189, 248, 0.35);
+  --overlay-bg: rgba(11, 12, 15, 0.6);
+
+  --blockquote-note-color: #7dd3fc;
+  --blockquote-tip-color: #34d399;
+  --blockquote-important-color: #c084fc;
+  --blockquote-warning-color: #fbbf24;
+  --blockquote-caution-color: #f87171;
+
+  --sidebar-header-border-color: #38bdf8;
+}
+
+/* ---------- PlayOS chrome overrides (Coal theme) ---------- */
+
+.coal .sidebar {
+  border-right: 1px solid #23262d;
+}
+
+.coal .chapter li a.active {
+  font-weight: 600;
+}
+
+.coal .chapter li.part-title {
+  color: #7dd3fc;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.coal .content a:hover {
+  color: #38bdf8;
+}
+
+.coal h1,
+.coal h2,
+.coal h3,
+.coal h4 {
+  letter-spacing: -0.02em;
+}
+
+.coal .content pre {
+  background: #0d0e12;
+  border: 1px solid #23262d;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.coal .content pre code.hljs {
+  background: #0d0e12;
 }
