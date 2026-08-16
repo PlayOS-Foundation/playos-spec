@@ -44,7 +44,7 @@ Library Screen (restored position)
 ```
 
 Additional screens:
-- **Settings Screen** — display brightness (stub), audio (deferred), system info, update check
+- **Settings Screen** — display brightness (live control via platform-api backlight), audio (deferred), system info, update check
 - **System Update Screen** — current version, download/apply progress
 
 ---

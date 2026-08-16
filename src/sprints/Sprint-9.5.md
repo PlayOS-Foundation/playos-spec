@@ -4,7 +4,7 @@
 
 **Primary Outcome:** The Settings → Display tab shows a live Brightness gauge (0–100%). D-pad up/down adjusts the backlight and the change is written through `/sys/class/backlight/` immediately, with the value reflected on the next read.
 
-**Status:** 🟡 Planned — not started
+**Status:** 🟢 Implemented — platform-api + shell changes landed; on-device brightness verification pending
 
 **Prerequisites:** Sprint 9 complete — power/battery/thermal telemetry and profile IPC are in place, and the Settings screen already renders tabs with a read-only info layout. ✅ Satisfied (`playos_power.c` ships the sysfs-read + 1-second-cache + IPC patterns this sprint reuses).
 
@@ -123,12 +123,12 @@ src/playos-shell-spec.md          # update brightness stub wording
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S9.5-T1 | Verify the Ally backlight node and write permission | `playos-refdistro` (on-device) | not started | confirm `amdgpu_bl0` + writable `brightness` + shell uid |
-| S9.5-T2 | Implement brightness get/set in `playos_display.c` | `playos-platform-api` | not started | sysfs enumeration + 1 s cache + clamp |
-| S9.5-T3 | Add interactive Brightness gauge to Settings → Display | `playos-shell` | not started | gauge row + d-pad up/down write + height bump |
-| S9.5-T4 | (Conditional) `SetBrightness` IPC fallback | `playos-refdistro`, `playos-runtime` | not started | only if T1 shows direct write is blocked |
-| S9.5-T5 | Spec/docs reconciliation | `playos-spec` | not started | update shell-spec stub wording + cross-links |
-| S9.5-T6 | Build + validation | `playos-platform-api`, `playos-shell`, `playos-refdistro` | not started | native compile + QEMU boot + Ally test |
+| S9.5-T1 | Verify the Ally backlight node and write permission | `playos-refdistro` (on-device) | deferred | direct-write path chosen; node name + writability still unconfirmed on hardware |
+| S9.5-T2 | Implement brightness get/set in `playos_display.c` | `playos-platform-api` | done | sysfs enumeration + 1 s cache + clamp; native build clean |
+| S9.5-T3 | Add interactive Brightness gauge to Settings → Display | `playos-shell` | done | gauge row + d-pad up/down write + height bump; native build clean |
+| S9.5-T4 | (Conditional) `SetBrightness` IPC fallback | `playos-refdistro`, `playos-runtime` | not needed | direct sysfs write chosen; T1 hardware check deferred |
+| S9.5-T5 | Spec/docs reconciliation | `playos-spec` | done | shell-spec stub wording updated |
+| S9.5-T6 | Build + validation | `playos-platform-api`, `playos-shell`, `playos-refdistro` | in progress | native compile clean; QEMU + Ally test pending |
 
 ---
 
@@ -291,8 +291,8 @@ S9.5-T5: update spec for display brightness control
 - [ ] D-pad up/down on the Display tab adjusts brightness and writes it immediately
 - [ ] Display tab content height fits the new row without clipping
 - [ ] The no-backlight path (QEMU / no node) reports unavailable and does not crash
-- [ ] `PLAYOS_API_VERSION` is unchanged; the change is additive
-- [ ] `playos-shell-spec.md` no longer describes brightness as a stub
+- [x] `PLAYOS_API_VERSION` is unchanged; the change is additive
+- [x] `playos-shell-spec.md` no longer describes brightness as a stub
 - [ ] Native and QEMU builds are clean
 
 ---
