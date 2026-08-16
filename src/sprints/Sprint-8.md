@@ -153,6 +153,8 @@ Volume and mute are system-wide. The shell/overlay owns the volume UI and its ca
 
 **Done when:** API compiles, `playos_audio_get_info()` returns a populated struct, and `set_master_volume(0.5f)` produces an audible volume change.
 
+**Follow-up — mixer-element selection (done):** the initial implementation of `audio_find_master()` / `audio_find_switch()` returned the first ALSA simple-mixer element carrying a playback volume/switch control. On the ROG Ally's Realtek codec that first element was `Headphone`, which does not drive the speaker path, so `set_master_volume()` / `set_muted()` wrote a control with no audible effect on the in-game PCM stream. Fixed by preferring well-known element names — `Master`, `Speaker`, `PCM`, `Front`, `Headphone`, `Headphones` — before falling back to first-match, and by logging the chosen element name. The shell Settings → Audio tab now displays the live `PlayOSAudioInfo` value instead of a hardcoded `75%` (still read-only). Evidence: `playos-platform-api` `fe6cc7a`, `playos-shell` `1db41e3`.
+
 ### S8-T3 — Implement audio lifecycle behavior
 
 | Lifecycle event | Audio action |
