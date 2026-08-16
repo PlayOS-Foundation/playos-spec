@@ -21,6 +21,7 @@ sudo apt-get install -y \
   dosfstools mtools parted \
   cmake meson ninja-build \
   pkg-config wayland-scanner \
+  libasound2-dev \
   sbsign pesign  # for EFI signing (Sprint 12+)
 ```
 
