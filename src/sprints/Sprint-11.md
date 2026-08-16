@@ -1,6 +1,6 @@
 # Sprint 11 — Immutable Images and A/B Updates
 
-**Goal:** Make the PlayOS system image immutable (read-only), implement an A/B partition scheme, and deliver signed, atomic system updates with automatic rollback on boot failure.
+**Goal:** Deliver signed, atomic A/B system updates with automatic rollback on boot failure, on top of the immutable (read-only EROFS/squashfs) system image installed in Sprint 10.
 
 **Primary Outcome:** The running system image is read-only (games cannot modify it). A system update can be applied to the inactive slot, and after a marked reboot, the device boots from the new slot. If the new slot fails to boot successfully, it rolls back to the previous slot automatically.
 
@@ -10,14 +10,14 @@
 
 ## Why This Sprint Exists
 
-Sprint 10 delivers an installable system but the installed image is mutable — anything running as root can modify the system partition. Sprint 11 makes the system image read-only and adds A/B slots so updates can be tested in the inactive slot and automatically rolled back if they fail. This is the safety foundation for production distribution.
+Sprint 10 delivers an installable system with a read-only EROFS/squashfs root. Sprint 11 adds A/B slot updates so a new system image can be tested in the inactive slot and automatically rolled back if it fails, plus dm-verity integrity hardening. This is the safety foundation for production distribution.
 
 ---
 
 ## Start Condition Checklist
 
-- Sprint 10 complete: installer creates a 3-partition layout (EFI, system, data); Ally boots from internal NVMe via the ESP EFI artifact.
-- The system partition exists, formatted ext4 and empty.
+- Sprint 10 complete: installer creates the full 5-partition layout (ESP, system A/B, `misc`, data); Ally boots from internal NVMe via the ESP EFI artifact.
+- System A holds a read-only EROFS/squashfs root; system B is reserved empty; the `misc` partition exists.
 - The EFI boot path (BOOTX64.EFI) is stable.
 - An update key pair is generated for development use.
 - ADR-0005 (RAUC for A/B System Updates) is Accepted; the RAUC-vs-custom criteria are recorded.
@@ -26,13 +26,13 @@ Sprint 10 delivers an installable system but the installed image is mutable — 
 
 ## Decisions Locked for This Sprint
 
-- **Read-only mount strategy this sprint:** simple `MS_RDONLY` ext4 mount; dm-verity is a post-MVP hardening step (document as required for production)
-- **A/B slot tracking:** `boot.json` on the ESP (FAT32 writable from `playos-init`)
+- **Read-only mount strategy this sprint:** system slots are inherently read-only EROFS/squashfs images (no `MS_RDONLY` flag needed); dm-verity is a post-MVP hardening step (document as required for production)
+- **A/B slot tracking:** `boot.json` on the ESP (FAT32 writable from `playos-init`); the `misc` partition is reserved as the more robust future home
 - **Boot success definition:** shell renders AND user interacts (A/B/D-pad), OR 60-second timer elapses
 - **Rollback trigger:** `boot_count >= 3` with `health != "good"` → mark slot bad, switch, reboot
 - **Update bundle:** RAUC format with development key; production HSM key is post-MVP
 - **Network download:** out of scope this sprint; update bundles are placed manually or via USB
-- **Installer update:** Sprint 11 updates the installer to create 4-partition (A/B) layout on fresh installs
+- **Installer update:** Sprint 11 does not repartition — Sprint 10 already creates the 5-partition layout; Sprint 11 adds A/B update/rollback logic on top
 
 ---
 
@@ -41,7 +41,7 @@ Sprint 10 delivers an installable system but the installed image is mutable — 
 ### In Scope
 
 - Read-only system partition mount
-- A/B partition layout (updated installer and `playos-init`)
+- A/B update/rollback logic on the existing 5-partition layout (Sprint 10 installer already created the partitions)
 - `boot.json` on ESP: active slot, health, boot count
 - Boot counting and automatic rollback
 - Update flow: signature verify → write inactive slot → update `boot.json` → reboot
@@ -63,7 +63,7 @@ Sprint 10 delivers an installable system but the installed image is mutable — 
 
 | Repo | Required work |
 |---|---|
-| `playos-refdistro` | A/B partition layout in installer, RAUC integration, update bundle build target |
+| `playos-refdistro` | RAUC integration, update bundle build target, read-only root image build (A/B layout already from Sprint 10) |
 | `playos-init` | Read-only system mount, `boot.json` management, boot counting and rollback, update application flow |
 | `playos-shell` | Update UI in settings screen |
 | `playos-platform-api` | `playos_system_os_version()` returns active slot version |
@@ -82,8 +82,8 @@ src/boot_slot.c                      # boot.json reader/writer, slot selection, 
 ### `playos-refdistro`
 
 ```text
-br2-external/configs/playos_ally_defconfig   # updated: 4-partition layout
-br2-external/configs/playos_ally_installer_defconfig   # updated: 4-partition installer
+br2-external/configs/playos_ally_defconfig   # updated: A/B read-only root image
+br2-external/configs/playos_ally_installer_defconfig   # updated: 5-partition installer
 br2-external/package/rauc/           # RAUC Buildroot package (or custom updater)
 scripts/create-update-bundle.sh      # development key signing
 ```
@@ -103,7 +103,7 @@ adr/ADR-0005-update-engine.md        # exists — RAUC vs custom decision; super
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
 | S11-T1 | Implement read-only system partition mount | `playos-init` | not started | |
-| S11-T2 | Update installer and `playos-init` for A/B partition layout | `playos-refdistro`, `playos-init` | not started | |
+| S11-T2 | Mount active system slot image and select active slot (layout already created in Sprint 10) | `playos-init` | not started | |
 | S11-T3 | Implement `boot.json` read/write and active slot selection | `playos-init` | not started | |
 | S11-T4 | Implement boot counting and automatic rollback | `playos-init` | not started | |
 | S11-T5 | Integrate RAUC (or equivalent) and update application flow | `playos-refdistro`, `playos-init` | not started | |
@@ -112,37 +112,39 @@ adr/ADR-0005-update-engine.md        # exists — RAUC vs custom decision; super
 | S11-T8 | Add `playos_system_os_version()` API | `playos-platform-api` | not started | |
 | S11-T9 | A/B update and rollback validation | `playos-refdistro` | not started | |
 
-### S11-T1 — Implement read-only system partition mount
+### S11-T1 — Mount the read-only system image
 
-- In `playos-init`, mount the system partition with `MS_RDONLY`:
+- In `playos-init`, mount the active slot's EROFS/squashfs image read-only:
   ```c
-  mount(system_dev, "/", "ext4", MS_RDONLY, NULL);
+  mount(system_dev, "/", "squashfs", MS_RDONLY, NULL);   /* or "erofs" */
   ```
+- The image filesystem is inherently read-only; there is no mutable system partition
 - All writes at runtime must go to `/data`
 - Verify: `touch /usr/test` returns `EROFS` or permission denied
-- Log the mount mode on boot: `playos-init: system partition mounted read-only`
+- Log the mount mode on boot: `playos-init: system image mounted read-only`
 - Document dm-verity as the production hardening path (do not implement this sprint)
 
 **Done when:** `touch /usr/test` fails with EROFS on a running Ally; all normal operations continue to work.
 
-### S11-T2 — Update installer and `playos-init` for A/B partition layout
+### S11-T2 — Mount active system slot image and select active slot
 
-New 4-partition layout:
+The 5-partition layout is created by the Sprint 10 installer and reused unchanged:
 
-```
+```text
 GPT disk
-├── Part 1: EFI System Partition    FAT32    512 MB    label: EFI
-├── Part 2: PlayOS system A         ext4     2 GB      label: playos-system-a
-├── Part 3: PlayOS system B         ext4     2 GB      label: playos-system-b
-└── Part 4: PlayOS data             ext4     remainder  label: playos-data
+├── Part 1: ESP           FAT32            512 MiB    label: ESP
+├── Part 2: system A      EROFS/squashfs   4 GiB      label: playos-a
+├── Part 3: system B      EROFS/squashfs   4 GiB      label: playos-b
+├── Part 4: misc          ext4/raw         64 MiB     label: misc
+└── Part 5: data          ext4             remainder  label: playos-data
 ```
 
-- Update `playos-installer` to create 4 partitions
-- Update `playos-init` to: read `boot.json` → select active slot → mount the correct partition
+- `playos-init` reads `boot.json` (or `misc` metadata) → selects active slot → mounts the matching system image read-only
 - Slot B starts as `"health": "empty"` after fresh install
-- Update both `playos_ally_defconfig` and `playos_ally_installer_defconfig`
+- No repartitioning here — this task consumes the layout Sprint 10 already created
+- `misc` is reserved as the more robust home for A/B slot metadata; `boot.json` on the ESP (S11-T3) remains the current implementation
 
-**Done when:** fresh install creates 4-partition layout; QEMU boots slot A; `fdisk -l` shows correct layout.
+**Done when:** QEMU boots slot A from its read-only EROFS/squashfs image; `fdisk -l` shows the 5-partition layout.
 
 ### S11-T3 — Implement `boot.json` read/write and active slot selection
 
@@ -232,7 +234,7 @@ const char *playos_system_os_version(void);
 
 Full test matrix on the ROG Ally:
 
-1. Fresh install → verify 4-partition layout → `boot.json` shows slot A good
+1. Fresh install → verify 5-partition layout → `boot.json` shows slot A good
 2. Apply valid update bundle → `boot.json` shows slot B pending → reboot → slot B active → 60s → slot B good
 3. Corrupt slot B initramfs → apply bundle with corrupt slot → reboot 3× → rollback to slot A
 4. `/data` content (game files, saves) survives update and rollback unchanged
@@ -275,7 +277,7 @@ If RAUC's Buildroot package is not available or too complex to integrate, implem
 ## Acceptance Criteria
 
 - [ ] Running system partition mounted read-only; `touch /usr/test` fails with EROFS
-- [ ] Installer creates 4-partition A/B layout on fresh NVMe
+- [ ] Installer creates 5-partition layout on fresh NVMe (ESP, A/B system, misc, data)
 - [ ] `boot.json` on ESP reflects active slot, health, and boot count
 - [ ] Update written to inactive slot does not affect running system
 - [ ] After reboot, system boots from newly updated slot

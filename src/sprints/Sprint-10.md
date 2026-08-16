@@ -4,13 +4,15 @@
 
 **Primary Outcome:** A user can boot the PlayOS installer from USB, confirm the target disk, wait for installation, remove the USB, and boot into the full PlayOS experience from internal storage.
 
+**Status:** 🔴 Not started — aligned to current repos: no `playos-installer`, `playos.mode=install` trigger, or `erase_games`/`erase_saves`/`erase_logs` handling has landed yet.
+
 **Prerequisites:** Sprint 9 complete — complete MVP feature set running on the ROG Ally.
 
 ---
 
 ## Why This Sprint Exists
 
-Sprint 9 completes the feature set. Sprint 10 makes PlayOS installable to real hardware — without it, the system only runs from USB. This sprint also completes the `FactoryReset` IPC (all options) and establishes the partition layout that Sprint 11 will extend to A/B.
+Sprint 9 completes the feature set. Sprint 10 makes PlayOS installable to real hardware — without it, the system only runs from USB. This sprint also completes the `FactoryReset` IPC (all options) and establishes the full 5-partition installed-disk layout (ESP, A/B system slots, `misc`, data) that Sprint 11 builds the A/B update and rollback logic on.
 
 ---
 
@@ -18,15 +20,15 @@ Sprint 9 completes the feature set. Sprint 10 makes PlayOS installable to real h
 
 - Sprint 9 complete: full feature set running on the ROG Ally from USB.
 - `FactoryReset { erase_cache, erase_config }` is implemented (Sprint 6); `erase_games`, `erase_saves`, and `erase_logs` are deferred to this sprint.
-- `playos-refdistro` produces a bootable USB image (`make playos-image`).
-- QEMU can boot the USB image on the host for testing.
+- `playos-refdistro` produces a bootable USB image (`make ally-usb-image` → `output/ally/images/playos-ally-usb.img`).
+- QEMU can boot the dev image on the host for testing (`make qemu-run`).
 - A spare NVMe or a test-only Ally is available for destructive disk tests.
 
 ---
 
 ## Decisions Locked for This Sprint
 
-- **Partition layout (Sprint 10 version):** 3 partitions — EFI (512 MB FAT32), system (2 GB ext4), data (remainder ext4); Sprint 11 will expand to A/B
+- **Partition layout (installed disk, 5 partitions):** ESP (512 MiB FAT32, label `ESP`), system A (4 GiB EROFS/squashfs, read-only, label `playos-a`), system B (4 GiB EROFS/squashfs, read-only, label `playos-b`, empty until Sprint 11), `misc` (64 MiB, A/B slot metadata, label `misc`), data (remainder ext4, label `playos-data`). The live USB keeps its current compact 3-partition layout — this 5-partition layout applies only to the installer-deployed internal disk.
 - **Installer trigger:** `playos.mode=install` kernel cmdline flag, OR no existing PlayOS data partition on a removable-boot device
 - **Installer NEVER silently formats:** user must see disk details and hold A for 3 seconds
 - **Disk partitioning tool:** `libfdisk` or raw ioctl (no parted/fdisk subprocess)
@@ -43,6 +45,9 @@ Sprint 9 completes the feature set. Sprint 10 makes PlayOS installable to real h
 - Installer Raylib UI (disk discovery, confirmation, progress, success, error screens)
 - GPT partitioning via `libfdisk`
 - FAT32 ESP format (`mkfs.fat`)
+- Read-only system A slot from a pre-built EROFS/squashfs image (`playos-a`)
+- Empty system B slot reserved for Sprint 11 A/B (`playos-b`)
+- A/B metadata partition (`misc`, 64 MiB)
 - ext4 data partition format (`mkfs.ext4`)
 - EFI boot artifact write
 - UEFI boot entry registration (`efibootmgr`, best-effort)
@@ -52,7 +57,7 @@ Sprint 9 completes the feature set. Sprint 10 makes PlayOS installable to real h
 
 ### Explicitly Out of Scope
 
-- A/B partition layout (Sprint 11)
+- A/B update/rollback mechanism and dm-verity hashing (Sprint 11) — Sprint 10 only creates the partitions
 - Network update download (Sprint 11/post-MVP)
 - dm-verity (Sprint 11/post-MVP)
 - Windows dual-boot or partition preservation (explicitly out of MVP scope)
@@ -83,13 +88,15 @@ src/playos-installer/
     screens/success.c
     screens/error.c
     disk/partition.c         # libfdisk wrapper
-    disk/format.c            # mkfs.fat, mkfs.ext4 subprocess calls
+    disk/format.c            # mkfs.fat (ESP), mkfs.ext4 (data/misc); system slots written from pre-built EROFS/squashfs images
     disk/efi.c               # EFI artifact copy, efibootmgr
 br2-external/package/playos-installer/
     playos-installer.mk
     Config.in
 br2-external/configs/playos_ally_installer_defconfig
 ```
+
+> **Note:** Like `src/playos-overlay/` (Sprint 7), `src/playos-installer/` is a second deliberate in-refdistro C-source exception. When implemented, update `playos-refdistro/AGENTS.md` "What NOT to Do" to list it alongside the overlay exception.
 
 ---
 
@@ -104,8 +111,8 @@ br2-external/configs/playos_ally_installer_defconfig
 | S10-T3 | Implement disk partitioning and formatting | `playos-refdistro` | not started | |
 | S10-T4 | Implement EFI artifact write and UEFI boot entry | `playos-refdistro` | not started | |
 | S10-T5 | Implement first-boot from internal disk | `playos-init` | not started | |
-| S10-T6 | Complete `FactoryReset` IPC (all five options) | `playos-init`, `playos-runtime`, `playos-refdistro` | not started | |
-| S10-T7 | Create `make installer-image` Buildroot target | `playos-refdistro` | not started | |
+| S10-T6 | Complete `FactoryReset` IPC (all five options) | `playos-init`, `playos-runtime`, `playos-refdistro` | not started | Verified: handler erases `cache`/`config` only; `games`/`saves`/`logs` explicitly deferred (`ipc_handler.c:522-554`) |
+| S10-T7 | Create `make installer-image` Buildroot target | `playos-refdistro` | not started | No installer target yet; normal bootable image is `make ally-usb-image` |
 | S10-T8 | Installer validation (QEMU loopback + Ally) | `playos-refdistro` | not started | |
 
 ### S10-T1 — Implement installer trigger mode in `playos-init`
@@ -135,7 +142,7 @@ State machine: `DISK_DISCOVERY` → `CONFIRMATION` → `INSTALLING` → `SUCCESS
 **Progress screen:**
 - Numbered step list with current step highlighted
 - Progress bar (0–100%)
-- Steps: Create GPT → Create EFI → Create system → Create data → Write EFI → Format data → Init data → Sync
+- Steps: Create GPT → Create ESP → Create system A → Create system B → Create misc → Create data → Write EFI → Populate system A → Format data → Init data → Sync
 
 **Success screen:**
 - "Installation complete. Remove USB and press A to restart."
@@ -152,25 +159,29 @@ State machine: `DISK_DISCOVERY` → `CONFIRMATION` → `INSTALLING` → `SUCCESS
 
 Using `libfdisk`:
 1. Create GPT partition table on the target device
-2. Partition 1: EFI System Partition, FAT32, 512 MB, label `EFI`
-3. Partition 2: PlayOS system, ext4, 2 GB, label `playos-system`
-4. Partition 3: PlayOS data, ext4, remainder, label `playos-data`
-5. Write partition table to disk
+2. Partition 1: EFI System Partition, FAT32, 512 MiB, label `ESP`
+3. Partition 2: system A, 4 GiB, label `playos-a` (read-only EROFS/squashfs root slot)
+4. Partition 3: system B, 4 GiB, label `playos-b` (reserved empty for Sprint 11 A/B)
+5. Partition 4: `misc`, 64 MiB, label `misc` (A/B slot metadata)
+6. Partition 5: data, ext4, remainder, label `playos-data`
+7. Write partition table to disk
 
-Format:
-- ESP: call `mkfs.fat -F32 -n EFI <part1>`
-- System: call `mkfs.ext4 -L playos-system <part2>` (empty ext4; becomes the read-only root in Sprint 11)
-- Data: call `mkfs.ext4 -L playos-data <part3>`
+Format/populate:
+- ESP: call `mkfs.fat -F32 -n ESP <part1>`; copy `EFI/BOOT/BOOTX64.EFI`
+- System A: write the pre-built read-only root image (EROFS, fallback squashfs) directly to `<part2>` — no `mkfs` at install time
+- System B: leave empty/blank; populated by the Sprint 11 A/B update path
+- `misc`: call `mkfs.ext4 -L misc <part4>` (or leave raw; the slot state is tiny)
+- Data: call `mkfs.ext4 -L playos-data <part5>`
 
 Each step must check the return code. On any failure: transition to ERROR screen with the error code and step name.
 
-**Done when:** QEMU loopback test shows correct 3-partition GPT layout and all three filesystems mountable.
+**Done when:** QEMU loopback test shows the correct 5-partition GPT layout, system A boots read-only, and `playos-data` mounts.
 
 ### S10-T4 — Implement EFI artifact write and UEFI boot entry
 
 1. Mount the ESP at `/mnt/efi`
 2. Create `/mnt/efi/EFI/BOOT/`
-3. Copy the PlayOS EFI artifact (kernel + initramfs combined UKI, or GRUB stub) to `BOOTX64.EFI`
+3. Copy the PlayOS EFI-stub kernel (bzImage with embedded initramfs) to `BOOTX64.EFI` — no intermediate bootloader (matches `scripts/gen-ally-usb-image.sh`)
 4. Run `efibootmgr --create --disk <dev> --part 1 --label "PlayOS" --loader /EFI/BOOT/BOOTX64.EFI` — log success or failure; failure is non-fatal (fallback path works)
 5. Unmount ESP
 
@@ -219,7 +230,7 @@ Extend the Sprint 6 handler (which already erases `cache` and `config`) to act o
 
 - `playos_ally_installer_defconfig` — like `playos_ally_defconfig` but with `playos-installer` instead of `playos-shell` as the first Wayland client
 - `make installer-image` produces a bootable USB image that enters installer mode
-- `make playos-image` continues to produce the normal system image (unchanged)
+- `make ally-usb-image` continues to produce the normal system image (unchanged)
 - Document both targets in `README.md`
 
 **Done when:** `make installer-image` completes without errors; the produced image boots into installer mode in QEMU.
@@ -265,7 +276,7 @@ The installer runs as root inside the initramfs. Use `libfdisk` directly — do 
 | Evidence | How it is produced |
 |---|---|
 | Partition layout | `fdisk -l <device>` after QEMU loopback install |
-| Filesystem types | `blkid` output showing FAT32, ext4 labels |
+| Filesystem types | `blkid` output showing FAT32 (ESP), EROFS/squashfs (system slots), ext4 (data/misc) labels |
 | NVMe boot | ROG Ally boot without USB, shell visible |
 | Factory reset | `ls /data/games/` empty after full reset; system boots |
 | Installer error screen | Write-protect target in QEMU; verify error screen appears |
@@ -296,11 +307,11 @@ The installer runs as root inside the initramfs. Use `libfdisk` directly — do 
 
 Sprint 11 may assume:
 
-- The installer creates a working 3-partition layout (EFI, system, data)
-- The system partition is created and formatted empty, ready for Sprint 11 to populate and mount read-only
+- The installer creates the full 5-partition layout (ESP, system A/B, `misc`, data)
+- System A is populated with the read-only EROFS/squashfs root and boots; system B is reserved empty; `misc` exists
 - `playos-init` boots from the ESP EFI artifact (BOOTX64.EFI) and provisions `/data`
 - `/data` provisioning is stable and tested
-- Sprint 11 will expand the partition layout to A/B; the installer will be updated accordingly
+- Sprint 11 implements A/B update/rollback logic and dm-verity on top of the existing layout; the installer does not repartition
 
 ---
 
