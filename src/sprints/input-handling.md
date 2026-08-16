@@ -108,3 +108,6 @@ Consequence: from the persistent logs alone we cannot see the actual capabilitie
 5. **Decide mapping for `0xbb` (F17) and `0xb9` (F15).** Both are currently unmapped; `0xbc` (F18) currently clears SYSTEM. Confirm the intended Ally button semantics (armoury/shortcut keys) and wire them into the shell/overlay key handling.
 
 6. **Remove the double-drain once the real volume node is identified.** Avoid opening the same `event8` fd twice; the vendor path should remain the single drainer for vendor keycodes, and volume keys should come from their own node(s).
+
+7. **Power button detection implemented (Sprint 9 follow-up).** `KEY_POWER` (`0x74`) and `KEY_SLEEP` (`0x8e`/142) on the ACPI Power/Sleep nodes are now decoded into `PLAYOS_BUTTON_POWER` (bit 16, reserved — games never see it). The shell discovers the power node (`is_reserved_power_device()`: `KEY_POWER`/`KEY_SLEEP`, no `BTN_SOUTH`/`BTN_MODE`), opens it without `EVIOCGRAB` so kernel ACPI power handling is unaffected, and exposes a `PWR` pill in the Live Input Test with the same 0.6s momentary-pulse latch as HOME/COMMAND. A new `shell_input_button_held()` level query was added and the Live Input Test now uses it for every pill. **Status:** implemented; compiles and builds, awaiting Ally hardware retest.
+
