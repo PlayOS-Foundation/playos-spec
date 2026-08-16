@@ -19,10 +19,24 @@ sudo apt-get install -y \
   python3 rsync cpio file \
   qemu-system-x86 ovmf \
   dosfstools mtools parted \
-  cmake meson ninja-build \
-  pkg-config wayland-scanner \
+  cmake meson ninja-build pkg-config \
   libasound2-dev \
-  sbsign pesign  # for EFI signing (Sprint 12+)
+  libexpat1-dev libffi-dev libxml2-dev \
+  libpciaccess-dev libudev-dev \
+  libxcb1-dev libxcb-composite0-dev libxcb-dri3-dev \
+  libxcb-ewmh-dev libxcb-icccm4-dev libxcb-present-dev \
+  libxcb-randr0-dev libxcb-render0-dev libxcb-render-util0-dev \
+  libxcb-res0-dev libxcb-shape0-dev libxcb-shm0-dev \
+  libxcb-sync-dev libxcb-xfixes0-dev libxcb-xinput-dev libxcb-xkb-dev \
+  libx11-dev libx11-xcb-dev \
+  libinput-dev libseat-dev libvulkan-dev \
+  libegl1-mesa-dev libgbm-dev libgles2-mesa-dev \
+  libdisplay-info-dev libliftoff-dev hwdata \
+  sbsign pesign  # EFI signing (Sprint 12+)
+
+# Native host deps (wlroots 0.20 needs Wayland >= 1.24, which 24.04 lacks):
+#   sudo bash playos-refdistro/scripts/build-host-deps.sh
+#   source /opt/playos-deps/env.sh
 ```
 
 ```bash
