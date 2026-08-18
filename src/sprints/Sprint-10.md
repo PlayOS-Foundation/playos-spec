@@ -4,7 +4,7 @@
 
 **Primary Outcome:** A user can boot the PlayOS installer from USB, confirm the target disk, wait for installation, remove the USB, and boot into the full PlayOS experience from internal storage.
 
-**Status:** 🔴 Not started — aligned to current repos: no `playos-installer`, `playos.mode=install` trigger, or `erase_games`/`erase_saves`/`erase_logs` handling has landed yet.
+**Status:** 🟡 In progress — installer source (`src/playos-installer/`), `playos.mode=install` trigger, complete `FactoryReset` handling, and Buildroot installer-image wiring have landed; T8 validation (QEMU loopback + physical Ally install) is still pending.
 
 **Prerequisites:** Sprint 9 complete — complete MVP feature set running on the ROG Ally.
 
@@ -106,14 +106,14 @@ br2-external/configs/playos_ally_installer_defconfig
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S10-T1 | Implement installer trigger mode in `playos-init` | `playos-init` | not started | |
-| S10-T2 | Build installer screen state machine (Raylib UI) | `playos-refdistro` | not started | |
-| S10-T3 | Implement disk partitioning and formatting | `playos-refdistro` | not started | |
-| S10-T4 | Implement EFI artifact write and UEFI boot entry | `playos-refdistro` | not started | |
-| S10-T5 | Implement first-boot from internal disk | `playos-init` | not started | |
-| S10-T6 | Complete `FactoryReset` IPC (all five options) | `playos-init`, `playos-runtime`, `playos-refdistro` | not started | Verified: handler erases `cache`/`config` only; `games`/`saves`/`logs` explicitly deferred (`ipc_handler.c:522-554`) |
-| S10-T7 | Create `make installer-image` Buildroot target | `playos-refdistro` | not started | No installer target yet; normal bootable image is `make ally-usb-image` |
-| S10-T8 | Installer validation (QEMU loopback + Ally) | `playos-refdistro` | not started | |
+| S10-T1 | Implement installer trigger mode in `playos-init` | `playos-init` | done | `mount.c:421-455` parses `playos.mode=install`; `main.c`/`supervisor.c` spawn `/usr/bin/playos-installer` |
+| S10-T2 | Build installer screen state machine (Raylib UI) | `playos-refdistro` | done | `src/playos-installer/main.c` DISK_DISCOVERY → CONFIRMATION → INSTALLING → SUCCESS/ERROR |
+| S10-T3 | Implement disk partitioning and formatting | `playos-refdistro` | done | `disk.c` (libfdisk GPT), `format.c` (mkfs.fat/mkfs.ext4, squashfs slot write) |
+| S10-T4 | Implement EFI artifact write and UEFI boot entry | `playos-refdistro` | done | `efi.c` writes `/EFI/BOOT/BOOTX64.EFI`, best-effort `efibootmgr` |
+| S10-T5 | Implement first-boot from internal disk | `playos-init` | done | Existing S6 first-boot provisioning already handles empty `/data` (`mount.c` `.playos-storage-version` marker + seed games); no new code required |
+| S10-T6 | Complete `FactoryReset` IPC (all five options) | `playos-init`, `playos-runtime`, `playos-refdistro` | done | Handler now erases `games`/`saves`/`cache`/`config`/`logs`; runtime trusted helper added |
+| S10-T7 | Create `make installer-image` Buildroot target | `playos-refdistro` | done | `playos_ally_installer_defconfig`, `playos-installer` package, `linux-installer.config`, `scripts/gen-installer-usb-image.sh`, Makefile `installer-*` targets |
+| S10-T8 | Installer validation (QEMU loopback + Ally) | `playos-refdistro` | not started | Compile/build/validation not yet run on host or device |
 
 ### S10-T1 — Implement installer trigger mode in `playos-init`
 

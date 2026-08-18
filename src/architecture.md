@@ -1,6 +1,6 @@
 # PlayOS Architecture Reference
 
-> **Version:** 2.4  
+> **Version:** 2.5  
 > **Device:** ROG Ally (AMD/AMDGPU primary)  
 > **Source of truth:** [`ideas.md`](ideas.md) — this document is the distilled reference.
 
@@ -342,10 +342,11 @@ MVP policy:
 
 ```
 GPT disk
-├── Partition 1: EFI System Partition   FAT32     BOOTX64.EFI
-├── Partition 2: PlayOS system A        immutable
-├── Partition 3: PlayOS system B        immutable
-└── Partition 4: PlayOS data            ext4      writable
+├── Partition 1: EFI System Partition   FAT32     512 MiB  BOOTX64.EFI
+├── Partition 2: PlayOS system A        immutable 4 GiB    read-only root slot
+├── Partition 3: PlayOS system B        immutable 4 GiB    reserved for A/B (Sprint 11)
+├── Partition 4: PlayOS misc            ext4      64 MiB   A/B slot metadata
+└── Partition 5: PlayOS data            ext4      remainder writable
 ```
 
 **Data partition (`/data`):**
