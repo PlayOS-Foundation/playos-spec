@@ -1,8 +1,10 @@
 # Sprint 11 — Immutable Images and A/B Updates
 
-**Goal:** Deliver signed, atomic A/B system updates with automatic rollback on boot failure, on top of the immutable (read-only EROFS/squashfs) system image installed in Sprint 10.
+**Goal:** Deliver signed, atomic A/B system updates with automatic rollback on boot failure, on top of the immutable (read-only squashfs) system image installed in Sprint 10.
 
 **Primary Outcome:** The running system image is read-only (games cannot modify it). A system update can be applied to the inactive slot, and after a marked reboot, the device boots from the new slot. If the new slot fails to boot successfully, it rolls back to the previous slot automatically.
+
+**Status:** 🟡 Not started — Sprint 10 (installer + NVMe deploy) is complete; A/B update, boot counting/rollback, and update-signing work has not begun.
 
 **Prerequisites:** Sprint 10 complete — installer creates the disk layout; device boots from internal NVMe.
 
@@ -10,14 +12,14 @@
 
 ## Why This Sprint Exists
 
-Sprint 10 delivers an installable system with a read-only EROFS/squashfs root. Sprint 11 adds A/B slot updates so a new system image can be tested in the inactive slot and automatically rolled back if it fails, plus dm-verity integrity hardening. This is the safety foundation for production distribution.
+Sprint 10 delivers an installable system with a read-only squashfs root. Sprint 11 adds A/B slot updates so a new system image can be tested in the inactive slot and automatically rolled back if it fails, plus dm-verity integrity hardening. This is the safety foundation for production distribution.
 
 ---
 
 ## Start Condition Checklist
 
 - Sprint 10 complete: installer creates the full 5-partition layout (ESP, system A/B, `misc`, data); Ally boots from internal NVMe via the ESP EFI artifact.
-- System A holds a read-only EROFS/squashfs root; system B is reserved empty; the `misc` partition exists.
+- System A holds a read-only squashfs root; system B is reserved empty; the `misc` partition exists.
 - The EFI boot path (BOOTX64.EFI) is stable.
 - An update key pair is generated for development use.
 - ADR-0005 (RAUC for A/B System Updates) is Accepted; the RAUC-vs-custom criteria are recorded.
@@ -26,13 +28,41 @@ Sprint 10 delivers an installable system with a read-only EROFS/squashfs root. S
 
 ## Decisions Locked for This Sprint
 
-- **Read-only mount strategy this sprint:** system slots are inherently read-only EROFS/squashfs images (no `MS_RDONLY` flag needed); dm-verity is a post-MVP hardening step (document as required for production)
+- **Read-only mount strategy this sprint:** system slots are inherently read-only squashfs images (no `MS_RDONLY` flag needed); dm-verity is a post-MVP hardening step (document as required for production)
 - **A/B slot tracking:** `boot.json` on the ESP (FAT32 writable from `playos-init`); the `misc` partition is reserved as the more robust future home
 - **Boot success definition:** shell renders AND user interacts (A/B/D-pad), OR 60-second timer elapses
 - **Rollback trigger:** `boot_count >= 3` with `health != "good"` → mark slot bad, switch, reboot
-- **Update bundle:** RAUC format with development key; production HSM key is post-MVP
+- **Update bundle:** RAUC (or a minimal custom updater, if RAUC integration exceeds the ADR-0005 criteria); development key; production HSM key is post-MVP — final RAUC-vs-custom choice is resolved during S11-T5, consistent with ADR-0005's "pending evaluation" status
 - **Network download:** out of scope this sprint; update bundles are placed manually or via USB
 - **Installer update:** Sprint 11 does not repartition — Sprint 10 already creates the 5-partition layout; Sprint 11 adds A/B update/rollback logic on top
+
+### Update contract (engine-agnostic, locked)
+
+Fixed regardless of whether RAUC or a custom updater wins in S11-T5 — the shell, `playos-init`, and the engine all build against this contract:
+
+- **Bundle location:** `/data/updates/` directory; bundles are matched by the neutral `.playosb` suffix (never a RAUC-specific extension). Exactly one bundle may be "ready to apply" at a time.
+- **`boot.json` schema** — `/EFI/playos/boot.json` on the ESP:
+  ```json
+  {
+    "v": 1,
+    "active_slot": "a",
+    "slot_a": { "version": "0.1.0", "boot_count": 0, "health": "good" },
+    "slot_b": { "version": "", "boot_count": 0, "health": "empty" }
+  }
+  ```
+  `health` ∈ { `good`, `pending`, `bad`, `empty` }. Slot selection, boot counting, and rollback read/write only this file.
+- **Apply-update IPC** (shell/overlay → `playos-init`):
+  ```json
+  { "v": 1, "type": "ApplyUpdate", "path": "/data/updates/0.2.0.playosb" }
+  ```
+  Responses: `ApplyUpdateAck { "accepted": true }` or `ApplyUpdateError { "reason": "..." }`.
+- **Update progress/status events** (`playos-init` → shell/overlay):
+  ```json
+  { "v": 1, "type": "UpdateProgress", "step": "verify", "percent": 25 }
+  { "v": 1, "type": "UpdateComplete", "active_slot": "b", "version": "0.2.0" }
+  { "v": 1, "type": "UpdateError", "step": "verify", "reason": "signature_invalid" }
+  ```
+- **Boot success signal:** the shell reports a successful boot (renders AND user interacts) or a 60-second timer elapses; either resets the active slot's `boot_count` to 0 and sets `health = "good"`.
 
 ---
 
@@ -109,14 +139,14 @@ adr/ADR-0005-update-engine.md        # exists — RAUC vs custom decision; super
 | S11-T5 | Integrate RAUC (or equivalent) and update application flow | `playos-refdistro`, `playos-init` | not started | |
 | S11-T6 | Implement update bundle signature verification | `playos-init` | not started | |
 | S11-T7 | Add shell update UI | `playos-shell` | not started | |
-| S11-T8 | Add `playos_system_os_version()` API | `playos-platform-api` | not started | |
+| S11-T8 | Update `playos_system_os_version()` to read active slot version | `playos-platform-api` | not started | API already exists (reads `/etc/playos-version`); must read slot version from `boot.json` |
 | S11-T9 | A/B update and rollback validation | `playos-refdistro` | not started | |
 
 ### S11-T1 — Mount the read-only system image
 
-- In `playos-init`, mount the active slot's EROFS/squashfs image read-only:
+- In `playos-init`, mount the active slot's squashfs image read-only:
   ```c
-  mount(system_dev, "/", "squashfs", MS_RDONLY, NULL);   /* or "erofs" */
+  mount(system_dev, "/", "squashfs", MS_RDONLY, NULL);   /* EROFS is a future hardening option, not implemented this sprint */
   ```
 - The image filesystem is inherently read-only; there is no mutable system partition
 - All writes at runtime must go to `/data`
@@ -133,8 +163,8 @@ The 5-partition layout is created by the Sprint 10 installer and reused unchange
 ```text
 GPT disk
 ├── Part 1: ESP           FAT32            512 MiB    label: ESP
-├── Part 2: system A      EROFS/squashfs   4 GiB      label: playos-a
-├── Part 3: system B      EROFS/squashfs   4 GiB      label: playos-b
+├── Part 2: system A      squashfs   4 GiB      label: playos-a
+├── Part 3: system B      squashfs   4 GiB      label: playos-b
 ├── Part 4: misc          ext4/raw         64 MiB     label: misc
 └── Part 5: data          ext4             remainder  label: playos-data
 ```
@@ -144,7 +174,7 @@ GPT disk
 - No repartitioning here — this task consumes the layout Sprint 10 already created
 - `misc` is reserved as the more robust home for A/B slot metadata; `boot.json` on the ESP (S11-T3) remains the current implementation
 
-**Done when:** QEMU boots slot A from its read-only EROFS/squashfs image; `fdisk -l` shows the 5-partition layout.
+**Done when:** QEMU boots slot A from its read-only squashfs image; `fdisk -l` shows the 5-partition layout.
 
 ### S11-T3 — Implement `boot.json` read/write and active slot selection
 
@@ -217,7 +247,9 @@ In the shell settings screen:
 
 **Done when:** placing a valid bundle in `/data/updates/` causes the Apply button to appear; applying it shows progress and the restart prompt.
 
-### S11-T8 — Add `playos_system_os_version()` API
+### S11-T8 — Update `playos_system_os_version()` to read active slot version
+
+The API already exists: declared in `playos-platform-api/include/playos/playos_system.h` and implemented in `src/playos_system.c`. It currently reads `/etc/playos-version` (fallback `"0.3.0"`), and the shell already calls it (`src/main.c`, `src/screen_settings.c`, `src/screen_home.c`). This task changes its source to the active slot's version, not its signature:
 
 ```c
 /* Returns a pointer to a static null-terminated version string, e.g. "0.1.0".
@@ -225,10 +257,11 @@ In the shell settings screen:
 const char *playos_system_os_version(void);
 ```
 
-- Reads the version of the active slot from `boot.json` on the ESP
-- Called by the shell settings screen and overlay system info section
+- Read the version of the active slot from `boot.json` on the ESP (S11-T3)
+- Keep the existing static-buffer lifetime contract; no caller changes required
+- Fall back to `"unknown"` (not a hardcoded version) when `boot.json` is unreadable
 
-**Done when:** `playos_system_os_version()` returns the correct version string that matches `boot.json`.
+**Done when:** `playos_system_os_version()` returns the version string from `boot.json`, and the shell settings/home screens display it unchanged.
 
 ### S11-T9 — A/B update and rollback validation
 

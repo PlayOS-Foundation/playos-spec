@@ -226,6 +226,23 @@ Fire-and-forget. `playos-init` delivers `PLAYOS_LIFECYCLE_SUSPEND` to the active
 
 ---
 
+#### `ApplyUpdate`
+```json
+{ "v": 1, "type": "ApplyUpdate", "path": "/data/updates/0.2.0.playosb" }
+```
+Requests that `playos-init` apply a system update bundle at `path` to the inactive slot. `path` must reside under `/data/updates/` and carry the `.playosb` suffix. Exactly one update may be in flight at a time.
+
+**Response:**
+```json
+{ "v": 1, "type": "ApplyUpdateAck", "accepted": true }
+{ "v": 1, "type": "ApplyUpdateError", "reason": "..." }
+```
+**Error reasons:** `not_found`, `invalid_bundle`, `signature_invalid`, `update_in_progress`, `game_running`, `internal_error`
+
+Progress is reported via the async `UpdateProgress` / `UpdateComplete` / `UpdateError` events below.
+
+---
+
 ### Async events (init → client, unsolicited)
 
 #### `GameStarted`
@@ -271,6 +288,24 @@ Fire-and-forget. `playos-init` delivers `PLAYOS_LIFECYCLE_SUSPEND` to the active
 { "v": 1, "type": "PerfProfileChanged", "profile": 1 }
 ```
 `profile` values (integer): `0` balanced, `1` power_save, `2` performance
+
+#### `UpdateProgress`
+```json
+{ "v": 1, "type": "UpdateProgress", "step": "verify", "percent": 25 }
+```
+`step` values: `verify`, `write_inactive_slot`, `write_efi`, `update_boot_json`, `sync`. `percent` is 0–100.
+
+#### `UpdateComplete`
+```json
+{ "v": 1, "type": "UpdateComplete", "active_slot": "b", "version": "0.2.0" }
+```
+Emitted after the inactive slot is written and `boot.json` is switched. The system requires a reboot to boot the new slot.
+
+#### `UpdateError`
+```json
+{ "v": 1, "type": "UpdateError", "step": "verify", "reason": "signature_invalid" }
+```
+Emitted when an update fails after being accepted. `reason` matches the `ApplyUpdateError` reason set.
 
 ---
 
