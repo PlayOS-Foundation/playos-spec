@@ -4,7 +4,7 @@
 
 **Primary Outcome:** A user can boot the PlayOS installer from USB, confirm the target disk, wait for installation, remove the USB, and boot into the full PlayOS experience from internal storage.
 
-**Status:** 🟡 In progress — installer source (`src/playos-installer/`), `playos.mode=install` trigger, complete `FactoryReset` handling, and Buildroot installer-image wiring have landed; T8 validation (QEMU loopback + physical Ally install) is still pending.
+**Status:** 🟢 Implemented and verified — installer source (`src/playos-installer/`), `playos.mode=install` trigger, complete `FactoryReset` handling, Buildroot installer-image wiring, and T8 validation (QEMU loopback + physical Ally install) have all landed; user confirmed NVMe install + boot from internal storage.
 
 **Prerequisites:** Sprint 9 complete — complete MVP feature set running on the ROG Ally.
 
@@ -113,7 +113,7 @@ br2-external/configs/playos_ally_installer_defconfig
 | S10-T5 | Implement first-boot from internal disk | `playos-init` | done | Existing S6 first-boot provisioning already handles empty `/data` (`mount.c` `.playos-storage-version` marker + seed games); no new code required |
 | S10-T6 | Complete `FactoryReset` IPC (all five options) | `playos-init`, `playos-runtime`, `playos-refdistro` | done | Handler now erases `games`/`saves`/`cache`/`config`/`logs`; runtime trusted helper added |
 | S10-T7 | Create `make installer-image` Buildroot target | `playos-refdistro` | done | `playos_ally_installer_defconfig`, `playos-installer` package, `linux-installer.config`, `scripts/gen-installer-usb-image.sh`, Makefile `installer-*` targets |
-| S10-T8 | Installer validation (QEMU loopback + Ally) | `playos-refdistro` | not started | Compile/build/validation not yet run on host or device |
+| S10-T8 | Installer validation (QEMU loopback + Ally) | `playos-refdistro` | done | QEMU loopback install SUCCESS (GPT verified); dev variant booted; physical Ally install to NVMe + reboot confirmed by user |
 
 ### S10-T1 — Implement installer trigger mode in `playos-init`
 

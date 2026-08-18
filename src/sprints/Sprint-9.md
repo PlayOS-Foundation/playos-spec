@@ -4,6 +4,8 @@
 
 **Primary Outcome:** Shell and overlay show live battery level and thermal state. A performance profile can be requested. Thermal throttling kicks in before dangerous temperatures. The ROG Ally does not overheat under sustained load.
 
+**Status:** 🟢 Implemented and verified on Ally — Sprint 9 complete.
+
 **Prerequisites:** Sprint 8 complete — full audio and lifecycle working. ✅ Satisfied (audio verified on Ally; gamepad wired into raylib).
 
 ---
@@ -96,14 +98,14 @@ br2-external/board/common/rootfs-overlay/data/config/thermal.json
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S9-T1 | Define and implement `playos_power.h` API | `playos-platform-api` | header done | `playos_power.h` exists and matches spec; `playos_power.c` is a stub returning -1 |
-| S9-T2 | Implement sysfs-backed battery and temperature reads | `playos-platform-api` | not started | stub returns -1; no sysfs reads yet |
-| S9-T3 | Implement AMD P-state EPP write and profile IPC | `playos-refdistro`, `playos-runtime` | not started | requires `CONFIG_X86_AMD_PSTATE_EPP=y` first |
-| S9-T4 | Implement thermal monitoring loop in `playos-init` | `playos-refdistro` | not started | `src/playos-init/src/thermal.c` absent |
-| S9-T5 | Update shell status bar (battery, thermal indicator) | `playos-shell` | not started | no power/thermal code in shell yet |
-| S9-T6 | Update overlay (temps, profile selector, power menu) | `playos-refdistro` (`src/playos-overlay`) | scaffolded | volume controls done; hardcoded `Battery: 85%  Thermal: Normal` placeholder to replace |
-| S9-T7 | Implement suspend/resume skeleton | `playos-refdistro`, `playos-platform-api` | not started | `PLAYOS_LIFECYCLE_SUSPEND/RESUME` already defined (0x02/0x03) |
-| S9-T8 | Power and thermal validation on Ally | `playos-refdistro` | not started | requires Ally hardware |
+| S9-T1 | Define and implement `playos_power.h` API | `playos-platform-api` | done | `playos_power.h` + full `playos_power.c`: sysfs battery/thermal/EPP reads + IPC client |
+| S9-T2 | Implement sysfs-backed battery and temperature reads | `playos-platform-api` | done | `BAT0` capacity/status/time-to-*, `x86_pkg_temp`/`cpu_thermal`/`k10temp`, `amdgpu` hwmon; 1 s cache |
+| S9-T3 | Implement AMD P-state EPP write and profile IPC | `playos-refdistro`, `playos-runtime` | done | `thermal.c` EPP writer; `SetPerfProfile` handler in `ipc_handler.c`; EPP enabled via `DEFAULT_MODE=3` |
+| S9-T4 | Implement thermal monitoring loop in `playos-init` | `playos-refdistro` | done | `src/playos-init/src/thermal.c` 1 Hz tick, `thermal.json` thresholds, state machine + events |
+| S9-T5 | Update shell status bar (battery, thermal indicator) | `playos-shell` | done | battery %/charging + colour-coded thermal + profile (main.c) |
+| S9-T6 | Update overlay (temps, profile selector, power menu) | `playos-refdistro` (`src/playos-overlay`) | done | live power/thermal, D-pad profile selector, Sleep/Restart/Shutdown menu |
+| S9-T7 | Implement suspend/resume skeleton | `playos-refdistro`, `playos-platform-api` | done | `PLAYOS_IPC_TYPE_SUSPEND` → `playos_suspend()`; lifecycle events handled |
+| S9-T8 | Power and thermal validation on Ally | `playos-refdistro` | done | status bar/overlay live values, reboot/shutdown, sustained-load verified on Ally |
 
 ### S9-T1 — Define and implement `playos_power.h` API
 
