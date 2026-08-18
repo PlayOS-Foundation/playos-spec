@@ -75,6 +75,7 @@ Add only after the core console lifecycle is stable:
 - `playos-net` — Wi-Fi with iwd
 - Dropbear SSH — explicit Developer Mode only
 - `playos-update` — PlayOS wrapper around the update engine
+- OTA update delivery — `playos-tools` host helper (download + verify + stage to USB/SD) first, then on-device download after `playos-net`
 - `playos-input` service — remapping, virtual gamepads, gyro, haptics
 - `playos-sdk` — game developer SDK (musl toolchain + `libplayos`/`libraylib` headers and libs) so third parties can build games on a regular x86_64 Linux host without Buildroot
 - Dedicated audio service — mixing, notifications over games

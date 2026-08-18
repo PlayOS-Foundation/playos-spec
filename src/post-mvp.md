@@ -18,6 +18,14 @@ These features are most commonly requested and have direct dependencies on shipp
 **Depends on:** Networking enabled in kernel config (deferred in MVP)  
 **Options:** See [networking options](sprints/network-options.md) for the D-Bus trade-off and the D-Bus-free `wpa_supplicant` alternative.
 
+### OTA System Updates + `playos-tools` Staging Helper
+**Motivation:** [Sprint 11](sprints/Sprint-11.md) ships the *offline* A/B update engine (signed `.playosb` → inactive slot → `boot.json` → rollback) but no delivery path. The ROG Ally has no Wi-Fi in MVP, so updates arrive by sneakernet: download on a workstation, stage to USB/SD, copy into `/data/updates/`. No network is required to *apply* an update — network only affects how the bundle is *delivered*.
+**Two phases:**
+1. **`playos-tools` host helper (works now, no on-device Wi-Fi):** a workstation CLI that downloads a signed `.playosb`, verifies its signature, and stages it to USB/SD for copy into `/data/updates/`. This closes the delivery gap immediately after Sprint 11 without touching the Ally's network stack.
+2. **On-device download (after `playos-net`):** the shell's "Check for Update" downloads the bundle over Wi-Fi directly into `/data/updates/`, reusing Sprint 11's `ApplyUpdate` IPC and `boot.json` contract unchanged — the update engine itself needs no modification.
+**Depends on:** Sprint 11 (A/B update engine + `/data/updates/*.playosb` contract — MVP); phase 2 additionally depends on Wi-Fi (`playos-net`).
+**Sprint:** not yet allocated (post-MVP). Phase 1 is a standalone `playos-tools` task; phase 2 is a follow-up to [Sprint 16](sprints/Sprint-16.md) (`playos-net`).
+
 ### Touch + On-Screen Keyboard (OSK)
 **Motivation:** The ROG Ally touchscreen is currently inert (no `wl_touch` forwarding), and every text-entry flow (Wi-Fi passphrase, search, save naming, profiles) needs a keyboard.  
 **Stack:** Touch/pointer via the Wayland seat (`wl_pointer`/`wl_touch` + `wlr_scene` hit-testing); text input via upstream `zwp_text_input_v3` (`wlr_text_input_v3`); OSK UI rendered by `playos-overlay` as a raylib component.  
@@ -160,6 +168,7 @@ Wi-Fi
     └── Bluetooth
     └── Cloud Saves
     └── Store + Download Manager
+    └── OTA System Updates (on-device download)
 
 Store + Download Manager
     └── Signed .play Packages
