@@ -4,7 +4,7 @@
 
 **Primary Outcome:** The running system image is read-only (games cannot modify it). A system update can be applied to the inactive slot, and after a marked reboot, the device boots from the new slot. If the new slot fails to boot successfully, it rolls back to the previous slot automatically.
 
-**Status:** 🟡 Not started — Sprint 10 (installer + NVMe deploy) is complete; A/B update, boot counting/rollback, and update-signing work has not begun.
+**Status:** 🟡 In progress — A/B update stack implemented and host-built (S11-T3 through S11-T8); the pivot-to-squashfs boot path (S11-T1/T2 end-to-end) and S11-T9 hardware validation remain.
 
 **Prerequisites:** Sprint 10 complete — installer creates the disk layout; device boots from internal NVMe.
 
@@ -132,15 +132,15 @@ adr/ADR-0005-update-engine.md        # exists — RAUC vs custom decision; super
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S11-T1 | Implement read-only system partition mount | `playos-init` | not started | |
-| S11-T2 | Mount active system slot image and select active slot (layout already created in Sprint 10) | `playos-init` | not started | |
-| S11-T3 | Implement `boot.json` read/write and active slot selection | `playos-init` | not started | |
-| S11-T4 | Implement boot counting and automatic rollback | `playos-init` | not started | |
-| S11-T5 | Integrate RAUC (or equivalent) and update application flow | `playos-refdistro`, `playos-init` | not started | |
-| S11-T6 | Implement update bundle signature verification | `playos-init` | not started | |
-| S11-T7 | Add shell update UI | `playos-shell` | not started | |
-| S11-T8 | Update `playos_system_os_version()` to read active slot version | `playos-platform-api` | not started | API already exists (reads `/etc/playos-version`); must read slot version from `boot.json` |
-| S11-T9 | A/B update and rollback validation | `playos-refdistro` | not started | |
+| S11-T1 | Implement read-only system partition mount | `playos-init` | deferred | Blocked: system still boots from embedded initramfs; `pivot_root` into the read-only squashfs slot is not yet wired |
+| S11-T2 | Mount active system slot image and select active slot (layout already created in Sprint 10) | `playos-init` | deferred | Slot-selection logic implemented in `boot_slot.c`; the active squashfs image is not yet mounted as the runtime root (same blocker as T1) |
+| S11-T3 | Implement `boot.json` read/write and active slot selection | `playos-init` | done | `src/boot_slot.c` reads/writes `/EFI/playos/boot.json`; host test `test_boot_slot` passes |
+| S11-T4 | Implement boot counting and automatic rollback | `playos-init` | done | Boot-count increment + 3-strike rollback on ShellReady/60s timer; host test passes |
+| S11-T5 | Integrate RAUC (or equivalent) and update application flow | `playos-refdistro`, `playos-init` | done | Custom dev-signed updater chosen over RAUC (see ADR-0005 revision); `ApplyUpdate` IPC + `scripts/create-update-bundle.sh` |
+| S11-T6 | Implement update bundle signature verification | `playos-init` | done | `src/sha256.c` HMAC-SHA256 (dev key); `.playosb` bundle verified before any partition write |
+| S11-T7 | Add shell update UI | `playos-shell` | done | Settings → System → Software Update (Check/Apply/Restart-to-Apply + progress + boot-slot info) |
+| S11-T8 | Update `playos_system_os_version()` to read active slot version | `playos-platform-api` | done | Reads active slot `version` from `/EFI/playos/boot.json`; falls back to `"unknown"` |
+| S11-T9 | A/B update and rollback validation | `playos-refdistro` | deferred | Requires S11-T1/T2 end-to-end pivot-to-squashfs boot + ROG Ally hardware |
 
 ### S11-T1 — Mount the read-only system image
 

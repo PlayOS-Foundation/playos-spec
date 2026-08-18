@@ -1,7 +1,7 @@
 # ADR-0005 — RAUC for A/B System Updates
 
 **Date:** Sprint 11  
-**Status:** Accepted (pending evaluation — may be revised to a simpler custom solution)  
+**Status:** Superseded — resolved to a minimal custom updater (Sprint 11)  
 **Deciders:** PlayOS core team
 
 ---
@@ -12,7 +12,9 @@ PlayOS needs a signed, atomic A/B update mechanism. Options: RAUC, Mender, SWUpd
 
 ## Decision
 
-Use RAUC as the first update engine. Evaluate whether a simpler custom EFI-image-based approach is sufficient before committing to full RAUC integration.
+Use a **minimal custom updater** in `playos-init`, not RAUC. The decision criteria below resolved to custom because the PlayOS system image is a single EFI/squashfs artifact, and the static musl PID 1 cannot carry OpenSSL/PKCS#11.
+
+**Resolution (Sprint 11):** `.playosb` bundle = `[PBS1][LE32 header_len][JSON header][raw squashfs][LE32 sig_len][hex HMAC-SHA256]`, verified with a development HMAC key before any partition write. Production key management (HSM) and dm-verity remain post-MVP.
 
 ## Rationale
 
