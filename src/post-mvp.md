@@ -118,14 +118,22 @@ These features are most commonly requested and have direct dependencies on shipp
 **Decisive factors:** .NET-on-musl/NativeAOT risk (ADR-0003), Buildroot toolchain effort, and loss of the single Raylib backend (`rcore_playos.c`, ADR-0006).  
 **Sprint:** [Sprint 18](sprints/Sprint-18.md)
 
+### LVGL Shell UI Spike
+**Motivation:** Assess whether [LVGL](https://lvgl.io/) v9 can build a resolution-adaptive, controller-first shell UI inside the existing raylib-backed shell, without replacing `rcore_playos.c` or the game ABI.  
+**Status:** Bounded spike only — **not** a planned shell rewrite. The recommended path is LVGL rendering to a raylib-managed texture (`flush_cb` → `glTexSubImage2D`), keeping raylib as the Wayland/EGL/vsync owner.  
+**Decisive factors:** no native gamepad indev (custom evdev→`LV_KEY_*` glue), 32-bit color/endianness matching, dirty-area sub-rect uploads for 60 fps, and no Buildroot package (vendor under `playos-shell/external/lvgl`).  
+**Sprint:** [Sprint 22](sprints/Sprint-22.md)
+
 ---
 
 ## Tier 3 — Long-Term (v1.0+)
 
 ### Cloud Saves and User Accounts
-**Motivation:** Save portability across devices; online game library  
-**Scope:** Account authentication (OAuth2 or PlayOS account service); save sync on game launch/exit  
-**Depends on:** Wi-Fi, network service, backend infrastructure
+**Motivation:** Save portability across devices; online game library; a single platform identity for Marketplace access and Online Gaming Services.  
+**Identity model:** Local profiles ([Sprint 21](sprints/Sprint-21.md)) are the offline identity; each can be linked to a **PlayOS Network account** (`playos-cloud`) that unlocks Marketplace and Online Gaming Services (matchmaking, multiplayer, friends, cloud saves).  
+**Scope:** Account authentication (OAuth2 or PlayOS account service); per-profile account linking; save sync on game launch/exit; scoped session tickets so games never receive raw account credentials.  
+**Depends on:** Wi-Fi (`playos-net`, Sprint 16), local profiles (Sprint 21), `playos-cloud` backend, and the Sprint 12 game sandbox.  
+**Self-hosting:** PlayOS Network / `playos-cloud` services are **self-hostable by design** — every hosted feature has a documented self-hosted deployment, and no feature may require a single central provider (accounts, cloud saves, matchmaking included).
 
 ### Store Integration and Download Manager
 **Motivation:** Users install games from a store without manual file transfer  
@@ -143,8 +151,15 @@ These features are most commonly requested and have direct dependencies on shipp
 **Motivation:** A content-economy layer for publishing, discovering, installing, and updating PlayOS applications, games, themes, and developer content; multiple store sources (official, community, OEM, private, LAN) rather than a single hard-coded store.  
 **Assessment:** See [Sprint 19 — Marketplace Assessment](sprints/Sprint-19.md). The repo is currently an empty stub; its docs reference "Part X — Package Format" and "Part XI — Cloud and Marketplace" in the spec, which do not yet exist. This is **spec-blocked**, not code-blocked.  
 **Package format:** `.gpk` (canonical in `playos-marketplace/AGENTS.md`; reconcile with the historical `.play` name below before implementation).  
-**V1 boundary:** Free-content catalog and install only — no payments, DRM, or entitlement enforcement.  
-**Depends on:** Wi-Fi (`playos-net`), SDK (Sprint 15), manifest signing (Sprint 12), atomic-install pattern (Sprint 11), and the missing Part X/Part XI spec chapters.
+**V1 boundary:** Free-content catalog and install only — no payments, DRM, or entitlement enforcement. Account-scoped entitlements are a later phase gated on PlayOS Network account linking (see [Sprint 21](sprints/Sprint-21.md)); v1 stays free and device-local.  
+**Depends on:** Wi-Fi (`playos-net`), SDK (Sprint 15), manifest signing (Sprint 12), atomic-install pattern (Sprint 11), and the missing Part X/Part XI spec chapters.  
+**Self-hosting:** stores are **self-hostable** — a store can be run by communities, OEMs, or individuals — consistent with the marketplace golden rules and the multiple-store-sources model above (no single hard-coded store).
+
+### Native Media & Browser Clients
+**Motivation:** Run Spotify, YouTube, YouTube Music, and a lightweight browser as controller-first PlayOS apps launched from `playos-shell`, without reopening the musl-only (ADR-0003) or ALSA-only (ADR-0007) decisions. This is **distinct** from the never-planned "browser-based shell" below — it is a set of *launched native clients*, not a rewrite of the shell.  
+**Assessment:** See [Sprint 20 — Native Media & Browser Client Strategy](sprints/Sprint-20.md). Verdict: **viable as a post-MVP direction** using native clients — Spotify via `librespot`/`spotifyd`, YouTube and YouTube Music via `mpv`+`yt-dlp`, and a browser via `WPE WebKit`+`Cog` — all speaking ALSA directly and driven over per-client IPC (no compositor `wl_seat` input forwarding required). Netflix is **out of scope** (Widevine is glibc-only, proprietary, and Google-licensed).  
+**Recommended posture:** treat as a post-MVP native-client strategy; optionally run the bounded host-only spike in Sprint 20 before any device integration.  
+**Depends on:** the Sprint 12 sandbox, Buildroot packaging for the native clients, the non-breaking launch-lifecycle extension (manifest `type`/`url`/`media_uri` + init exec branch + shell validation), and validation of `WPE WebKit` on musl (the highest-risk item).
 
 ### Delta Updates (Games and System)
 **Motivation:** Reduce download size for incremental game and system updates  
@@ -152,9 +167,10 @@ These features are most commonly requested and have direct dependencies on shipp
 **Depends on:** Store integration, A/B system updates (MVP)
 
 ### Multiple Local User Profiles
-**Motivation:** Family devices; per-user settings, saves, and game libraries  
-**Scope:** Profile selection at boot or via shell; per-profile `/data/saves/<profile>/<game-id>/`  
-**Depends on:** Storage layout stable (MVP)
+**Motivation:** Family devices; per-user settings, saves, screenshots, and progress — isolated from each other like PlayStation console profiles.  
+**Assessment:** See [Sprint 21 — Multiple Local User Profiles (Post-MVP)](sprints/Sprint-21.md). Verdict: **feasible post-MVP** via **path-scoped profiles** — a single `playos-game` Linux identity plus a `PLAYOS_PROFILE_ID` env and profile-scoped Landlock allowlist.  
+**Scope:** Profile selection at boot or via shell; per-profile `/data/profiles/<profile-id>/{saves,cache,screenshots,settings}/<game-id>/`; game installs (`/data/games`) stay shared.  
+**Depends on:** Storage layout stable (MVP), Sprint 12 sandbox (data-driven path policy), and the post-MVP profile work deferred to Sprint 21.
 
 ### External Display Profiles
 **Motivation:** Docking station or TV output; ROG Ally supports USB-C DisplayPort  

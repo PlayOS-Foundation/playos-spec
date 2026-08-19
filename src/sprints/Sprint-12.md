@@ -27,7 +27,8 @@ Before Sprint 12, the security boundary is mostly a convention. Games are spawne
 
 ## Decisions Locked for This Sprint
 
-- **Game identity:** games run as `playos-game` (UID ~1000) with no supplementary groups.
+- **Game identity:** games run as `playos-game` (UID ~1000) with no supplementary groups. No per-profile Linux uid is introduced; console-style local profiles are a future data-path layer over this single identity.
+- **Sandbox parameterization:** the sandbox path policy is parameterized by launch identity (game id now; a profile id later), so a future profile can be inserted without reworking enforcement.
 - **Capability set:** games start with no capabilities; `prctl(PR_SET_NO_NEW_PRIVS, 1)` is set before exec.
 - **DRM access:** games connect through the Wayland seat; direct `/dev/dri/card*` access is denied.
 - **Input boundary:** reserved buttons are intercepted at the libinput/seat layer and never forwarded; the `libplayos` mask is defense-in-depth only.
@@ -57,6 +58,7 @@ Before Sprint 12, the security boundary is mostly a convention. Games are spawne
 - Full dm-verity/IMA verified-boot implementation (documented as a target only).
 - Network sandboxing (no network stack in the MVP).
 - Store-level signing and distribution.
+- Multi-user local profiles (deferred to [Sprint 21](Sprint-21.md)); this sprint only establishes the single unprivileged identity and data-driven sandbox they will build on.
 
 ---
 
@@ -134,7 +136,7 @@ Update the **Status** column as work progresses: `not started` → `in progress`
 
 ### S12-T2 — Apply Landlock filesystem restrictions
 
-Build a Landlock ruleset granting exactly the paths a game needs and default-deny everything else: `/data/games/<game-id>/` read-only, `/data/saves/<game-id>/` and `/data/cache/<game-id>/` read-write, `/tmp` or `/run/game-<id>/` read-write scratch, and `/run/playos/` execute-only for the Wayland socket. Deny other games' data, `/data/config/`, `/run/playos/control.sock`, `/dev/input/event*`, and `/proc/*/`. If the kernel is older than 5.13, fall back to logging-only enforcement with an alert.
+Build a Landlock ruleset granting exactly the paths a game needs and default-deny everything else: `/data/games/<game-id>/` read-only, `/data/saves/<game-id>/` and `/data/cache/<game-id>/` read-write, `/tmp` or `/run/game-<id>/` read-write scratch, and `/run/playos/` execute-only for the Wayland socket. Deny other games' data, `/data/config/`, `/run/playos/control.sock`, `/dev/input/event*`, and `/proc/*/`. Build the ruleset from launch-time variables (game id now; a `profile-id` prefix later) so Sprint 21 can add profile scoping by changing one path-construction function, not the enforcement logic. If the kernel is older than 5.13, fall back to logging-only enforcement with an alert.
 
 **Done when:** a game process cannot `open()` another game's save directory or read `/data/config/`; the unsupported-kernel fallback logs an alert without blocking launch.
 
@@ -191,6 +193,8 @@ Document the target signed chain: UEFI Secure Boot signs `BOOTX64.EFI`; `BOOTX64
 **Treat the `libplayos` mask as defense-in-depth.** The real boundary is the seat plus group permissions plus Landlock plus seccomp; the software bitmask is a convenience, not the enforcement point.
 
 **Landlock fallback must be loud, not silent.** If the kernel is too old, log an alert and continue, but record it as an unresolved hardening gap rather than failing the whole launch path.
+
+**Keep Landlock path construction data-driven.** Build paths in one function taking the launch identity (game id now, profile id later) so the ruleset does not encode raw path strings and Sprint 21 can add profile scoping without touching enforcement.
 
 **Production lint fails the build.** Debug-artifact absence is enforced in CI, not checked manually.
 

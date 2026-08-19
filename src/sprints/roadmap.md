@@ -57,6 +57,9 @@ The first meaningful PlayOS MVP is complete when all of the following are true o
 | [17](Sprint-17.md) | Touch Input + On-Screen Keyboard (OSK) | Touch end-to-end (compositor → raylib backend) plus a reusable system OSK |
 | [18](Sprint-18.md) | C# Shell Reimplementation Assessment (Post-MVP Spike) | Feasibility assessment only — no C# shell implemented |
 | [19](Sprint-19.md) | Marketplace Assessment (Post-MVP) | Assessment and spec-first sequencing only — no marketplace code |
+| [20](Sprint-20.md) | Native Media & Browser Client Strategy (Post-MVP) | Assessment of native Spotify/YouTube/YouTube Music/browser clients — Netflix out of scope |
+| [21](Sprint-21.md) | Multiple Local User Profiles (Post-MVP) | Assessment/design of console-style local profiles with per-profile isolated saves/settings — no implementation |
+| [22](Sprint-22.md) | LVGL Shell UI Spike (Post-MVP) | Gated LVGL-via-raylib texture spike with controller navigation + go/no-go — no shell port |
 
 ---
 
