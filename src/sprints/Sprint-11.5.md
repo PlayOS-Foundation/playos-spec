@@ -94,7 +94,7 @@ src/mount.c                           # mount active slot squashfs + remount dat
 | S11.5-T2 | `pivot_root`/`switch_root` into the active slot squashfs | `playos-init` | done | `playos_pivot_to_active_slot()` added in `src/mount.c`; switch_root idiom (MS_MOVE + chroot + exec /init). |
 | S11.5-T3 | Wire `boot_slot.c` active-slot selection into the mount path | `playos-init` | done | `boot_slot_read()` selects `playos-a`/`playos-b`; called in `main.c` after ESP/boot-slot block. |
 | S11.5-T4 | Make 3-strike rollback real end-to-end | `playos-init` | in progress | Wiring landed (boot accounting runs on ESP before pivot, ESP stays mounted); 3-strike rollback needs T5 hardware test. |
-| S11.5-T5 | A/B update + rollback validation matrix (was S11-T9) | `playos-refdistro` | not started | QEMU then ROG Ally |
+| S11.5-T5 | A/B update + rollback validation matrix (was S11-T9) | `playos-refdistro` | not started | QEMU then ROG Ally; **fresh install → 5-partition layout → NVMe boot validated 2026-08-19** (via the S10-T8 re-install fix); the full 6-case A/B update/rollback matrix is still pending |
 
 ---
 

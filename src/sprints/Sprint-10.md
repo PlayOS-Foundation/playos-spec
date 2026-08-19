@@ -113,7 +113,7 @@ br2-external/configs/playos_ally_installer_defconfig
 | S10-T5 | Implement first-boot from internal disk | `playos-init` | done | Existing S6 first-boot provisioning already handles empty `/data` (`mount.c` `.playos-storage-version` marker + seed games); no new code required |
 | S10-T6 | Complete `FactoryReset` IPC (all five options) | `playos-init`, `playos-runtime`, `playos-refdistro` | done | Handler now erases `games`/`saves`/`cache`/`config`/`logs`; runtime trusted helper added |
 | S10-T7 | Create `make installer-image` Buildroot target | `playos-refdistro` | done | `playos_ally_installer_defconfig`, `playos-installer` package, `linux-installer.config`, `scripts/gen-installer-usb-image.sh`, Makefile `installer-*` targets |
-| S10-T8 | Installer validation (QEMU loopback + Ally) | `playos-refdistro` | done | QEMU loopback install SUCCESS (GPT verified); dev variant booted; physical Ally install to NVMe + reboot confirmed by user |
+| S10-T8 | Installer validation (QEMU loopback + Ally) | `playos-refdistro` | done | QEMU loopback install SUCCESS (GPT verified); dev variant booted; physical Ally install to NVMe + reboot confirmed by user; **2026-08-19 re-install on an already-installed NVMe fixed** — `playos-init` now skips ESP mount and pivot in installer mode, and `playos-installer` appends step diagnostics to `/data/log/installer.log` |
 
 ### S10-T1 — Implement installer trigger mode in `playos-init`
 
@@ -250,6 +250,7 @@ Abort test:
 
 Re-install test:
 - Run installer on an already-installed Ally; verify it works
+- **2026-08-19 fix:** on a previously-installed NVMe, installer mode in `playos-init` now skips mounting the internal `ESP` label (the disk is about to be repartitioned) and skips `playos_pivot_to_active_slot()` (so `/usr/bin/playos-installer` stays visible). Without this, re-install failed with `Installation Failed` because the old ESP mount made the later `fdisk`/`mkfs` steps fail busy. Verified end-to-end by user: re-install completed and booted from NVMe.
 
 **Done when:** all four validation scenarios pass with evidence.
 
