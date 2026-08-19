@@ -4,7 +4,9 @@
 
 **Primary Outcome:** On boot, the initramfs mounts the active slot's squashfs image read-only and pivots into it; `touch /usr/test` fails with `EROFS`; a bad slot automatically rolls back after 3 failed boots; the full A/B test matrix passes on QEMU and the ROG Ally.
 
-**Status:** 🟢 Complete — T1–T4 landed; squashfs boot path and A/B validation pass on QEMU and the ROG Ally.
+**Status:** 🟡 Partially validated — T1–T4 landed; host tests + QEMU (pivot + forced rollback) pass. The full 6-case A/B matrix still needs a ROG Ally hardware run.
+
+> **ROG Ally hardware gate:** execute the full 6-case matrix on real hardware only after **[Sprint 11.6](Sprint-11.6.md)** is complete and the ROG Ally is reachable over the network via SSH (USB-C Ethernet + Dropbear). Sprint 11.6 provides the remote access needed to run and capture the matrix directly, instead of reading logs off a USB stick.
 
 **Prerequisites:** Sprint 11 host-side stack landed and committed (boot.json read/write + slot selection, boot-count/rollback logic, `.playosb` bundle format + sign/verify, `ApplyUpdate` IPC, shell update UI, `playos_system_os_version()`).
 
@@ -93,8 +95,8 @@ src/mount.c                           # mount active slot squashfs + remount dat
 | S11.5-T1 | Confirm/produce a complete bootable squashfs rootfs + minimal initramfs shim | `playos-refdistro` | done | Full userspace confirmed in `output/ally/images/rootfs.squashfs`; added `/EFI` mountpoint to rootfs-overlay. |
 | S11.5-T2 | `pivot_root`/`switch_root` into the active slot squashfs | `playos-init` | done | `playos_pivot_to_active_slot()` added in `src/mount.c`; switch_root idiom (MS_MOVE + chroot + exec /init). |
 | S11.5-T3 | Wire `boot_slot.c` active-slot selection into the mount path | `playos-init` | done | `boot_slot_read()` selects `playos-a`/`playos-b`; called in `main.c` after ESP/boot-slot block. |
-| S11.5-T4 | Make 3-strike rollback real end-to-end | `playos-init` | in progress | Wiring landed (boot accounting runs on ESP before pivot, ESP stays mounted); 3-strike rollback needs T5 hardware test. |
-| S11.5-T5 | A/B update + rollback validation matrix (was S11-T9) | `playos-refdistro` | not started | QEMU then ROG Ally; **fresh install → 5-partition layout → NVMe boot validated 2026-08-19** (via the S10-T8 re-install fix); the full 6-case A/B update/rollback matrix is still pending |
+| S11.5-T4 | Make 3-strike rollback real end-to-end | `playos-init` | done | Host `test_boot_slot` covers boot-count/3-strike rollback; QEMU Scenario B proves forced rollback (boot.json flipped to slot b, slot a marked bad). |
+| S11.5-T5 | A/B update + rollback validation matrix (was S11-T9) | `playos-refdistro` | in progress | Automated subset passes (host `test_boot_slot` 2/2 + QEMU Scenario A/B); **fresh install → 5-partition layout → NVMe boot validated 2026-08-19** (S10-T8 re-install fix). Full 6-case matrix on ROG Ally still pending (real apply/reboot/mark-good timing, `/data` survival on real NVMe, live version API per slot) — **blocked on [Sprint 11.6](Sprint-11.6.md)** SSH/network reachability for remote execution. |
 
 ---
 
@@ -188,29 +190,31 @@ S11.5-T5: A/B validation matrix + evidence
 
 ## Verification and Evidence
 
-| Evidence | How it is produced |
-|---|---|
-| Read-only root | `cat /proc/mounts` shows `/` on `squashfs` `ro`; `touch /usr/test` → `EROFS` |
-| Slot selection | changing `active_slot` in `boot.json` changes the mounted slot |
-| Rollback | 3-strike test log showing automatic slot switch |
-| Data survival | file hashes before/after update match |
-| Signature rejection | log showing bundle rejected before any write |
-| Version API | `playos_system_os_version()` per slot |
+| Evidence | How it is produced | Current state |
+|---|---|---|
+| Read-only root | `cat /proc/mounts` shows `/` on `squashfs` `ro`; `touch /usr/test` → `EROFS` | ⚠️ Not yet asserted by the QEMU harness (pivot is asserted; ro/EROFS check not captured) |
+| Slot selection | changing `active_slot` in `boot.json` changes the mounted slot | ✅ QEMU Scenario A pivots to slot `a` read from `boot.json`; Scenario B writes `active_slot: "b"` |
+| Rollback | 3-strike test log showing automatic slot switch | ✅ QEMU Scenario B flips to `b` and marks `a` `bad`; host `test_boot_slot` covers boot-count logic |
+| Update apply/verify | host `test_boot_slot` valid / bad-signature / bad-magic cases | ✅ `ctest` 2/2 pass |
+| Data survival | file hashes before/after update match | ⚠️ Pending ROG Ally — not covered by the QEMU harness |
+| Signature rejection | log showing bundle rejected before any write | ✅ host `test_boot_slot` bad-signature case |
+| Version API | `playos_system_os_version()` per slot | ⚠️ Code inspection only; hardware per-slot run pending |
 
 ---
 
 ## Acceptance Criteria
 
-- [x] System boots from the read-only squashfs active slot (not the embedded initramfs)
-- [x] `touch /usr/test` fails with `EROFS`
-- [x] Active-slot selection in `boot.json` changes which slot is mounted
-- [x] A valid bundle applied to the inactive slot does not affect the running system
-- [x] After reboot, the system boots from the newly updated slot
-- [x] Successful boot marks the new slot `health = "good"` after 60 seconds
-- [x] 3 consecutive failed boots trigger rollback to the previous slot
-- [x] `/data` content survives update and rollback unchanged
-- [x] Invalid-signature bundle is rejected before any partition write
-- [x] QEMU validation passes for the bootable subset; ROG Ally passes the full matrix
+- [x] System boots from the read-only squashfs active slot (not the embedded initramfs) — QEMU Scenario A
+- [ ] `touch /usr/test` fails with `EROFS` — squashfs ro is by construction, but the current QEMU harness does not assert this
+- [x] Active-slot selection in `boot.json` drives which slot is mounted — QEMU Scenario A reads `active_slot: "a"`
+- [x] A valid bundle applied to the inactive slot does not affect the running system — host `test_boot_slot` apply path (by design, apply writes only to the inactive slot)
+- [ ] After reboot, the system boots from the newly updated slot — full apply→reboot→active cycle not yet run on QEMU or hardware
+- [ ] Successful boot marks the new slot `health = "good"` after 60 seconds — logic covered by host test; real 60s timer not yet exercised
+- [x] 3 consecutive failed boots trigger rollback to the previous slot — QEMU Scenario B + host `test_boot_slot`
+- [ ] `/data` content survives update and rollback unchanged — not yet exercised on QEMU or hardware
+- [x] Invalid-signature bundle is rejected before any partition write — host `test_boot_slot` bad-signature case
+- [x] QEMU validation passes for the bootable subset — Scenario A (pivot) + Scenario B (forced rollback)
+- [ ] ROG Ally passes the full 6-case matrix — pending [Sprint 11.6](Sprint-11.6.md) SSH/network reachability
 
 ---
 
@@ -219,13 +223,13 @@ S11.5-T5: A/B validation matrix + evidence
 Sprint 12 (Security Hardening) may assume:
 
 - The system image is immutable at runtime (read-only squashfs root).
-- Signed A/B updates with automatic rollback are functional end-to-end.
+- Signed A/B updates with automatic rollback are functional on the automated/QEMU subset; the full hardware matrix is pending Sprint 11.5 closure, executed over SSH after [Sprint 11.6](Sprint-11.6.md) is complete.
 - Games and user data live on `/data` and are unaffected by updates and rollback.
 
 ---
 
 ## Exit Gate
 
-The system boots from the read-only squashfs active slot, A/B updates can be applied and automatically rolled back on failure, and the full validation matrix passes on QEMU and the ROG Ally.
+The system boots from the read-only squashfs active slot, A/B updates can be applied and automatically rolled back on failure, and the full validation matrix passes on QEMU and the ROG Ally (the Ally portion executed over SSH once [Sprint 11.6](Sprint-11.6.md) is complete).
 
 *Previous: [Sprint 11](Sprint-11.md) | Next: [Sprint 12](Sprint-12.md)*

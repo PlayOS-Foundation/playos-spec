@@ -254,4 +254,4 @@ Sprint 13 may assume:
 
 Game processes are privilege-reduced and cannot access trusted IPC, DRM primary nodes, or other games' data. Production builds ship without debug services. Security restrictions do not break any existing functionality.
 
-*Previous: [Sprint 11.5](Sprint-11.5.md) | Next: [Sprint 13](Sprint-13.md)*
+*Previous: [Sprint 11.6](Sprint-11.6.md) | Next: [Sprint 13](Sprint-13.md)*

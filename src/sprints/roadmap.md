@@ -49,6 +49,7 @@ The first meaningful PlayOS MVP is complete when all of the following are true o
 | [9](Sprint-9.md) | Power, Battery, Thermal, and Suspend Foundations | Safe power behavior exposed through a restricted public Platform API |
 | [10](Sprint-10.md) | Installer and Internal-Disk Deployment | Tested installation path from removable media to ROG Ally internal SSD |
 | [11](Sprint-11.md) | Immutable Images and A/B Updates | Signed, atomic A/B system updates with automatic rollback |
+| [11.6](Sprint-11.6.md) | Developer SSH (Dropbear) + Minimal Wired Network Bring-Up | USB-C Ethernet SSH (key auth) for on-device debugging; full Wi-Fi stays Sprint 16 |
 | [12](Sprint-12.md) | Security Hardening | Hardened boundary between public Platform API, trusted runtime control, and games |
 | [13](Sprint-13.md) | Intel Expansion | Architecture and Platform API backend portable to Intel graphics |
 | [14](Sprint-14.md) | Production Readiness | Signed preview release with versioned public Platform API |
@@ -78,7 +79,7 @@ The first meaningful PlayOS MVP is complete when all of the following are true o
 Add only after the core console lifecycle is stable:
 
 - `playos-device` — hardware and power policy service
-- Dropbear SSH — explicit Developer Mode only
+- Dropbear SSH — explicit Developer Mode only (minimal wired slice pulled forward in [Sprint 11.6](Sprint-11.6.md); full Wi-Fi remains [Sprint 16](Sprint-16.md))
 - `playos-update` — PlayOS wrapper around the update engine
 - OTA update delivery — `playos-tools` host helper (download + verify + stage to USB/SD) first, then on-device download after Sprint 16 (`playos-net`)
 - `playos-input` service — remapping, virtual gamepads, gyro, haptics

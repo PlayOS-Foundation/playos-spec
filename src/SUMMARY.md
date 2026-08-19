@@ -54,6 +54,7 @@
 - [Sprint 10 — Installer and Internal-Disk Deployment](sprints/Sprint-10.md)
 - [Sprint 11 — Immutable Images and A/B Updates](sprints/Sprint-11.md)
 - [Sprint 11.5 — Pivot-to-Squashfs Boot and A/B Validation](sprints/Sprint-11.5.md)
+- [Sprint 11.6 — Developer SSH (Dropbear) + Minimal Wired Network Bring-Up](sprints/Sprint-11.6.md)
 - [Sprint 12 — Security Hardening](sprints/Sprint-12.md)
 - [Sprint 13 — Intel Expansion](sprints/Sprint-13.md)
 - [Sprint 14 — Production Readiness](sprints/Sprint-14.md)
