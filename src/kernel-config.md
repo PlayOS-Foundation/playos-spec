@@ -126,7 +126,28 @@ CONFIG_SND_SOC_AMD_MACH=y        # or specific machine driver
 # Minimal for first sprints
 CONFIG_NET=y
 CONFIG_UNIX=y                    # Required for Wayland sockets
-# Wi-Fi deferred to post-MVP:
+
+# Sprint 11.6 — wired developer SSH (USB-C Ethernet + QEMU test NIC).
+# No wireless in this sprint:
+CONFIG_NETDEVICES=y
+CONFIG_ETHERNET=y
+CONFIG_MII=y
+CONFIG_USB_NET_DRIVERS=y
+CONFIG_USB_USBNET=y
+CONFIG_USB_NET_AX8817X=y
+CONFIG_USB_NET_AX88179_178A=y
+CONFIG_USB_RTL8152=y
+CONFIG_USB_NET_CDCETHER=y
+CONFIG_USB_NET_CDC_NCM=y
+CONFIG_USB_NET_CDC_EEM=y
+CONFIG_USB_NET_RNDIS_HOST=y
+CONFIG_USB_NET_SMSC95XX=y
+CONFIG_USB_NET_MCS7830=y
+CONFIG_VIRTIO_NET=y
+CONFIG_E1000=y
+CONFIG_E1000E=y
+
+# Wi-Fi deferred to post-MVP / Sprint 16:
 # CONFIG_CFG80211=y
 # CONFIG_MAC80211=y
 # CONFIG_IWLWIFI=y               # Intel Wi-Fi

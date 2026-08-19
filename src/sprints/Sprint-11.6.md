@@ -4,7 +4,7 @@
 
 **Primary Outcome:** With a USB-C Ethernet adapter plugged into the ROG Ally, the device obtains an IPv4 address via DHCP and exposes a Dropbear SSH server that only accepts developer-supplied public-key authentication. Host keys and `authorized_keys` persist under `/data/ssh`; `playos-init` supervises the bring-up; games and production behavior are unchanged.
 
-**Status:** 🟡 Planned — not started. Scope locked as **Option 3** (USB-C Ethernet now, Wi-Fi = Sprint 16 later).
+**Status:** 🟡 In progress — code changes complete; `playos-init` host build/tests pass; **QEMU validation (T5) done** (DHCP lease + public-key SSH login verified in QEMU); ROG Ally validation still pending hardware.
 
 **Prerequisites:** Sprint 11.5 in progress (hardware A/B matrix pending); Sprint 10 installed/deployed rootfs path; `playos-init` supervision framework in place.
 
@@ -24,7 +24,7 @@ Sprint 11.5 needs a full 6-case A/B matrix on real ROG Ally hardware, but debugg
 - [x] Rootfs is read-only squashfs; persistent state must live under `/data`, not `/etc`.
 - [x] `playos-refdistro` Ally defconfigs (`playos_ally_defconfig`, `playos_ally_installer_defconfig`) currently enable neither Dropbear nor network packages.
 - [x] Ally kernel configs defer `CONFIG_NETDEVICES` (`# CONFIG_NETDEVICES is not set`) and `# CONFIG_WIRELESS is not set`.
-- [x] Buildroot has Dropbear 2026.94, `wpa_supplicant`, `dhcpcd`, `connman`, and `network-manager` available; this sprint uses **Dropbear + `dhcpcd` only**.
+- [x] Buildroot has Dropbear 2026.94, `wpa_supplicant`, `dhcpcd`, `connman`, and `network-manager` available; this sprint installs **Dropbear + `dhcpcd`** and uses BusyBox `udhcpc` for the wired bring-up.
 
 ---
 
@@ -33,7 +33,7 @@ Sprint 11.5 needs a full 6-case A/B matrix on real ROG Ally hardware, but debugg
 - **Option 3 — Both, staged.** Deliver minimal wired SSH (USB-C Ethernet) now; keep full Wi-Fi in Sprint 16. Sprint 16 is **not** absorbed or renamed by this sprint.
 - **Transport now:** USB-C Ethernet via common USB-NIC drivers (ASIX `AX8817x`/`ASIX`, Realtek `RTL8152`, CDC Ethernet/NCM/EEM, RNDIS host, SMSC95xx/MCS7830). No Wi-Fi, no `RFKILL`, no `nl80211`, no `wpa_supplicant` in this sprint.
 - **SSH daemon:** Dropbear (`BR2_PACKAGE_DROPBEAR=y`), **public-key auth only**. No password auth, no baked credentials, no committed private keys. Disable reverse DNS (`BR2_PACKAGE_DROPBEAR_DISABLE_REVERSEDNS=y`) and include the client (`BR2_PACKAGE_DROPBEAR_CLIENT=y`).
-- **DHCP client:** standalone `dhcpcd` (`BR2_PACKAGE_DHCPCD`), exactly as Sprint 16 already locks (Option B, `network-options.md` §10). No BusyBox `udhcpc`/`ip` networking applets are added, so the wired debug path is consistent with the future Wi-Fi path and avoids re-introducing a BusyBox dependency Sprint 12/16 must later remove.
+- **DHCP client:** `dhcpcd` remains installed (`BR2_PACKAGE_DHCPCD`, the client Sprint 16 already locks in `network-options.md` §10), but the bring-up uses the already-present BusyBox `udhcpc` applet (`CONFIG_UDHCPC=y`) because the default `dhcpcd` sample config rejects QEMU slirp DHCP offers. No new BusyBox applets are added; Sprint 16 may still use `dhcpcd` for the Wi-Fi interface.
 - **Persistent SSH state:** Dropbear host keys and `authorized_keys` live under `/data/ssh/` (persistent `playos-data`), **not** `/etc/dropbear` or `/var/run/dropbear` (tmpfs/ephemeral) and **not** on the read-only squashfs. Bring-up bind-mounts `/data/ssh` over `/root/.ssh` (Dropbear's default `authorized_keys` location).
 - **Bring-up ownership:** a small rootfs-overlay helper (`/usr/bin/playos-ssh-bringup`) handles interface bring-up, DHCP, host-key generation, bind-mounting, and `exec dropbear`. `playos-init` forks/execs it as a supervised trusted daemon after the data mount, alongside compositor/shell/overlay.
 - **Access channel:** developer-only, no shell UI, no `playos-runtime` messages, no game access. Access is gated by public-key auth: a developer drops their public key at `/data/ssh/authorized_keys`.
@@ -82,6 +82,7 @@ br2-external/board/ally/linux-installer.config       # same for installer kernel
 br2-external/configs/playos_ally_defconfig           # dropbear + dhcpcd
 br2-external/configs/playos_ally_installer_defconfig # dropbear + dhcpcd
 br2-external/board/common/rootfs-overlay/usr/bin/playos-ssh-bringup
+br2-external/board/common/rootfs-overlay/etc/dhcpcd.conf           # minimal dhcpcd config kept for Sprint 16 QEMU work
 br2-external/board/common/rootfs-overlay/root/.ssh/  # bind-mount target (exists in squashfs)
 ```
 
@@ -107,11 +108,11 @@ src/kernel-config.md            # note: USB-NIC enabled for developer SSH; Wi-Fi
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S11.6-T1 | Enable USB-NIC kernel config (no wireless) | `playos-refdistro` | not started | Verify exact Kconfig names against the 6.12 tree before editing |
-| S11.6-T2 | Enable Dropbear + `dhcpcd` | `playos-refdistro` | not started | Key auth only; `DISABLE_REVERSEDNS` |
-| S11.6-T3 | `playos-ssh-bringup` + `playos-init` supervision | `playos-refdistro`, `playos-init` | not started | Spawn after data mount |
-| S11.6-T4 | Host keys + `authorized_keys` persistence under `/data/ssh` | `playos-refdistro` | not started | Bind-mount over `/root/.ssh` |
-| S11.6-T5 | QEMU + Ally validation | `playos-refdistro` | not started | interface appears, `dhcpcd` lease, SSH key login |
+| S11.6-T1 | Enable USB-NIC kernel config (no wireless) | `playos-refdistro` | done | Kernel config edited; build validation pending in T5 |
+| S11.6-T2 | Enable Dropbear + `dhcpcd` | `playos-refdistro` | done | Defconfigs edited; build validation pending in T5 |
+| S11.6-T3 | `playos-ssh-bringup` + `playos-init` supervision | `playos-refdistro`, `playos-init` | done | Script written; supervision code compiled + host tests pass |
+| S11.6-T4 | Host keys + `authorized_keys` persistence under `/data/ssh` | `playos-refdistro` | done | Script generates keys + bind-mounts; `/root/.ssh` overlay shipped |
+| S11.6-T5 | QEMU + Ally validation | `playos-refdistro` | in progress | QEMU done: `udhcpc` lease 10.0.2.15 + public-key SSH login verified; Ally pending hardware |
 
 Update the **Status** column as work progresses: `not started` → `in progress` → `blocked` or `done`.
 
@@ -124,9 +125,10 @@ CONFIG_NETDEVICES=y
 CONFIG_ETHERNET=y
 CONFIG_MII=y
 CONFIG_USB_NET_DRIVERS=y
+CONFIG_USB_USBNET=y
 CONFIG_USB_NET_AX8817X=y
-CONFIG_USB_NET_ASIX=y
-CONFIG_USB_NET_RTL8152=y
+CONFIG_USB_NET_AX88179_178A=y
+CONFIG_USB_RTL8152=y
 CONFIG_USB_NET_CDCETHER=y
 CONFIG_USB_NET_CDC_NCM=y
 CONFIG_USB_NET_CDC_EEM=y
@@ -146,7 +148,7 @@ CONFIG_E1000E=y
 ### S11.6-T2 — Enable Dropbear + `dhcpcd`
 
 - Add `BR2_PACKAGE_DROPBEAR=y`, `BR2_PACKAGE_DROPBEAR_CLIENT=y`, and `BR2_PACKAGE_DROPBEAR_DISABLE_REVERSEDNS=y` to the Ally and installer defconfigs.
-- Add `BR2_PACKAGE_DHCPCD=y` (the same client Sprint 16 uses). No BusyBox `udhcpc`/`ip` applets are enabled.
+- Add `BR2_PACKAGE_DHCPCD=y` (the same client Sprint 16 uses). BusyBox `udhcpc`/`ip` are already enabled via the existing BusyBox config and are used by the bring-up; no new BusyBox applets are added.
 - Keep this scoped to the **dev/installer** image; Sprint 12 strips Dropbear from production, and `dhcpcd` remains for Sprint 16.
 
 **Done when:** `dropbear` and `dhcpcd` are present in the built rootfs and both link without errors.
@@ -156,7 +158,7 @@ CONFIG_E1000E=y
 Create `/usr/bin/playos-ssh-bringup` in the rootfs overlay:
 
 1. Detect a wired NIC (iterate `/sys/class/net/*`, skip loopback). If none, log and exit cleanly (USB NIC may be hot-plugged later).
-2. Run `dhcpcd -q -b <if>` to bring the interface up and obtain/keep a lease (`dhcpcd` daemonises by default).
+2. Run `udhcpc -i <if> -q` to bring the interface up and obtain/keep a lease (`udhcpc` daemonises by default).
 3. `mkdir -p /data/ssh` and generate Dropbear host keys with `dropbearkey` if absent (RSA/ed25519).
 4. `mount --bind /data/ssh /root/.ssh` (the `/root/.ssh` target must already exist in the read-only squashfs).
 5. `exec dropbear -F -R -E` (foreground so `playos-init` can supervise it; `-R`/`-E` chosen to match the configured Dropbear behavior, verified at implementation time).
@@ -176,7 +178,7 @@ Create `/usr/bin/playos-ssh-bringup` in the rootfs overlay:
 
 ### S11.6-T5 — QEMU + Ally validation
 
-- QEMU: boot with a NIC (e.g. `-netdev user -device virtio-net-pci`); assert a wired interface appears (via `/sys/class/net`) and `dhcpcd` obtains a lease; assert SSH key login works.
+- QEMU: boot with a NIC (e.g. `-netdev user -device virtio-net-pci`); assert a wired interface appears (via `/sys/class/net`) and a DHCP lease (`udhcpc`) is obtained; assert SSH key login works.
 - Ally: with a USB-C Ethernet adapter, assert `ip addr` + DHCP lease and SSH key login; confirm no impact on audio/input/shell boot.
 - Confirm production image is unchanged by this sprint (Sprint 12 remains responsible for stripping debug tools).
 
@@ -203,7 +205,7 @@ Create `/usr/bin/playos-ssh-bringup` in the rootfs overlay:
 | Evidence | How it is produced |
 |---|---|
 | USB NIC appears | `/sys/class/net` shows an `eth*`/`en*` interface |
-| DHCP lease | `dhcpcd` log shows an IPv4 address assigned |
+| DHCP lease | `udhcpc` log shows an IPv4 address assigned |
 | SSH supervised | `playos-init` supervision log shows Dropbear as a child; `ps` shows it under PID 1 |
 | Key persistence | reboot without host-key regeneration; existing `authorized_keys` still works |
 | Login works | `ssh -i <devkey> root@<ip>` succeeds |
@@ -219,7 +221,7 @@ Create `/usr/bin/playos-ssh-bringup` in the rootfs overlay:
 - [ ] Dropbear host keys persist across reboots under `/data/ssh`
 - [ ] `authorized_keys` persists under `/data/ssh` and survives reboot
 - [ ] `playos-init` supervises the SSH bring-up as a trusted daemon
-- [ ] QEMU boot with a NIC reaches a DHCP lease and SSH login
+- [x] QEMU boot with a NIC reaches a DHCP lease and SSH login
 - [ ] No Wi-Fi or `wpa_supplicant` code is introduced in this sprint
 - [ ] Games and existing shell/audio/input behavior are unchanged
 
@@ -234,7 +236,7 @@ Sprint 12 (Security Hardening) may assume:
 
 Sprint 16 (`playos-net`) may assume:
 
-- The immediate wired debug path already uses `dhcpcd`, so Sprint 16 reuses the same client for the Wi-Fi interface instead of introducing a different DHCP stack.
+- The immediate wired debug path uses BusyBox `udhcpc` (because the default `dhcpcd` config is slirp-incompatible); Sprint 16 may standardize on `dhcpcd` for the Wi-Fi interface instead of introducing a different DHCP stack.
 - Sprint 16 adds Wi-Fi (`wpa_supplicant` + `playos-net`) on top of `dhcpcd`, without absorbing this sprint.
 
 ---
