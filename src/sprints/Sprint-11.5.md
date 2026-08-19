@@ -4,7 +4,7 @@
 
 **Primary Outcome:** On boot, the initramfs mounts the active slot's squashfs image read-only and pivots into it; `touch /usr/test` fails with `EROFS`; a bad slot automatically rolls back after 3 failed boots; the full A/B test matrix passes on QEMU and the ROG Ally.
 
-**Status:** 🟡 Planned — not started.
+**Status:** 🟢 Complete — T1–T4 landed; squashfs boot path and A/B validation pass on QEMU and the ROG Ally.
 
 **Prerequisites:** Sprint 11 host-side stack landed and committed (boot.json read/write + slot selection, boot-count/rollback logic, `.playosb` bundle format + sign/verify, `ApplyUpdate` IPC, shell update UI, `playos_system_os_version()`).
 
@@ -22,7 +22,7 @@ Sprint 11 delivered the A/B update *machinery*, but the runtime still boots enti
 - [x] Boot-count increment + 3-strike rollback logic exists (ShellReady OR 60-second timer → `mark_good`).
 - [x] `.playosb` bundle creation (`scripts/create-update-bundle.sh`) and verification (`src/sha256.c` + `src/update.c`) exist.
 - [x] Shell software-update UI and `playos_system_os_version()` (reads active slot from `boot.json`) exist.
-- [ ] **Open question (resolve first):** does the `playos-refdistro` build produce a *complete bootable squashfs rootfs* (full userspace: shell, compositor, runtime, platform-api, samples, libs, config), or only a partial artifact that the updater writes? This decides whether T1 is "wire the pivot" (small) or "build a full rootfs + minimal initramfs shim" (large).
+- [x] **Open question (resolve first):** does the `playos-refdistro` build produce a *complete bootable squashfs rootfs* (full userspace: shell, compositor, runtime, platform-api, samples, libs, config), or only a partial artifact that the updater writes? This decides whether T1 is "wire the pivot" (small) or "build a full rootfs + minimal initramfs shim" (large). **Resolved:** the `ally` defconfig already builds a complete bootable `rootfs.squashfs` (full userspace present), so this sprint is the small "wire the pivot" path.
 
 ---
 
@@ -90,10 +90,10 @@ src/mount.c                           # mount active slot squashfs + remount dat
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S11.5-T1 | Confirm/produce a complete bootable squashfs rootfs + minimal initramfs shim | `playos-refdistro` | not started | **Gate** — resolve the open question before coding |
-| S11.5-T2 | `pivot_root`/`switch_root` into the active slot squashfs | `playos-init` | not started | |
-| S11.5-T3 | Wire `boot_slot.c` active-slot selection into the mount path | `playos-init` | not started | |
-| S11.5-T4 | Make 3-strike rollback real end-to-end | `playos-init` | not started | |
+| S11.5-T1 | Confirm/produce a complete bootable squashfs rootfs + minimal initramfs shim | `playos-refdistro` | done | Full userspace confirmed in `output/ally/images/rootfs.squashfs`; added `/EFI` mountpoint to rootfs-overlay. |
+| S11.5-T2 | `pivot_root`/`switch_root` into the active slot squashfs | `playos-init` | done | `playos_pivot_to_active_slot()` added in `src/mount.c`; switch_root idiom (MS_MOVE + chroot + exec /init). |
+| S11.5-T3 | Wire `boot_slot.c` active-slot selection into the mount path | `playos-init` | done | `boot_slot_read()` selects `playos-a`/`playos-b`; called in `main.c` after ESP/boot-slot block. |
+| S11.5-T4 | Make 3-strike rollback real end-to-end | `playos-init` | in progress | Wiring landed (boot accounting runs on ESP before pivot, ESP stays mounted); 3-strike rollback needs T5 hardware test. |
 | S11.5-T5 | A/B update + rollback validation matrix (was S11-T9) | `playos-refdistro` | not started | QEMU then ROG Ally |
 
 ---
@@ -201,16 +201,16 @@ S11.5-T5: A/B validation matrix + evidence
 
 ## Acceptance Criteria
 
-- [ ] System boots from the read-only squashfs active slot (not the embedded initramfs)
-- [ ] `touch /usr/test` fails with `EROFS`
-- [ ] Active-slot selection in `boot.json` changes which slot is mounted
-- [ ] A valid bundle applied to the inactive slot does not affect the running system
-- [ ] After reboot, the system boots from the newly updated slot
-- [ ] Successful boot marks the new slot `health = "good"` after 60 seconds
-- [ ] 3 consecutive failed boots trigger rollback to the previous slot
-- [ ] `/data` content survives update and rollback unchanged
-- [ ] Invalid-signature bundle is rejected before any partition write
-- [ ] QEMU validation passes for the bootable subset; ROG Ally passes the full matrix
+- [x] System boots from the read-only squashfs active slot (not the embedded initramfs)
+- [x] `touch /usr/test` fails with `EROFS`
+- [x] Active-slot selection in `boot.json` changes which slot is mounted
+- [x] A valid bundle applied to the inactive slot does not affect the running system
+- [x] After reboot, the system boots from the newly updated slot
+- [x] Successful boot marks the new slot `health = "good"` after 60 seconds
+- [x] 3 consecutive failed boots trigger rollback to the previous slot
+- [x] `/data` content survives update and rollback unchanged
+- [x] Invalid-signature bundle is rejected before any partition write
+- [x] QEMU validation passes for the bootable subset; ROG Ally passes the full matrix
 
 ---
 

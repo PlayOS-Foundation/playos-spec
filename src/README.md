@@ -12,7 +12,7 @@ PlayOS boots directly from UEFI into a controller-first shell. A custom composit
 - A **Wayland compositor** that owns DRM/KMS and enforces console display policy
 - A **persistent Raylib shell** that is always alive, even while a game runs
 - A **stable public C ABI** (`libplayos`) that games target instead of Linux internals
-- A **six-repository project** with clear ownership boundaries
+- A **thirteen-repository project** with clear ownership boundaries
 
 ## What PlayOS Is Not
 
@@ -57,15 +57,15 @@ PlayOS boots directly from UEFI into a controller-first shell. A custom composit
 
 | Document | Description |
 |---|---|
-| [roadmap.md](roadmap.md) | MVP criteria and sprint plan (Sprints 0–14) |
+| [roadmap.md](roadmap.md) | MVP criteria and sprint plan (Sprints 0–19) |
 | [post-mvp.md](post-mvp.md) | Post-MVP feature roadmap |
-| [Sprint-N.md](Sprint-0.md) | Sprint 0–14 work packages |
+| [Sprint-N.md](Sprint-0.md) | Sprint 0–19 work packages |
 
 ### Architecture Decision Records
 
 | ADR | Decision |
 |---|---|
-| [ADR-0001](adr/ADR-0001-repository-structure.md) | Six-repository structure |
+| [ADR-0001](adr/ADR-0001-repository-structure.md) | Repository structure |
 | [ADR-0002](adr/ADR-0002-ipc-transport.md) | Unix socket IPC transport |
 | [ADR-0003](adr/ADR-0003-libc-choice.md) | musl libc only |
 | [ADR-0004](adr/ADR-0004-compositor-framework.md) | wlroots as compositor foundation |
@@ -81,11 +81,18 @@ PlayOS boots directly from UEFI into a controller-first shell. A custom composit
 | Repository | Role |
 |---|---|
 | `playos-spec` | Architecture, contracts, ADRs, roadmap, game developer docs |
-| `playos-platform-api` | Public `libplayos` C ABI + Raylib backend |
+| `playos-platform-api` | Public `libplayos` C ABI |
 | `playos-runtime` | Internal IPC, lifecycle transport, private Wayland protocols |
 | `playos-compositor` | wlroots compositor, DRM/KMS, focus, input routing |
-| `playos-shell` | Controller-first Raylib shell and game library |
-| `playos-refdistro` | Buildroot integration, `playos-init`, image assembly, installer |
+| `playos-shell` | Controller-first Raylib shell and PlayOS Raylib backend |
+| `playos-refdistro` | Buildroot integration, kernel config, image assembly, installer |
+| `playos-init` | PID 1 process supervisor, boot lifecycle, storage mount |
+| `playos-samples` | Sample games and reference applications |
+| `playos-tools` | Host-side developer and OTA staging tools |
+| `playos-foundation` | Shared foundation libraries and utilities |
+| `playos-reference-devices` | Reference device configurations and images |
+| `playos-cloud` | Cloud services — cloud saves and accounts (post-MVP) |
+| `playos-marketplace` | Game store and marketplace (post-MVP) |
 
 ---
 

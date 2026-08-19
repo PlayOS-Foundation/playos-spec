@@ -285,21 +285,21 @@ The installer runs as root inside the initramfs. Use `libfdisk` directly — do 
 
 ## Acceptance Criteria
 
-- [ ] Installer boots from USB and shows disk discovery screen
-- [ ] Only internal NVMe disks listed; USB boot device excluded
-- [ ] Disk model, size, and partition count shown correctly
-- [ ] Confirmation requires holding A for 3 seconds (no accidental erase)
-- [ ] B on confirmation returns to disk selection
-- [ ] Installation completes on clean NVMe without error
-- [ ] Progress bar reaches 100% and success screen appears
-- [ ] After USB removal and reboot: PlayOS boots from NVMe
-- [ ] Empty game library shown on first boot from internal disk
-- [ ] File written to `/data/` persists after restart
-- [ ] Manually installed game appears in shell after restart
-- [ ] Full factory reset leaves system bootable with empty valid data partition
-- [ ] Error screen shown if installation fails at any step (no terminal drop)
-- [ ] `make installer-image` produces a bootable installer USB image
-- [ ] CI passes (installer compiles; disk operations tested on QEMU loopback)
+- [x] Installer boots from USB and shows disk discovery screen
+- [x] Only internal NVMe disks listed; USB boot device excluded
+- [x] Disk model, size, and partition count shown correctly
+- [x] Confirmation requires holding A for 3 seconds (no accidental erase)
+- [x] B on confirmation returns to disk selection
+- [x] Installation completes on clean NVMe without error
+- [x] Progress bar reaches 100% and success screen appears
+- [x] After USB removal and reboot: PlayOS boots from NVMe
+- [x] Empty game library shown on first boot from internal disk
+- [x] File written to `/data/` persists after restart
+- [x] Manually installed game appears in shell after restart
+- [x] Full factory reset leaves system bootable with empty valid data partition
+- [x] Error screen shown if installation fails at any step (no terminal drop)
+- [x] `make installer-image` produces a bootable installer USB image
+- [x] CI passes (installer compiles; disk operations tested on QEMU loopback)
 
 ---
 

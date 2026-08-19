@@ -301,7 +301,7 @@ int playos_storage_atomic_replace(const char *src_path, const char *dst_path);
 int playos_storage_atomic_write(const char *path, const void *data, size_t len);
 ```
 
-**Isolation guarantee:** Each game receives paths scoped to its `game_id`. A game process cannot construct or access another game's save path through this API. Landlock enforcement (Sprint 12) backs this up at the OS level.
+**Isolation guarantee:** Each game receives paths scoped to its `game_id`. A game process cannot construct or access another game's save path through this API. Landlock enforcement (Sprint 12, not yet started) backs this up at the OS level.
 
 ---
 
@@ -426,7 +426,7 @@ The backend is an internal detail. Games always call the public API; the backend
 `playos-platform-api` may provide optional C++ wrappers and engine adapters:
 
 - `include/playos/playos.hpp` — C++ RAII wrappers and enum class aliases
-- `src/backends/rcore_playos.c` — Raylib platform backend
+- `src/backends/rcore_playos.c` — Raylib platform backend (lives in `playos-shell`, not `playos-platform-api`)
 - Future: Godot, SDL2 adapter headers
 
 These wrappers **must not replace the C ABI** as the source of truth. They are convenience layers built on top of it.

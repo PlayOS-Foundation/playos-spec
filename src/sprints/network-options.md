@@ -1,6 +1,6 @@
 # Networking Options — Wi-Fi & Bluetooth
 
-> **Status:** Design analysis (pre-ADR). Networking and Bluetooth are **post-MVP** — no sprint in the 0–15 plan delivers them.
+> **Status:** Design analysis (pre-ADR). Networking (Wi-Fi) is scoped as [Sprint 16](Sprint-16.md) (post-MVP); Bluetooth remains post-MVP with no sprint.
 > **Cross-references:** [roadmap.md](roadmap.md) §Post-MVP, [post-mvp.md](../post-mvp.md), [architecture.md](../architecture.md) §14, [runtime-ipc.md](../runtime-ipc.md), [kernel-config.md](../kernel-config.md), [security-model.md](../security-model.md) §11
 
 ---
@@ -155,6 +155,6 @@ CONFIG_BT_RFCOMM=y          # HID profile
 - **Wi-Fi:** Option B — `wpa_supplicant` (D-Bus-free) + `dhcpcd` + a trusted `playos-net` bridge. It lands networking with zero D-Bus and zero BusyBox, fully consistent with the existing IPC model.
 - **Bluetooth:** defer. When it lands, introduce a private `dbus-broker` scoped to the trusted zone for BlueZ — the one subsystem that genuinely requires D-Bus.
 
-**Open decision:** `post-mvp.md` currently specifies `iwd` as the Wi-Fi stack. Choosing Option B requires updating that stack (and ideally capturing the decision as a new ADR, e.g. "ADR-0009 — Wi-Fi stack: wpa_supplicant over iwd to avoid D-Bus").
+**Decision:** Option B — `wpa_supplicant` (D-Bus-free) + `dhcpcd` + a trusted `playos-net` bridge — is the chosen Wi-Fi stack, decomposed as [Sprint 16](Sprint-16.md). A formal ADR is still recommended (e.g. "ADR-0009 — Wi-Fi stack: wpa_supplicant over iwd to avoid D-Bus").
 
 **Work package:** the chosen stack is decomposed as **[Sprint 16 — `playos-net`](Sprint-16.md)**.

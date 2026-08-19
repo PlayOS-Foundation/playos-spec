@@ -65,6 +65,7 @@ CONFIG_MSDOS_PARTITION=y    # for USB drives
 CONFIG_VFAT_FS=y            # ESP (FAT32)
 CONFIG_EXT4_FS=y            # Data partition
 CONFIG_EXT4_USE_FOR_EXT2=y
+CONFIG_SQUASHFS=y           # Read-only system root (A/B squashfs slots)
 # CONFIG_XFS_FS is not needed
 # CONFIG_BTRFS_FS is not needed
 ```

@@ -1,6 +1,6 @@
 # PlayOS Security Model
 
-> **Cross-references:** [architecture.md](architecture.md) §13–15, [runtime-ipc.md](runtime-ipc.md) §3, [Sprint-12.md](Sprint-12.md)
+> **Cross-references:** [architecture.md](architecture.md) §13–15, [runtime-ipc.md](runtime-ipc.md) §3, [sprints/Sprint-12.md](sprints/Sprint-12.md)
 
 ---
 
@@ -111,7 +111,7 @@ A normal game **must not** be able to:
 
 ### System partition (`/`)
 - Mounted read-only via `MS_RDONLY` (Sprint 11)
-- dm-verity hash tree appended to system image (Sprint 12+)
+- dm-verity hash tree appended to system image (Sprint 12+ — planned, not yet implemented)
 - Any write attempt returns `EROFS`
 
 ### Data partition (`/data`)
@@ -205,7 +205,7 @@ Requires Linux ≥ 5.13 (ROG Ally ships with kernels that support this). Falls b
 | `/data/games/<game-id>/` | Read-only |
 | `/data/saves/<game-id>/` | Read + write + create + remove |
 | `/data/cache/<game-id>/` | Read + write + create + remove |
-| `/run/playos/wayland-0` (Wayland socket) | Connect (execute) |
+| `/run/playos/playos-0` (Wayland socket) | Connect (execute) |
 | `/dev/dri/renderD*` | Read (for EGL) |
 | `/dev/urandom`, `/dev/random` | Read |
 | `/proc/self/` | Read-only |
@@ -309,7 +309,7 @@ If Secure Boot verification fails:
 | Feature | Development image | Production image |
 |---|---|---|
 | BusyBox shell | ✅ Present | ❌ Absent |
-| SSH daemon | ✅ (post-network sprint) | ❌ Absent |
+| SSH daemon | ❌ (planned post-network sprint) | ❌ Absent |
 | `gdbserver`, `strace` | ✅ Present | ❌ Absent |
 | Serial console | ✅ Enabled | ✅ Enabled (needed for recovery) |
 | dm-verity | Optional | ✅ Required |

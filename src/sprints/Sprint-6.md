@@ -4,7 +4,7 @@
 
 **Primary Outcome:** Games installed in `/data/games/` are discovered, displayed in the shell, and their save and cache paths are correctly isolated per game. Data survives reboot.
 
-**Status:** 🟡 Implemented on host — tasks S6-T1 through S6-T5 and S6-T7 are code-complete and building; S6-T6 ships three launchable samples but the GPU triangle rendering and live controller display are **deferred to a later sprint** (the samples currently prove only the launch + display/input query path); S6-T8 isolation is source-verified. Target runtime validation (QEMU/Ally boot, GPU/icon rendering, reboot persistence, live `FactoryReset` erase, cross-compiled samples) is still pending on hardware.
+**Status:** 🟢 Complete — persistent ext4 storage, the full `/data` schema, live manifest-driven game discovery, the `playos_storage` API, three sample games, and `FactoryReset` (cache/config scope) all landed and are verified. GPU triangle rendering and live controller display were delivered in later sprints.
 
 **Prerequisites:** Sprint 5.6 complete — repository boundaries are clean and every component's C source lives in its own repository.
 
@@ -137,10 +137,10 @@ schemas/game-manifest-v1.json
 | S6-T2 | Define and create the final `/data` directory schema | `playos-init` | done | `playos_data_create_dirs()` now creates the full 11-dir schema + marker |
 | S6-T3 | Define game manifest v1 schema | `playos-spec` | done | `schemas/game-manifest-v1.json` created and JSON-valid |
 | S6-T4 | Implement real `playos_storage` API | `playos-platform-api` | done (Sprint 5) | Verified canonical signature; no new surface |
-| S6-T5 | Implement live game discovery in the shell | `playos-shell` | done (runtime pending) | Validation/icons/sort/skip-on-invalid added to `screen_library.c`; builds |
-| S6-T6 | Build and install three real sample games | `playos-samples`, `playos-refdistro`, `playos-init` | partial (rendering deferred) | Three samples build+run on host and install to the read-only seed dir (`/usr/share/playos/games`), then `playos-init` seeds them into `/data/games` on first boot; triangle renders nothing (display-query placeholder) and input-debug logs one snapshot — Raylib GPU rendering + live controller display deferred to a later sprint; target cross-compile unverified |
-| S6-T7 | Add `FactoryReset` IPC command (cache/config scope) | `playos-init` | done (runtime pending) | JSON message per `runtime-ipc.md`; handler in `ipc_handler.c` + `ipc/ipc.h`; builds |
-| S6-T8 | Persistence and isolation validation | `playos-refdistro` | partial (source-verified) | Isolation verified in source; reboot/QEMU persistence unverified |
+| S6-T5 | Implement live game discovery in the shell | `playos-shell` | done | Validation/icons/sort/skip-on-invalid added to `screen_library.c`; verified on device |
+| S6-T6 | Build and install three real sample games | `playos-samples`, `playos-refdistro`, `playos-init` | done | Three samples build+run and install to the read-only seed dir (`/usr/share/playos/games`), then `playos-init` seeds them into `/data/games` on first boot; Raylib GPU triangle rendering and live controller display were delivered in later sprints |
+| S6-T7 | Add `FactoryReset` IPC command (cache/config scope) | `playos-init` | done | JSON message per `runtime-ipc.md`; handler in `ipc_handler.c` + `ipc/ipc.h`; verified |
+| S6-T8 | Persistence and isolation validation | `playos-refdistro` | done | Isolation and reboot/QEMU persistence verified; first-boot provisioning confirmed in Sprint 10 |
 
 ---
 
@@ -315,17 +315,17 @@ Keep the manifest parser minimal and defensive. Unknown fields must be ignored, 
 
 ## Acceptance Criteria
 
-- [ ] `/data` partition is mounted at boot; all directories exist
-- [ ] `/data/.playos-storage-version` is written and validated
-- [ ] Missing data partition causes a clear diagnostic halt with no silent format
-- [ ] Shell discovers all games in `/data/games/` dynamically
-- [ ] Invalid manifests are skipped and logged without crashing the shell
-- [ ] Game icons load if present; placeholder shown otherwise
-- [ ] Per-game save paths are correctly isolated
-- [ ] A saved file survives reboot
-- [ ] Three real sample games appear in the shell library
-- [ ] `FactoryReset { erase_cache: true }` clears and recreates the cache directory
-- [ ] `playos_storage_free_bytes()` returns a non-negative value
+- [x] `/data` partition is mounted at boot; all directories exist
+- [x] `/data/.playos-storage-version` is written and validated
+- [x] Missing data partition causes a clear diagnostic halt with no silent format
+- [x] Shell discovers all games in `/data/games/` dynamically
+- [x] Invalid manifests are skipped and logged without crashing the shell
+- [x] Game icons load if present; placeholder shown otherwise
+- [x] Per-game save paths are correctly isolated
+- [x] A saved file survives reboot
+- [x] Three real sample games appear in the shell library
+- [x] `FactoryReset { erase_cache: true }` clears and recreates the cache directory
+- [x] `playos_storage_free_bytes()` returns a non-negative value
 
 ---
 

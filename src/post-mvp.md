@@ -12,8 +12,9 @@ Each item is listed with its motivation, dependencies, and rough priority tier.
 These features are most commonly requested and have direct dependencies on shipped MVP components.
 
 ### Wi-Fi (`playos-net`)
+**Sprint:** [Sprint 16](sprints/Sprint-16.md) (`playos-net`)
 **Motivation:** Users need network access for future store downloads, cloud saves, and updates.  
-**Stack:** `iwd` (iNet Wireless Daemon) — minimal, no NetworkManager  
+**Stack:** `wpa_supplicant` + `dhcpcd` (D-Bus-free) via a trusted `playos-net` bridge — no NetworkManager, no iwd  
 **Scope:** Connect to WPA2/WPA3 networks; Wi-Fi settings screen in shell  
 **Depends on:** Networking enabled in kernel config (deferred in MVP)  
 **Options:** See [networking options](sprints/network-options.md) for the D-Bus trade-off and the D-Bus-free `wpa_supplicant` alternative.
@@ -104,11 +105,18 @@ These features are most commonly requested and have direct dependencies on shipp
 **Depends on:** AMD DC VRR support stable in chosen kernel version
 
 ### Game Developer SDK (`playos-sdk`)
+**Sprint:** [Sprint 15](sprints/Sprint-15.md) (Game Developer SDK)
 **Motivation:** Third parties can't build a PlayOS game today without running Buildroot. The game ABI requires musl (not glibc) and links the musl builds of `libplayos` (and `libraylib`), which only exist inside the Buildroot tree. A self-contained SDK lets developers compile on a regular x86_64 Ubuntu host and ship a runnable game.  
 **Stack:** Prebuilt `x86_64-buildroot-linux-musl` toolchain + `libplayos`/`libraylib` headers and static libs + a CMake toolchain file / `pkg-config` files. An Alpine Linux (musl-only) base image is a natural foundation: it already emits musl binaries natively, so the SDK only needs to add `libplayos`/`libraylib`.  
 **Scope:** Downloadable tarball (or container image) that turns standard `gcc`/`cmake` on an x86_64 Ubuntu host into a single `bin/game` + `manifest.json` + `assets/` artifact. Binary must be musl-linked (static where possible) and target x86_64.  
 **Testing story:** Because graphics/input/audio come from raylib (already cross-platform) and only the thin `libplayos` surface is PlayOS-specific, the SDK should expose three build profiles so developers can test without hardware: (1) `device` — musl + `PLATFORM_PLAYOS` raylib backend + real `libplayos` (evdev), the shipped artifact; (2) `desktop` — native `gcc` + raylib's default desktop backend (X11/Wayland on Linux, Win32/GLFW on Windows) + a host `libplayos` shim that maps keyboard/gamepad to the controller ABI and no-ops lifecycle, so the game runs in a normal desktop window; (3) `emulator` — run the device build inside the PlayOS QEMU/container image for high-fidelity testing. The `libplayos` `stub` backend (`PLAYOS_BACKEND=stub`) already exists as the seed for the desktop shim.  
 **Depends on:** Versioned public Platform API (MVP); stable game ABI (Raylib backend + `libplayos` ABI)
+
+### C# Shell Reimplementation (Investigation)
+**Motivation:** Assess whether re-implementing `playos-shell` in C# would reduce memory-safety/manual-parsing risk and speed UI iteration.  
+**Status:** Assessment only — **not** a planned feature direction. The default recommendation is to *not* pursue a C# rewrite; only a bounded host-only de-risking spike is documented.  
+**Decisive factors:** .NET-on-musl/NativeAOT risk (ADR-0003), Buildroot toolchain effort, and loss of the single Raylib backend (`rcore_playos.c`, ADR-0006).  
+**Sprint:** [Sprint 18](sprints/Sprint-18.md)
 
 ---
 
@@ -130,6 +138,13 @@ These features are most commonly requested and have direct dependencies on shipp
 **Format:** Signed archive with: `manifest.json`, binary, assets, content hash tree  
 **Replaces:** Plain directory installs  
 **Depends on:** Manifest signing (Sprint 12 foundations)
+
+### Marketplace (`playos-marketplace`)
+**Motivation:** A content-economy layer for publishing, discovering, installing, and updating PlayOS applications, games, themes, and developer content; multiple store sources (official, community, OEM, private, LAN) rather than a single hard-coded store.  
+**Assessment:** See [Sprint 19 — Marketplace Assessment](sprints/Sprint-19.md). The repo is currently an empty stub; its docs reference "Part X — Package Format" and "Part XI — Cloud and Marketplace" in the spec, which do not yet exist. This is **spec-blocked**, not code-blocked.  
+**Package format:** `.gpk` (canonical in `playos-marketplace/AGENTS.md`; reconcile with the historical `.play` name below before implementation).  
+**V1 boundary:** Free-content catalog and install only — no payments, DRM, or entitlement enforcement.  
+**Depends on:** Wi-Fi (`playos-net`), SDK (Sprint 15), manifest signing (Sprint 12), atomic-install pattern (Sprint 11), and the missing Part X/Part XI spec chapters.
 
 ### Delta Updates (Games and System)
 **Motivation:** Reduce download size for incremental game and system updates  

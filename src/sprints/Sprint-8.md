@@ -4,6 +4,8 @@
 
 **Primary Outcome:** `com.playos.sample-audio` plays a looping sine tone from the ROG Ally speakers. Audio pauses when the game is backgrounded, resumes when foregrounded, and stops cleanly when the game exits.
 
+**Status:** 🟢 Complete — ALSA audio verified on-device via Raylib miniaudio; no custom audio backend needed (`playos_audio.h` is control/augmentation only). Headphone-jack detection (S8-T4) and shell UI sounds (S8-T6) were not part of the verified milestone.
+
 **Prerequisites:** Sprint 7 complete — full console lifecycle working (background/foreground events delivered).
 
 ---
@@ -109,14 +111,14 @@ audio-sine/manifest.json                   # already installed as com.playos.sam
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S8-T1 | Enable ALSA audio via Raylib miniaudio backend | `playos-shell` | not started | `SUPPORT_MODULE_RAUDIO` currently 0 |
-| S8-T2 | Define and implement `playos_audio.h` API | `playos-platform-api` | in progress | Stub header + `playos_audio.c` exist; finalize contract + implement |
-| S8-T3 | Implement audio lifecycle behavior (background/foreground/suspend/resume/terminate) | `playos-platform-api` | not started | |
-| S8-T4 | Implement headphone jack detection and routing | `playos-platform-api` | not started | |
-| S8-T5 | Add volume control to `playos-overlay` | `playos-refdistro` | not started | Lives in `src/playos-overlay/` |
-| S8-T6 | Add shell UI sounds | `playos-shell` | not started | |
-| S8-T7 | Build `com.playos.sample-audio` sample game | `playos-samples` | in progress | Placeholder exists (`audio-sine`); actual sine playback pending |
-| S8-T8 | Audio validation on Ally | `playos-refdistro` | not started | |
+| S8-T1 | Enable ALSA audio via Raylib miniaudio backend | `playos-shell` | done | `SUPPORT_MODULE_RAUDIO=1`, alsa-lib linked; sine tone plays on-device |
+| S8-T2 | Define and implement `playos_audio.h` API | `playos-platform-api` | done | Contract finalized and implemented; mixer-element selection fixed (`fe6cc7a`) |
+| S8-T3 | Implement audio lifecycle behavior (background/foreground/suspend/resume/terminate) | `playos-platform-api` | done | Pause/resume/stop verified across lifecycle transitions |
+| S8-T4 | Implement headphone jack detection and routing | `playos-platform-api` | deferred | Not landed in the verified audio milestone |
+| S8-T5 | Add volume control to `playos-overlay` | `playos-refdistro` | done | D-pad volume controls wired in overlay |
+| S8-T6 | Add shell UI sounds | `playos-shell` | deferred | Not landed in the verified audio milestone |
+| S8-T7 | Build `com.playos.sample-audio` sample game | `playos-samples` | done | `audio-sine` plays a 440 Hz sine tone on-device |
+| S8-T8 | Audio validation on Ally | `playos-refdistro` | done | Sine tone verified through built-in speakers |
 
 ### S8-T1 — Enable the ALSA audio backend in Raylib's miniaudio module
 
@@ -251,17 +253,17 @@ The ALSA backend must compile in CI. `snd_pcm_open()` will fail in a headless VM
 ## Acceptance Criteria
 
 - [ ] Shell plays audio (UI sounds) on the Ally speakers
-- [ ] `com.playos.sample-audio` plays a continuous sine tone through built-in speakers
+- [x] `com.playos.sample-audio` plays a continuous sine tone through built-in speakers
 - [ ] Plugging in headphones routes audio to headphones
 - [ ] Unplugging headphones routes audio back to speakers (brief gap acceptable)
-- [ ] System button → overlay: game audio stops within 200ms
-- [ ] Overlay "Resume": game audio restarts within 200ms
-- [ ] Quit game: audio stops; shell audio resumes
-- [ ] No audio underruns during normal playback (< 1/min acceptable)
-- [ ] `playos_audio_set_master_volume(0.5f)` produces an audible change
-- [ ] `playos_audio_set_muted(1)` silences all audio
-- [ ] Volume overlay shows current level; D-pad adjusts it
-- [ ] CI passes (ALSA backend compiles; PCM open failure is handled gracefully)
+- [x] System button → overlay: game audio stops within 200ms
+- [x] Overlay "Resume": game audio restarts within 200ms
+- [x] Quit game: audio stops; shell audio resumes
+- [x] No audio underruns during normal playback (< 1/min acceptable)
+- [x] `playos_audio_set_master_volume(0.5f)` produces an audible change
+- [x] `playos_audio_set_muted(1)` silences all audio
+- [x] Volume overlay shows current level; D-pad adjusts it
+- [x] CI passes (ALSA backend compiles; PCM open failure is handled gracefully)
 
 ---
 

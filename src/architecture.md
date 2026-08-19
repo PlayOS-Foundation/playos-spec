@@ -89,8 +89,14 @@ Persistent Data Partition (/data)
 | `playos-platform-api` | Public `libplayos` C ABI, C++ wrappers, engine adapters |
 | `playos-runtime` | Internal IPC, lifecycle transport, private Wayland protocols, OS integration |
 | `playos-compositor` | wlroots compositor, DRM/KMS, surface/focus/input policy |
-| `playos-shell` | Raylib controller-first shell and trusted UX |
-| `playos-refdistro` | Buildroot integration, kernel config, image assembly |
+| `playos-shell` | Controller-first Raylib shell and PlayOS Raylib backend |
+| `playos-refdistro` | Buildroot integration, kernel config, image assembly, installer |
+| `playos-samples` | Sample games and reference applications |
+| `playos-tools` | Host-side developer and OTA staging tools |
+| `playos-foundation` | Shared foundation libraries and utilities |
+| `playos-reference-devices` | Reference device configurations and images |
+| `playos-cloud` | Cloud services — cloud saves and accounts (post-MVP) |
+| `playos-marketplace` | Game store and marketplace (post-MVP) |
 
 **Dependency direction:**
 

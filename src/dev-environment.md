@@ -59,6 +59,8 @@ qemu-system-x86_64 \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_VARS.fd \
   -drive file=${BUILD}/images/playos-esp.img,format=raw,if=none,id=esp \
   -device nvme,drive=esp,serial=playos-esp \
+  -drive file=${BUILD}/images/system.img,format=raw,if=none,id=system \
+  -device nvme,drive=system,serial=playos-a \
   -drive file=${BUILD}/images/data.img,format=raw,if=none,id=data \
   -device nvme,drive=data,serial=playos-data \
   -device virtio-gpu \
@@ -73,6 +75,21 @@ qemu-system-x86_64 \
 ```
 
 **Important:** Always boot via OVMF (not `-kernel`). The UEFI boot path must be validated, not bypassed.
+
+### QEMU virtual system slot
+
+The active system slot is the read-only squashfs root produced by `make qemu-build`
+(`build/qemu/images/rootfs.squashfs`). Wrap it as a raw image so `playos-init` can
+mount it read-only and pivot into it:
+
+```bash
+# Create the system-slot image
+make qemu-create-system-disk    # or:
+dd if=build/qemu/images/rootfs.squashfs of=build/qemu/images/system.img bs=1M
+```
+
+`playos-init` mounts this read-only as the active slot (`playos-a`) and pivots into it
+(Sprint 11.5).
 
 ### QEMU virtual data disk
 

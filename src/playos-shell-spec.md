@@ -3,7 +3,7 @@
 > **Repository:** `playos-shell`  
 > **Role:** Persistent controller-first console UI; trusted Wayland client  
 > **Language:** C (Raylib)  
-> **Cross-references:** [architecture.md](architecture.md) §7.3, [platform-api.md](platform-api.md), [Sprint-5.md](Sprint-5.md), [Sprint-6.md](Sprint-6.md)
+> **Cross-references:** [architecture.md](architecture.md) §7.3, [platform-api.md](platform-api.md), [sprints/Sprint-5.md](sprints/Sprint-5.md), [sprints/Sprint-6.md](sprints/Sprint-6.md)
 
 ---
 
@@ -44,7 +44,7 @@ Library Screen (restored position)
 ```
 
 Additional screens:
-- **Settings Screen** — display brightness (live control via platform-api backlight), audio (deferred), system info, update check
+- **Settings Screen** — display brightness (live control via platform-api backlight), audio, system info, update check
 - **System Update Screen** — current version, download/apply progress
 
 ---

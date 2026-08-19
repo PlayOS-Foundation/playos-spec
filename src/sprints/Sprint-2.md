@@ -68,8 +68,8 @@ Sprint 2 proves the graphics session model before any ROG Ally-specific DRM work
 | Repo | Required work | Status |
 |---|---|---|
 | `playos-compositor` | Implement the wlroots compositor skeleton and test client | ✅ Done |
-| `playos-runtime` | Maintain the private protocol XML and scanner-generated glue | ⚠️ Protocol XML exists; Buildroot package is still a Sprint 0 stub |
-| `playos-refdistro` | Add Buildroot packaging and dependencies for wlroots and the compositor | ✅ Done; QEMU build in progress |
+| `playos-runtime` | Maintain the private protocol XML and scanner-generated glue | ✅ Done — protocol XML staged in Buildroot (Sprint 2.5) |
+| `playos-refdistro` | Add Buildroot packaging and dependencies for wlroots and the compositor | ✅ Done; QEMU build passed |
 | `playos-spec` | Clarify protocol or backend strategy if implementation exposes gaps | ✅ This document |
 
 ---
@@ -217,7 +217,7 @@ BR2_PACKAGE_MESA3D_OPENGL_ES=y
 ## Acceptance Criteria
 
 - [x] `playos-compositor` builds cleanly against wlroots *(host: wlroots 0.17.1, 0 warnings)*
-- [ ] the compositor starts under `playos-init` *(awaiting QEMU boot test)*
+- [x] the compositor starts under `playos-init` *(QEMU boot verified — Sprint 2.5)*
 - [x] a Wayland socket is created and passed to child clients *(host: wayland-N socket verified)*
 - [x] the compositor signals readiness before trusted client launch *(readiness file mechanism implemented)*
 - [x] a test client connects and maps one fullscreen surface *(host: playos-test-client verified)*
@@ -225,7 +225,7 @@ BR2_PACKAGE_MESA3D_OPENGL_ES=y
 - [x] the compositor can run in nested Wayland mode for developer iteration *(nested test implemented; requires running Wayland session)*
 - [x] the private `playos-v1.xml` skeleton is generated with `wayland-scanner` *(generated in build)*
 - [x] Buildroot packages and image integration work end-to-end *(QEMU build verified — Spr 2.5)*
-- [ ] QEMU headless validation remains automated *(awaiting successful QEMU build+boot)*
+- [x] QEMU headless validation remains automated *(QEMU build+boot verified — Sprint 2.5)*
 
 ---
 
@@ -257,9 +257,9 @@ BR2_PACKAGE_MESA3D_OPENGL_ES=y
 
 Sprint 3 may assume:
 
-- a functioning compositor binary already exists *(host: yes; Buildroot: awaiting QEMU build)*
+- a functioning compositor binary already exists *(host: yes; Buildroot: yes)*
 - `playos-init` can supervise and wait for compositor readiness ✅
-- a stable Wayland session bootstrap exists in QEMU/dev environments *(host: yes; QEMU: TBD)*
+- a stable Wayland session bootstrap exists in QEMU/dev environments *(host: yes; QEMU: yes)*
 - the private protocol XML is available and build-integrated ✅
 
 Sprint 3 must focus on physical hardware bring-up, not rebuild the software session model from scratch.
@@ -270,6 +270,6 @@ Sprint 3 must focus on physical hardware bring-up, not rebuild the software sess
 
 `playos-compositor` starts under `playos-init`, creates a Wayland session, signals readiness, and renders a fullscreen test client in headless QEMU and nested developer mode.
 
-**Current status:** All host-build criteria met. QEMU Buildroot end-to-end build in progress — blocked on wlroots 0.20 API compatibility verification. Once QEMU build completes and boots, all acceptance criteria will be satisfied.
+**Current status:** Complete — all acceptance criteria met (QEMU Buildroot build and boot verified in Sprint 2.5).
 
 *Previous: [Sprint 1](Sprint-1.md) | Next: [Sprint 3](Sprint-3.md)*

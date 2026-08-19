@@ -24,7 +24,7 @@ src/
 ├── post-mvp.md                 ← Post-MVP feature backlog
 ├── sprints/
 │   ├── roadmap.md              ← MVP criteria and sprint table
-│   └── Sprint-0.md … Sprint-14.md
+│   └── Sprint-0.md … Sprint-19.md
 └── adr/
     └── ADR-0001.md … ADR-0008.md
 ```

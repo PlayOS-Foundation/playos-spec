@@ -110,7 +110,7 @@ Runs the compositor in QEMU with a headless backend and verifies the Wayland ses
 ```bash
 # In the booted QEMU image (via serial or QEMU monitor):
 # Verify Wayland socket exists
-ls -la /run/playos/wayland-0
+ls -la /run/playos/playos-0
 
 # Verify compositor state via IPC
 playos-ctl query-status
@@ -121,7 +121,7 @@ ps | grep playos-shell
 ```
 
 **Checks:**
-- `/run/playos/wayland-0` socket exists
+- `/run/playos/playos-0` socket exists
 - `QueryStatus` returns `compositor_state=SHELL_FOREGROUND`
 - `playos-shell` process is running
 - No segfaults in compositor or shell logs
@@ -239,7 +239,7 @@ Run on release candidates and nightly builds.
 
 ### `playos-ctl` — IPC test client
 
-A development-only CLI tool (in `playos-refdistro/src/tools/`) that wraps the control IPC:
+A development-only CLI tool (in `playos-tools`) that wraps the control IPC:
 
 ```
 playos-ctl launch <game-id>

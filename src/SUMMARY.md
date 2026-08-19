@@ -50,16 +50,21 @@
 - [Sprint 7 — Game Launch, Lifecycle, System Button, and Overlay](sprints/Sprint-7.md)
 - [Sprint 8 — ALSA Audio](sprints/Sprint-8.md)
 - [Sprint 9 — Power, Battery, Thermal, and Suspend Foundations](sprints/Sprint-9.md)
+- [Sprint 9.5 — Display Brightness Control](sprints/Sprint-9.5.md)
 - [Sprint 10 — Installer and Internal-Disk Deployment](sprints/Sprint-10.md)
 - [Sprint 11 — Immutable Images and A/B Updates](sprints/Sprint-11.md)
+- [Sprint 11.5 — Pivot-to-Squashfs Boot and A/B Validation](sprints/Sprint-11.5.md)
 - [Sprint 12 — Security Hardening](sprints/Sprint-12.md)
 - [Sprint 13 — Intel Expansion](sprints/Sprint-13.md)
 - [Sprint 14 — Production Readiness](sprints/Sprint-14.md)
 - [Sprint 15 — Game Developer SDK](sprints/Sprint-15.md)
 - [Sprint 16 — `playos-net` (Wi-Fi)](sprints/Sprint-16.md)
 - [Sprint 17 — Touch Input + On-Screen Keyboard (OSK)](sprints/Sprint-17.md)
+- [Sprint 18 — C# Shell Reimplementation Assessment (Post-MVP Spike)](sprints/Sprint-18.md)
+- [Sprint 19 — Marketplace Assessment (Post-MVP)](sprints/Sprint-19.md)
 - [Post-MVP Features](post-mvp.md)
 - [Networking Options — Wi-Fi & Bluetooth](sprints/network-options.md)
+- [ROG Ally Input Handling](sprints/input-handling.md)
 
 ---
 

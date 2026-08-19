@@ -3,7 +3,7 @@
 > **Repository:** `playos-overlay` (or future multi-surface backend in `playos-shell`)  
 > **Role:** Trusted system overlay — quick menu, notifications, power management UI  
 > **Language:** C (Raylib)  
-> **Cross-references:** [architecture.md](architecture.md) §7.4, §8.3, [wayland-protocol.md](wayland-protocol.md), [Sprint-7.md](Sprint-7.md)
+> **Cross-references:** [architecture.md](architecture.md) §7.4, §8.3, [wayland-protocol.md](wayland-protocol.md), [sprints/Sprint-7.md](sprints/Sprint-7.md)
 
 ---
 

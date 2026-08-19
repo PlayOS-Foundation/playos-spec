@@ -80,14 +80,10 @@ playos-refdistro/
 │   │   ├── playos-runtime/
 │   │   ├── playos-compositor/
 │   │   ├── playos-shell/
-│   │   ├── playos-overlay/
-│   │   └── raylib-playos/
+│   │   └── playos-overlay/
 │   └── patches/
 │       ├── linux/          kernel patches (minimize; prefer upstream)
-│       ├── wlroots/        wlroots patches if needed
-│       └── raylib/         Raylib PlayOS backend patches
-├── src/
-│   └── playos-init/        PID 1 source (built as a Buildroot package)
+│       └── wlroots/        wlroots patches if needed
 ├── protocols/              copy of playos-runtime Wayland protocol XML
 ├── scripts/                helper scripts
 ├── docs/ → ../             documentation (this file is one of them)
@@ -156,6 +152,7 @@ LINUX_VERSION=6.6.30
 LINUX_SOURCE=https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.6.30.tar.xz
 LINUX_SHA256=...
 
+PLAYOS_INIT_COMMIT=abc999...
 PLAYOS_PLATFORM_API_COMMIT=def456...
 PLAYOS_RUNTIME_COMMIT=ghi789...
 PLAYOS_COMPOSITOR_COMMIT=jkl012...
@@ -233,8 +230,9 @@ After `make qemu-build`:
 ```
 build/qemu/
 ├── images/
-│   ├── bzImage                    Linux kernel (fast dev)
-│   ├── rootfs.cpio.zst            Initramfs (fast dev)
+│   ├── bzImage                    Linux kernel
+│   ├── initramfs.cpio.zst         Minimal pivot initramfs (mounts squashfs active slot)
+│   ├── rootfs.squashfs            Read-only squashfs system root
 │   └── playos-esp.img             UEFI-bootable ESP image
 └── staging/                       Sysroot for cross-development
 ```

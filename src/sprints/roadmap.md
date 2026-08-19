@@ -54,6 +54,9 @@ The first meaningful PlayOS MVP is complete when all of the following are true o
 | [14](Sprint-14.md) | Production Readiness | Signed preview release with versioned public Platform API |
 | [15](Sprint-15.md) | Game Developer SDK | Self-contained `playos-sdk` (musl toolchain + `libplayos`/`libraylib`) with device/desktop/emulator testing |
 | [16](Sprint-16.md) | `playos-net` (Wi-Fi) | D-Bus-free Wi-Fi (`wpa_supplicant` + `dhcpcd` + `playos-net` bridge) driven through `playos-runtime` |
+| [17](Sprint-17.md) | Touch Input + On-Screen Keyboard (OSK) | Touch end-to-end (compositor → raylib backend) plus a reusable system OSK |
+| [18](Sprint-18.md) | C# Shell Reimplementation Assessment (Post-MVP Spike) | Feasibility assessment only — no C# shell implemented |
+| [19](Sprint-19.md) | Marketplace Assessment (Post-MVP) | Assessment and spec-first sequencing only — no marketplace code |
 
 ---
 
@@ -72,12 +75,10 @@ The first meaningful PlayOS MVP is complete when all of the following are true o
 Add only after the core console lifecycle is stable:
 
 - `playos-device` — hardware and power policy service
-- `playos-net` — Wi-Fi with iwd
 - Dropbear SSH — explicit Developer Mode only
 - `playos-update` — PlayOS wrapper around the update engine
-- OTA update delivery — `playos-tools` host helper (download + verify + stage to USB/SD) first, then on-device download after `playos-net`
+- OTA update delivery — `playos-tools` host helper (download + verify + stage to USB/SD) first, then on-device download after Sprint 16 (`playos-net`)
 - `playos-input` service — remapping, virtual gamepads, gyro, haptics
-- `playos-sdk` — game developer SDK (musl toolchain + `libplayos`/`libraylib` headers and libs) so third parties can build games on a regular x86_64 Linux host without Buildroot
 - Dedicated audio service — mixing, notifications over games
 - Bluetooth
 - Fast, fully qualified suspend/resume

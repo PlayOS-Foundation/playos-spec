@@ -20,7 +20,7 @@ The installer writes a GPT table with five partitions to the target fixed disk
 |---:|---|---|---|---|
 | 1 | `ESP` | 512 MiB | FAT32 | EFI System Partition; `EFI/BOOT/BOOTX64.EFI` |
 | 2 | `playos-a` | 4 GiB | squashfs (read-only) | Active system slot |
-| 3 | `playos-b` | 4 GiB | squashfs (read-only) | Inactive system slot (reserved, Sprint 11) |
+| 3 | `playos-b` | 4 GiB | squashfs (read-only) | Inactive system slot (A/B updates, Sprint 11.5) |
 | 4 | `misc` | 64 MiB | ext4 | A/B slot metadata (`/data/misc`-style state) |
 | 5 | `playos-data` | remainder | ext4 | Writable user data |
 
@@ -28,7 +28,7 @@ The installer writes a GPT table with five partitions to the target fixed disk
 GPT disk (internal NVMe/SATA)
 ├── Partition 1: ESP           512 MiB  FAT32     label "ESP"
 ├── Partition 2: playos-a      4 GiB    squashfs  label "playos-a"   (active slot)
-├── Partition 3: playos-b      4 GiB    squashfs  label "playos-b"   (reserved)
+├── Partition 3: playos-b      4 GiB    squashfs  label "playos-b"   (inactive slot)
 ├── Partition 4: misc          64 MiB   ext4      label "misc"       (A/B metadata)
 └── Partition 5: playos-data   remainder ext4     label "playos-data" (writable)
 ```
@@ -40,7 +40,7 @@ GPT disk (internal NVMe/SATA)
 - `playos-data` holds all user content: games, saves, cache, log, updates, config.
 - The installer never silently formats a disk; the user must explicitly confirm the
   target with a hold-to-confirm gesture.
-- Sprint 10 creates the slots; A/B update/rollback and dm-verity land in Sprint 11.
+- Sprint 10 creates the slots; A/B update/rollback landed in Sprint 11/11.5; dm-verity remains planned (Sprint 12+).
 
 ---
 

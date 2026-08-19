@@ -93,21 +93,22 @@ See [Partition Layout](partition-layout.md) for the full layout.
 
 ---
 
-## 6. Boot model caveat (Sprint 10)
+## 6. Boot model (Sprint 11.5)
 
-The installed system boots via the EFI-stub kernel and its embedded initramfs, exactly
-like the live USB. The on-disk `playos-a` squashfs is written and labelled but is
-**inert until Sprint 11** implements A/B slot mounting. In practice this means:
+The installed system boots via the EFI-stub kernel and its initramfs, which then mounts
+the active slot's read-only squashfs image (`playos-a` by default) and pivots into it
+(Sprint 11.5). In practice this means:
 
 - Removing the USB and booting from the internal ESP works now.
-- `/data` first-boot provisioning runs from the embedded initramfs as usual.
-- The `playos-a` squashfs becomes the booted read-only root in the Sprint 11 A/B path.
+- `/data` first-boot provisioning runs from the initramfs as usual.
+- The active-slot squashfs is the booted read-only root; the inactive slot (`playos-b`)
+  is used for A/B updates and rollback.
 
 ---
 
 ## 7. Future work
 
-- Sprint 11: A/B update/rollback, dm-verity, and booting the squashfs slot.
+- dm-verity integrity hardening (Sprint 12+).
 - Automatic installer triggering when a removable boot medium has no `playos-data`
   on an internal disk (currently the trigger is the explicit `playos.mode=install`
   command line only).

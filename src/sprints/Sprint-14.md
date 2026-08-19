@@ -33,7 +33,7 @@ All MVP features are implemented by the end of Sprint 13, but the project is not
 - **Compatibility policy:** minor versions are backward-compatible; a major version bump is breaking.
 - **Breaking-change process:** breaking changes after v0.1.0 require an RFC in `playos-spec`, an ADR, a major version bump, and a migration guide.
 - **Release trigger and tag:** the pipeline runs on a version tag push such as `v0.1.0`.
-- **Release artifacts:** `playos-v0.1.0-rog-ally-installer.img`, `playos-v0.1.0-rog-ally-update.raucb`, `playos-v0.1.0-sdk-headers.tar.gz`, plus SHA256 checksums and signatures.
+- **Release artifacts:** `playos-v0.1.0-rog-ally-installer.img`, `playos-v0.1.0-rog-ally-update.playosb`, `playos-v0.1.0-sdk-headers.tar.gz`, plus SHA256 checksums and signatures.
 - **Recovery rendering:** recovery must work without AMDGPU, using SimpleDRM or software rendering.
 - **Performance targets:** the baseline table below is the acceptance target; any metric more than 2× over target is a documented gap.
 
@@ -162,7 +162,7 @@ Add Doxygen comments to every public symbol across the seven public headers, gen
 
 ### S14-T4 — Implement the release pipeline
 
-Create `playos-refdistro/.github/workflows/release.yml`, triggered by a version tag push such as `v0.1.0`. The pipeline locks component versions in `versions.lock`, builds the production ROG Ally image (no debug tools, signed EFI artifact), builds the installer image, runs the QEMU boot test suite, verifies production lint, signs the EFI artifact and update bundle with the development key, and packages `installer.img`, `update.raucb`, and `sdk-headers.tar.gz` with SHA256 checksums and signatures before creating a GitHub Release.
+Create `playos-refdistro/.github/workflows/release.yml`, triggered by a version tag push such as `v0.1.0`. The pipeline locks component versions in `versions.lock`, builds the production ROG Ally image (no debug tools, signed EFI artifact), builds the installer image, runs the QEMU boot test suite, verifies production lint, signs the EFI artifact and update bundle with the development key, and packages `installer.img`, `update.playosb`, and `sdk-headers.tar.gz` with SHA256 checksums and signatures before creating a GitHub Release.
 
 **Done when:** pushing a test tag runs the pipeline end-to-end and produces all three artifacts plus checksums and a GitHub Release.
 
@@ -223,7 +223,7 @@ Confirm the production image ships without debug tools, the EFI artifact is sign
 | API fully documented | Doxygen output with zero undocumented public symbols |
 | Release pipeline works | CI log from a test tag produces installer, update bundle, and SDK tarball |
 | Installer boots a clean device | Physical install of `playos-v0.1.0-rog-ally-installer.img` on a clean ROG Ally |
-| Update applies via A/B | `update.raucb` applied through the A/B flow |
+| Update applies via A/B | `update.playosb` applied through the A/B flow |
 | MVP criteria met | Committed smoke-test report with all 19 criteria passing |
 | SDK usable by a second developer | Minimal game compiled from `sdk-headers.tar.gz` on a Linux host |
 | Recovery works | Boot into recovery from button hold and boot-count-exceeded; menu on SimpleDRM |
@@ -238,9 +238,9 @@ Confirm the production image ships without debug tools, the EFI artifact is sign
 - [ ] `libplayos` public headers are fully documented (Doxygen)
 - [ ] `PLAYOS_API_VERSION 1` defined; SONAME is `libplayos.so.0`
 - [ ] "Building Your First PlayOS Game" guide is complete and tested
-- [ ] Release pipeline produces signed `installer.img` and `update.raucb` from a tag push
+- [ ] Release pipeline produces signed `installer.img` and `update.playosb` from a tag push
 - [ ] `playos-v0.1.0-rog-ally-installer.img` installs successfully on a clean ROG Ally
-- [ ] `playos-v0.1.0-rog-ally-update.raucb` applies successfully via A/B update flow
+- [ ] `playos-v0.1.0-rog-ally-update.playosb` applies successfully via A/B update flow
 - [ ] SDK headers tarball compiles a minimal game on a Linux host
 - [ ] Recovery mode is reachable and shows the recovery menu without AMDGPU
 - [ ] Performance baseline documented; no metric is more than 2× over target

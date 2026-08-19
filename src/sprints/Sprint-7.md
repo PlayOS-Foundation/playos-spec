@@ -4,6 +4,8 @@
 
 **Primary Outcome:** A real game launches from the shell, runs with hardware acceleration, the System button surfaces the overlay, resume returns to the same running game, and both clean exit and crash return to the shell without any black screen or visible Linux prompt.
 
+**Status:** 🟢 Complete — full console lifecycle verified on ROG Ally: launch, overlay, background, resume, clean exit, and crash recovery.
+
 **Prerequisites:** Sprint 6 complete — persistent storage and game discovery working.
 
 ---
@@ -122,14 +124,14 @@ src/playos-overlay/
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S7-T1 | Implement full game launch flow in `playos-init` | `playos-init` | not started | |
-| S7-T2 | Implement full compositor state machine | `playos-compositor` | not started | |
-| S7-T3 | Implement system button intercept at seat level | `playos-compositor` | not started | |
-| S7-T4 | Build `playos-overlay` trusted Raylib client | `playos-refdistro` | not started | |
-| S7-T5 | Implement lifecycle fd delivery in platform-api | `playos-platform-api` | not started | |
-| S7-T6 | Finalize private Wayland protocol (overlay kept, game-launch removed) | `playos-runtime` | not started | |
-| S7-T7 | Implement game exit and crash recovery | `playos-compositor`, `playos-refdistro` | not started | |
-| S7-T8 | Integration and lifecycle validation on Ally | `playos-refdistro` | not started | |
+| S7-T1 | Implement full game launch flow in `playos-init` | `playos-init` | done | `GameStarted` emitted; launch env + lifecycle fd wired |
+| S7-T2 | Implement full compositor state machine | `playos-compositor` | done | All five states and transitions implemented |
+| S7-T3 | Implement system button intercept at seat level | `playos-compositor` | done | `PLAYOS_BUTTON_SYSTEM` intercepted at seat level; never delivered to games |
+| S7-T4 | Build `playos-overlay` trusted Raylib client | `playos-refdistro` | done | Raylib overlay UI builds and runs as trusted Wayland client |
+| S7-T5 | Implement lifecycle fd delivery in platform-api | `playos-platform-api` | done | `PLAYOS_LIFECYCLE_FD` delivered to games |
+| S7-T6 | Finalize private Wayland protocol (overlay kept, game-launch removed) | `playos-runtime` | done | `playos_overlay_v1` kept; `playos_game_launch_v1` removed |
+| S7-T7 | Implement game exit and crash recovery | `playos-compositor`, `playos-refdistro` | done | `GameExited`/`GameCrashed` emitted; returns safely to shell |
+| S7-T8 | Integration and lifecycle validation on Ally | `playos-refdistro` | done | End-to-end lifecycle verified on ROG Ally |
 
 ### S7-T1 — Implement full game launch flow in `playos-init`
 
@@ -324,20 +326,20 @@ While touching `playos-init` for S7-T1/S7-T7, remove the dead code that Sprint 6
 
 ## Acceptance Criteria
 
-- [ ] Selecting a game launches it; first-frame switch happens with no black flash
-- [ ] Game receives `PLAYOS_LIFECYCLE_FOREGROUND` at launch
-- [ ] System button press shows overlay above game (dim + overlay visible)
-- [ ] Game receives `PLAYOS_LIFECYCLE_BACKGROUND` on system button press
-- [ ] Overlay "Resume" returns to game; `PLAYOS_LIFECYCLE_FOREGROUND` delivered
-- [ ] Overlay "Quit" terminates game cleanly; shell shown
-- [ ] Clean exit returns to shell with library scroll position restored
-- [ ] `kill -9 <game_pid>` returns display to shell within 500ms; crash toast shown
-- [ ] Second launch attempt while game is running is rejected; first game unaffected
-- [ ] `PLAYOS_BUTTON_SYSTEM` never appears in any game client's input stream
-- [ ] Non-cooperative game receives `SIGSTOP` within 500ms of `BACKGROUND` event
-- [ ] Compositor state transitions are logged
-- [ ] Full 3-cycle lifecycle test passes without state leaks
-- [ ] CI passes
+- [x] Selecting a game launches it; first-frame switch happens with no black flash
+- [x] Game receives `PLAYOS_LIFECYCLE_FOREGROUND` at launch
+- [x] System button press shows overlay above game (dim + overlay visible)
+- [x] Game receives `PLAYOS_LIFECYCLE_BACKGROUND` on system button press
+- [x] Overlay "Resume" returns to game; `PLAYOS_LIFECYCLE_FOREGROUND` delivered
+- [x] Overlay "Quit" terminates game cleanly; shell shown
+- [x] Clean exit returns to shell with library scroll position restored
+- [x] `kill -9 <game_pid>` returns display to shell within 500ms; crash toast shown
+- [x] Second launch attempt while game is running is rejected; first game unaffected
+- [x] `PLAYOS_BUTTON_SYSTEM` never appears in any game client's input stream
+- [x] Non-cooperative game receives `SIGSTOP` within 500ms of `BACKGROUND` event
+- [x] Compositor state transitions are logged
+- [x] Full 3-cycle lifecycle test passes without state leaks
+- [x] CI passes
 
 ---
 

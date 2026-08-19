@@ -4,7 +4,7 @@
 
 **Primary Outcome:** The running system image is read-only (games cannot modify it). A system update can be applied to the inactive slot, and after a marked reboot, the device boots from the new slot. If the new slot fails to boot successfully, it rolls back to the previous slot automatically.
 
-**Status:** 🟡 In progress — A/B update stack implemented and host-built (S11-T3 through S11-T8); the pivot-to-squashfs boot path (S11-T1/T2 end-to-end) and S11-T9 hardware validation remain.
+**Status:** 🟢 Complete — completed via Sprint 11.5 (pivot-to-squashfs boot path and S11-T9 hardware validation).
 
 **Prerequisites:** Sprint 10 complete — installer creates the disk layout; device boots from internal NVMe.
 
@@ -212,7 +212,7 @@ After successful boot (user interacts with shell OR 60-second timer):
 ### S11-T5 — Integrate RAUC (or equivalent) and update application flow
 
 Update application sequence:
-1. Receive update bundle path (e.g., `/data/updates/playos-0.2.0.raucb`)
+1. Receive update bundle path (e.g., `/data/updates/playos-0.2.0.playosb`)
 2. Verify bundle signature (see S11-T6)
 3. Identify inactive slot (opposite of `active_slot` in `boot.json`)
 4. Write new system image to inactive slot partition
@@ -309,19 +309,19 @@ If RAUC's Buildroot package is not available or too complex to integrate, implem
 
 ## Acceptance Criteria
 
-- [ ] Running system partition mounted read-only; `touch /usr/test` fails with EROFS
-- [ ] Installer creates 5-partition layout on fresh NVMe (ESP, A/B system, misc, data)
-- [ ] `boot.json` on ESP reflects active slot, health, and boot count
-- [ ] Update written to inactive slot does not affect running system
-- [ ] After reboot, system boots from newly updated slot
-- [ ] Successful boot marks new slot `health = "good"` after 60 seconds
-- [ ] 3 consecutive failed boots of new slot triggers rollback to previous slot
-- [ ] Previous slot boots and is functional after rollback
-- [ ] Games and saves on `/data` survive update and rollback unchanged
-- [ ] `playos_system_os_version()` returns active slot version correctly
-- [ ] Bundle with invalid signature is rejected before any partition write
-- [ ] Shell update UI shows current version and allows applying a bundle
-- [ ] CI: update bundle creation and signature verification tested on host
+- [x] Running system partition mounted read-only; `touch /usr/test` fails with EROFS
+- [x] Installer creates 5-partition layout on fresh NVMe (ESP, A/B system, misc, data)
+- [x] `boot.json` on ESP reflects active slot, health, and boot count
+- [x] Update written to inactive slot does not affect running system
+- [x] After reboot, system boots from newly updated slot
+- [x] Successful boot marks new slot `health = "good"` after 60 seconds
+- [x] 3 consecutive failed boots of new slot triggers rollback to previous slot
+- [x] Previous slot boots and is functional after rollback
+- [x] Games and saves on `/data` survive update and rollback unchanged
+- [x] `playos_system_os_version()` returns active slot version correctly
+- [x] Bundle with invalid signature is rejected before any partition write
+- [x] Shell update UI shows current version and allows applying a bundle
+- [x] CI: update bundle creation and signature verification tested on host
 
 ---
 

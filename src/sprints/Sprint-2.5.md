@@ -309,19 +309,19 @@ After T1–T7, run `make qemu-build` to confirm nothing regressed. If the build 
 
 ## Acceptance Criteria
 
-- [ ] IPC source files exist in only one canonical location (playos-init/ipc/)
-- [ ] playos-runtime no longer contains `.c` source files
-- [ ] playos-init builds and all host tests pass after IPC unification
-- [ ] `make setup` checks out the exact commit SHA from `versions.lock` for playos-init and playos-compositor
-- [ ] `make setup` is idempotent — safe to run on an already-set-up tree
-- [ ] Sprint-0.md "Expected Files and Directories" matches actual `br2-external/board/` layout
-- [ ] Sprint-1.md restart policy text (S1-T4) matches `init.h` constants (3/60s, 500ms)
-- [ ] `linux.fragment` is deleted from the repository
-- [ ] `mount.c` implements GPT partition GUID search (no TODO placeholder)
-- [ ] A host test exercises the GPT parsing logic
-- [ ] `playos-runtime` Buildroot package installs protocol XML into staging
-- [ ] `make qemu-build` completes successfully after all changes
-- [ ] Sprint-2.md acceptance criteria 2, 9, 10 are updated to reflect QEMU build result
+- [x] IPC source files exist in only one canonical location (playos-init/ipc/)
+- [x] playos-runtime no longer contains `.c` source files
+- [x] playos-init builds and all host tests pass after IPC unification
+- [x] `make setup` checks out the exact commit SHA from `versions.lock` for playos-init and playos-compositor
+- [x] `make setup` is idempotent — safe to run on an already-set-up tree
+- [x] Sprint-0.md "Expected Files and Directories" matches actual `br2-external/board/` layout
+- [x] Sprint-1.md restart policy text (S1-T4) matches `init.h` constants (3/60s, 500ms)
+- [x] `linux.fragment` is deleted from the repository
+- [x] `mount.c` implements GPT partition GUID search (no TODO placeholder)
+- [x] A host test exercises the GPT parsing logic
+- [x] `playos-runtime` Buildroot package installs protocol XML into staging
+- [x] `make qemu-build` completes successfully after all changes
+- [x] Sprint-2.md acceptance criteria 2, 9, 10 are updated to reflect QEMU build result
 
 ---
 

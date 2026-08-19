@@ -275,17 +275,17 @@ If the file is missing or malformed, use the built-in defaults and log a warning
 
 ## Acceptance Criteria
 
-- [ ] Shell status bar shows live battery percentage; updates within 30 s of charging state change
-- [ ] CPU and GPU temperatures visible in overlay; accurate within ±2°C of `sensors`
-- [ ] Running a stress test progresses thermal state from NORMAL to WARM; log shows state change
-- [ ] At HOT state: system switches to BALANCED P-state; overlay shows warning
-- [ ] `SetPerfProfile PERFORMANCE` honored when thermal state is NORMAL
-- [ ] `SetPerfProfile PERFORMANCE` rejected when thermal state is HOT
-- [ ] Shutdown from overlay: system shuts down cleanly (filesystems synced)
-- [ ] Restart from overlay: system reboots cleanly
-- [ ] `PLAYOS_LIFECYCLE_SUSPEND` and `PLAYOS_LIFECYCLE_RESUME` delivered without crashing any consumer
-- [ ] Sample games run sustained load without GPU hang or kernel panic
-- [ ] CI passes
+- [x] Shell status bar shows live battery percentage; updates within 30 s of charging state change
+- [x] CPU and GPU temperatures visible in overlay; accurate within ±2°C of `sensors`
+- [x] Running a stress test progresses thermal state from NORMAL to WARM; log shows state change
+- [x] At HOT state: system switches to BALANCED P-state; overlay shows warning
+- [x] `SetPerfProfile PERFORMANCE` honored when thermal state is NORMAL
+- [x] `SetPerfProfile PERFORMANCE` rejected when thermal state is HOT
+- [x] Shutdown from overlay: system shuts down cleanly (filesystems synced)
+- [x] Restart from overlay: system reboots cleanly
+- [x] `PLAYOS_LIFECYCLE_SUSPEND` and `PLAYOS_LIFECYCLE_RESUME` delivered without crashing any consumer
+- [x] Sample games run sustained load without GPU hang or kernel panic
+- [x] CI passes
 
 ---
 

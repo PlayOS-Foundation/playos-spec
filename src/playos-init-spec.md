@@ -1,9 +1,9 @@
 # `playos-init` Specification
 
-> **Repository:** `playos-refdistro/src/playos-init/`  
+> **Repository:** `playos-init`  
 > **Role:** PID 1, process supervisor, boot orchestrator  
 > **Language:** C (or Rust)  
-> **Cross-references:** [architecture.md](architecture.md) §6–7.1, [runtime-ipc.md](runtime-ipc.md), [Sprint-1.md](Sprint-1.md)
+> **Cross-references:** [architecture.md](architecture.md) §6–7.1, [runtime-ipc.md](runtime-ipc.md), [sprints/Sprint-1.md](sprints/Sprint-1.md)
 
 ---
 
@@ -77,7 +77,7 @@ Kernel starts /init (playos-init, PID 1)
 `playos-init` searches for the data partition in order:
 
 1. Partition with label `playos-data`
-2. Partition with GUID `<defined in playos-spec/schemas/disk-layout.json>`
+2. Partition with GUID `<TODO: define in playos-spec/schemas/disk-layout.json>`
 3. UUID from kernel command line: `playos.data_uuid=<uuid>`
 
 **PlayOS must never silently format.** If the partition is not found:
@@ -121,8 +121,8 @@ Before `execve()`, `playos-init`:
 1. Sets `PLAYOS_GAME_ID`, paths, and lifecycle environment
 2. Applies `PR_SET_NO_NEW_PRIVS = 1`
 3. Drops all capabilities
-4. Applies seccomp filter (Sprint 12)
-5. Applies Landlock rules (Sprint 12)
+4. Applies seccomp filter (Sprint 12 — not yet implemented)
+5. Applies Landlock rules (Sprint 12 — not yet implemented)
 6. Drops `CAP_SETUID` / `CAP_SETGID`
 7. `execve()` the game executable
 

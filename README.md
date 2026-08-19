@@ -29,8 +29,15 @@ mdbook serve      # live preview at http://localhost:3000
 | `playos-platform-api` | Public `libplayos` C ABI |
 | `playos-runtime` | Internal IPC and Wayland protocol |
 | `playos-compositor` | wlroots Wayland compositor |
-| `playos-shell` | Raylib controller-first UI |
+| `playos-shell` | Raylib controller-first UI and PlayOS Raylib backend |
 | `playos-refdistro` | Buildroot OS image assembly |
+| `playos-init` | PID 1 process supervisor |
+| `playos-samples` | Sample games and reference applications |
+| `playos-tools` | Host-side developer and OTA staging tools |
+| `playos-foundation` | Shared foundation libraries and utilities |
+| `playos-reference-devices` | Reference device configurations and images |
+| `playos-cloud` | Cloud services (post-MVP) |
+| `playos-marketplace` | Game store and marketplace (post-MVP) |
 
 ## Conventions
 

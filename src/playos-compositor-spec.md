@@ -3,7 +3,7 @@
 > **Repository:** `playos-compositor`  
 > **Role:** wlroots-based Wayland compositor; permanent DRM/KMS owner  
 > **Language:** C  
-> **Cross-references:** [architecture.md](architecture.md) §7.2, §8–9, [wayland-protocol.md](wayland-protocol.md), [Sprint-2.md](Sprint-2.md), [Sprint-4.md](Sprint-4.md)
+> **Cross-references:** [architecture.md](architecture.md) §7.2, §8–9, [wayland-protocol.md](wayland-protocol.md), [sprints/Sprint-2.md](sprints/Sprint-2.md), [sprints/Sprint-4.md](sprints/Sprint-4.md)
 
 ---
 
