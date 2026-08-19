@@ -340,4 +340,4 @@ Sprint 12 (Security Hardening) may assume:
 
 The system image is immutable at runtime. A/B updates can be applied, verified, and automatically rolled back on failure. Games and user data are unaffected by updates and rollbacks.
 
-*Previous: [Sprint 10](Sprint-10.md) | Next: [Sprint 12](Sprint-12.md)*
+*Previous: [Sprint 10](Sprint-10.md) | Next: [Sprint 11.5](Sprint-11.5.md)*
