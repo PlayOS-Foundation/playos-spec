@@ -166,7 +166,9 @@ Reserved buttons (`SYSTEM`, `QUICK_MENU`) are intercepted by the compositor at t
 
 ### S12-T7 — Remove debug tools from production build
 
-The production `defconfig` excludes BusyBox (`/bin/sh`, `/bin/busybox`), the SSH daemon, `gdbserver`/`strace`/`ltrace`, `evtest`/`modetest` and graphics diagnostic tools, and ships with no open listening TCP/UDP sockets. A post-build script asserts their absence, and CI has a production-image lint step that fails if debug artifacts are present. The development image retains all debug tools behind `BR2_PACKAGE_PLAYOS_DEV_TOOLS`.
+The production `defconfig` excludes BusyBox (`/bin/sh`, `/bin/busybox`), the SSH daemon, `gdbserver`/`strace`/`ltrace`, `evtest`/`modetest` and graphics diagnostic tools, and ships with no open listening TCP/UDP sockets. A post-build script asserts their absence, and CI has a production-image lint step that fails if debug artifacts are present. The development image retains all debug tools behind `BR2_PACKAGE_PLAYOS_DEV_TOOLS`. BusyBox is NOT init (PID 1 is `playos-init`, installed at `/init`), so excluding BusyBox removes `/bin/sh` and its applets only; `ip` (BusyBox) is replaced by `iproute2` and `udhcpc` (BusyBox) by `dhcpcd`.
+
+**Open decision — future Developer Mode SSH:** if Dropbear is ever re-enabled on a BusyBox-free production/developer image, an interactive SSH login still needs a shell to `exec` (Dropbear reads it from `/etc/passwd`). Choose between shipping a minimal standalone shell (`mksh`/`dash`) or a `command=`-style forced command — see `post-mvp.md` §SSH Developer Mode.
 
 **Done when:** the production image contains no `busybox`, `gdbserver`, or `strace` and no open sockets; the CI lint step fails if any of these appear.
 

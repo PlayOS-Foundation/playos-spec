@@ -133,7 +133,7 @@ Update the **Status** column as work progresses: `not started` → `in progress`
 | S0-T1 | Create or validate the six-repository structure | cross-repo | done | README.md, CONTRIBUTING.md, AGENTS.md, .gitignore in all 6 repos |
 | S0-T2 | Add the Buildroot integration skeleton | `playos-refdistro` | done | br2-external/ with Config.in, external.mk, external.desc, 5 package stubs |
 | S0-T3 | Create the QEMU x86_64 defconfig | `playos-refdistro` | done | playos_qemu_x86_64_defconfig with EFI, initramfs, virtio, serial console |
-| S0-T4 | Build the minimal kernel + initramfs path | `playos-refdistro` | done | board/common/rootfs-overlay/init, board/common/busybox.config |
+| S0-T4 | Build the minimal kernel + initramfs path | `playos-refdistro` | done | board/common/rootfs-overlay/init.busybox, board/common/busybox.config |
 | S0-T5 | Produce the real UEFI boot artifact | `playos-refdistro` | done | scripts/qemu-boot-check.sh boots OVMF with kernel+initramfs, asserts banner |
 | S0-T6 | Standardise developer commands | `playos-refdistro` | done | Makefile with setup, qemu-*, ally-* stubs, clean, distclean |
 | S0-T7 | Create and enforce version pinning | `playos-refdistro` | done | versions.lock with real Git SHAs for all 6 PlayOS components |
@@ -443,7 +443,7 @@ br2-external/board/
 ├── common/
 │   ├── busybox.config
 │   └── rootfs-overlay/
-│       └── init
+│       └── init.busybox
 ├── patches/
 │   └── linux/
 │       └── 0001-c23-bool-fix.patch    # GCC 13+/C23 kernel compatibility

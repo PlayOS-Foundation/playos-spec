@@ -38,6 +38,7 @@ These features are most commonly requested and have direct dependencies on shipp
 **Motivation:** Developers need remote access for debugging without a physical serial connection.  
 **Policy:** SSH is present only in Developer Mode, which requires explicit user opt-in. Not enabled by default. Absent from retail builds.  
 **Stack:** Dropbear — small SSH server  
+**Login shell (open decision):** Dropbear itself has no BusyBox dependency, but an interactive SSH session `exec`s the user's login shell read from `/etc/passwd`. Production has no `/bin/sh` (BusyBox `ash` is removed — `security-model.md` §11, `Sprint-12.md` S12-T7), so Developer Mode must supply a shell one of two ways: (1) ship a minimal standalone shell (`mksh` or `dash`) for the debug account, or (2) run Dropbear with a forced command in `authorized_keys` (e.g. `command="playos-support"`) so no interactive shell is ever spawned. Option 1 preserves a normal debug shell; option 2 keeps the smallest trusted surface. **Decision deferred** until Developer Mode ships — record the chosen approach here when settled.  
 **Depends on:** Wi-Fi
 
 ### Input Service (`playos-input`)

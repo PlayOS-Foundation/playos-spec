@@ -227,7 +227,7 @@ Init -> Client
 
 - Add the Buildroot package for `playos-init`.
 - Install the built binary as `/init`.
-- Remove the BusyBox shell-script `/init` from the normal boot path.
+- Remove the BusyBox shell-script `/init` (Sprint 0's `rootfs-overlay/init.busybox`, installed as `/init.busybox`) from the normal boot path.
 - Keep BusyBox available only for developer and diagnostic workflows.
 
 **Done when:** `make qemu-build && make qemu-run` boots through the real binary.

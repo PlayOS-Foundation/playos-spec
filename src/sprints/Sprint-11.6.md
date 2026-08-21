@@ -4,7 +4,7 @@
 
 **Primary Outcome:** With a USB-C Ethernet adapter plugged into the ROG Ally, the device obtains an IPv4 address via DHCP and exposes a Dropbear SSH server that only accepts developer-supplied public-key authentication. Host keys and `authorized_keys` persist under `/data/ssh`; `playos-init` supervises the bring-up; games and production behavior are unchanged.
 
-**Status:** 🟡 In progress — code changes complete; `playos-init` host build/tests pass; **QEMU validation (T5) done** (DHCP lease + public-key SSH login verified in QEMU); ROG Ally validation still pending hardware.
+**Status:** 🟡 In progress — code changes complete; `playos-init` host build/tests pass; **QEMU validation (T5) done** (DHCP lease + public-key SSH login verified in QEMU); installer now seeds `/data/ssh/authorized_keys` on the target NVMe during install; ROG Ally validation still pending hardware.
 
 **Prerequisites:** Sprint 11.5 in progress (hardware A/B matrix pending); Sprint 10 installed/deployed rootfs path; `playos-init` supervision framework in place.
 
@@ -37,6 +37,7 @@ Sprint 11.5 needs a full 6-case A/B matrix on real ROG Ally hardware, but debugg
 - **Persistent SSH state:** Dropbear host keys and `authorized_keys` live under `/data/ssh/` (persistent `playos-data`), **not** `/etc/dropbear` or `/var/run/dropbear` (tmpfs/ephemeral) and **not** on the read-only squashfs. Bring-up bind-mounts `/data/ssh` over `/root/.ssh` (Dropbear's default `authorized_keys` location).
 - **Bring-up ownership:** a small rootfs-overlay helper (`/usr/bin/playos-ssh-bringup`) handles interface bring-up, DHCP, host-key generation, bind-mounting, and `exec dropbear`. `playos-init` forks/execs it as a supervised trusted daemon after the data mount, alongside compositor/shell/overlay.
 - **Access channel:** developer-only, no shell UI, no `playos-runtime` messages, no game access. Access is gated by public-key auth: a developer drops their public key at `/data/ssh/authorized_keys`.
+- **Installer key seeding:** the trusted installer copies the developer key from the installer USB's `playos-data` partition (`/data/ssh/authorized_keys`) into the freshly-created target NVMe `playos-data/ssh/authorized_keys` during the "Format data" step. This means a fresh install is immediately SSH-able after first boot — the developer never has to mount and edit the NVMe `playos-data` partition by hand.
 - **Production split:** this sprint enables SSH in the **dev/installer** image. Sprint 12 removes Dropbear and BusyBox from the production image (as already specified in S12-T7).
 
 ---
@@ -48,6 +49,7 @@ Sprint 11.5 needs a full 6-case A/B matrix on real ROG Ally hardware, but debugg
 - `playos-refdistro` — kernel config: enable `NETDEVICES` plus USB-NIC and QEMU test NIC drivers (no wireless).
 - `playos-refdistro` — Ally/installer defconfigs: enable `dropbear` (+ client, `DISABLE_REVERSEDNS`) and `dhcpcd`.
 - `playos-refdistro` — rootfs overlay: `/usr/bin/playos-ssh-bringup` and a build-time `/root/.ssh` directory (bind-mount target on the read-only squashfs).
+- `playos-refdistro` — installer: copy the optional `/data/ssh/authorized_keys` from the installer USB into the target NVMe `playos-data` partition during the "Format data" install step.
 - `playos-init` — spawn and supervise `playos-ssh-bringup` after `/data` mounts.
 - `playos-spec` — this document; `SUMMARY.md` + `roadmap.md` wiring; a networking note in `kernel-config.md`.
 
@@ -66,7 +68,7 @@ Sprint 11.5 needs a full 6-case A/B matrix on real ROG Ally hardware, but debugg
 
 | Repo | Required work |
 |---|---|
-| `playos-refdistro` | Kernel USB-NIC config; Dropbear + `dhcpcd` packages; `playos-ssh-bringup` overlay script; `/root/.ssh` build-time directory |
+| `playos-refdistro` | Kernel USB-NIC config; Dropbear + `dhcpcd` packages; `playos-ssh-bringup` overlay script; `/root/.ssh` build-time directory; installer key seeding in `src/playos-installer` |
 | `playos-init` | Supervise `playos-ssh-bringup` as a trusted daemon after the data mount |
 | `playos-spec` | This sprint; `SUMMARY.md` and `roadmap.md` links; `kernel-config.md` networking note |
 
@@ -84,6 +86,9 @@ br2-external/configs/playos_ally_installer_defconfig # dropbear + dhcpcd
 br2-external/board/common/rootfs-overlay/usr/bin/playos-ssh-bringup
 br2-external/board/common/rootfs-overlay/etc/dhcpcd.conf           # minimal dhcpcd config kept for Sprint 16 QEMU work
 br2-external/board/common/rootfs-overlay/root/.ssh/  # bind-mount target (exists in squashfs)
+src/playos-installer/format.c   # playos_format_seed_ssh_keys()
+src/playos-installer/format.h   # declaration
+src/playos-installer/main.c     # calls seeding after step 5 (Format data)
 ```
 
 ### `playos-init`
@@ -171,10 +176,10 @@ Create `/usr/bin/playos-ssh-bringup` in the rootfs overlay:
 
 - Dropbear host keys live at `/data/ssh/dropbear_*_host_key`, generated once and reused across boots.
 - `authorized_keys` lives at `/data/ssh/authorized_keys`; the bind-mount makes it visible at `/root/.ssh/authorized_keys`.
-- Document the developer setup: copy the developer's public key to `/data/ssh/authorized_keys` on the mounted `playos-data` partition.
+- Developer setup: put the developer's public key at `ssh/authorized_keys` on the installer USB's `playos-data` partition (the same partition that already holds `/data/log`). During the "Format data" install step, the installer copies it to the target NVMe `playos-data/ssh/authorized_keys`, so the fresh install is immediately SSH-able after first boot.
 - Do **not** commit any private key or seed an `authorized_keys` in the repo.
 
-**Done when:** a reboot preserves the host key (no re-generation / client key-change warning) and a public key in `/data/ssh/authorized_keys` permits login.
+**Done when:** a reboot preserves the host key (no re-generation / client key-change warning); a public key placed on the installer USB ends up at `/data/ssh/authorized_keys` on the target NVMe after install; and a public key in `/data/ssh/authorized_keys` permits login.
 
 ### S11.6-T5 — QEMU + Ally validation
 
@@ -208,6 +213,7 @@ Create `/usr/bin/playos-ssh-bringup` in the rootfs overlay:
 | DHCP lease | `udhcpc` log shows an IPv4 address assigned |
 | SSH supervised | `playos-init` supervision log shows Dropbear as a child; `ps` shows it under PID 1 |
 | Key persistence | reboot without host-key regeneration; existing `authorized_keys` still works |
+| Installer seeds key | fresh install copies `/data/ssh/authorized_keys` from the installer USB to the target NVMe `playos-data`; `/data/log/installer.log` records the seed result |
 | Login works | `ssh -i <devkey> root@<ip>` succeeds |
 | No wireless pulled in | kernel config still has `# CONFIG_WIRELESS is not set` |
 | Production unchanged | production defconfig still excludes Dropbear/BusyBox (Sprint 12) |
@@ -220,6 +226,7 @@ Create `/usr/bin/playos-ssh-bringup` in the rootfs overlay:
 - [ ] Dropbear SSH accepts a developer-supplied public key and rejects password login
 - [ ] Dropbear host keys persist across reboots under `/data/ssh`
 - [ ] `authorized_keys` persists under `/data/ssh` and survives reboot
+- [ ] The installer seeds `/data/ssh/authorized_keys` on the target NVMe from the installer USB during install
 - [ ] `playos-init` supervises the SSH bring-up as a trusted daemon
 - [x] QEMU boot with a NIC reaches a DHCP lease and SSH login
 - [ ] No Wi-Fi or `wpa_supplicant` code is introduced in this sprint

@@ -11,7 +11,7 @@ PlayOS deliberately ships with no network stack in MVP:
 
 - `kernel-config.md` defers `CFG80211`/`MAC80211`/`MT7921E` and the Bluetooth subsystem.
 - `architecture.md` §14 lists "Wi-Fi, Bluetooth, SSH, cloud saves" as post-MVP.
-- The production image contains **no BusyBox** (dev/diagnostic only — `security-model.md` §11), **no D-Bus**, and no open TCP/UDP sockets (Sprint 12).
+- The production image contains **no BusyBox** (dev/diagnostic only — `security-model.md` §11), **no D-Bus**, and no open TCP/UDP sockets (Sprint 12). This also means production has no `/bin/sh`, so any future SSH Developer Mode (Dropbear) needs a standalone-shell vs forced-command decision for its login shell — see `post-mvp.md` §SSH Developer Mode.
 
 The central question is therefore not *which* Wi-Fi daemon to use, but whether introducing D-Bus is acceptable. Both `iwd` and BlueZ hard-depend on D-Bus, while PlayOS's architecture mandates a strict one-mechanism-per-layer IPC model (see §3).
 
