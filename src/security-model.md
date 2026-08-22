@@ -57,11 +57,11 @@
 
 | Component | User | Capabilities | Notes |
 |---|---|---|---|
-| `playos-init` | `root` | All (required for process supervision, mounts, device setup) | Drop unnecessary caps after init |
-| `playos-compositor` | `playos-system` | `CAP_SYS_ADMIN` (DRM master), `CAP_DAC_READ_SEARCH` (device nodes) | Drop all others |
-| `playos-shell` | `playos-system` | None | Member of `playos-trusted` group |
-| `playos-overlay` | `playos-system` | None | Member of `playos-trusted` group |
-| Active game | `playos-game` | None | `PR_SET_NO_NEW_PRIVS = 1` before exec |
+| `playos-init` | `root` | All (required for process supervision, mounts, device setup) | Drop unnecessary caps after init (future) |
+| `playos-compositor` | `root` | All | Sprint 12 scopes privilege reduction to games; dropping system-component privileges is deferred |
+| `playos-shell` | `root` | All | Trusted; root accepted by control-socket check |
+| `playos-overlay` | `root` | All | Trusted; root accepted by control-socket check |
+| Active game | `playos-game` (uid 1001, gid 1001) | None | `PR_SET_NO_NEW_PRIVS = 1`; supplementary group `audio` only; seccomp + Landlock before exec |
 | `playos-installer` | `root` | All | Only present in installer image |
 
 ---
@@ -133,83 +133,62 @@ Note: Games access GPU rendering through the Wayland EGL surface, not directly t
 
 ## 6. seccomp Filter Policy
 
-Applied to game processes via `libseccomp` before `execve()`. Default action: `SECCOMP_RET_ERRNO(EPERM)`.
+Applied to game processes as a hand-built classic-BPF filter (no runtime
+`libseccomp` dependency — `playos-init` is a static PID 1). The filter
+verifies `AUDIT_ARCH_X86_64`, kills any other ABI, and returns `EPERM`
+for the privileged/credential syscall **deny-list** below. A full syscall
+*allowlist* is deferred (games are dynamically linked; see Sprint-12.md
+Decisions). Path-based `open`/`openat` restrictions are enforced by
+Landlock (§7), not by pointer-dereferencing BPF.
 
-### Allowed syscalls (core game set)
+### Allowed syscalls
 
-```
-# Memory management
-mmap, munmap, mprotect, mremap, madvise, brk
+Everything not listed below is allowed. This is a deliberate MVP
+tradeoff: Landlock default-deny is the path boundary, the seccomp
+deny-list blocks the privileged syscalls Landlock cannot reach.
 
-# File I/O
-read, readv, write, writev, open, openat, close, stat, fstat, lstat,
-newfstatat, statx, lseek, dup, dup2, ioctl (restricted — see below),
-fcntl, access, faccessat, getdents64, getcwd
-
-# Network (AF_UNIX only for Wayland socket)
-socket (AF_UNIX only — enforced by arg filter), connect, bind,
-accept, sendmsg, recvmsg, sendto, recvfrom, shutdown, getsockname, getpeername
-
-# Processes and threads
-exit, exit_group, clone, clone3, fork, execve (restricted — no setuid),
-wait4, waitid, getpid, getppid, gettid, set_tid_address, prctl (restricted)
-
-# Synchronization
-futex, futex_waitv, nanosleep, clock_nanosleep
-
-# Signals
-rt_sigaction, rt_sigprocmask, rt_sigreturn, sigaltstack, kill (self only)
-
-# Time
-clock_gettime, clock_getres, gettimeofday, time
-
-# Misc
-getrandom, getuid, getgid, geteuid, getegid, uname, sysinfo,
-pread64, pwrite64, eventfd2, epoll_create1, epoll_ctl, epoll_wait,
-pipe2, timerfd_create, timerfd_settime, timerfd_gettime,
-inotify_init1, inotify_add_watch, inotify_rm_watch,
-mlock, munlock, memfd_create
-```
-
-### Blocked syscalls (fatal SIGSYS or EPERM)
+### Blocked syscalls (return `EPERM`)
 
 ```
-mount, umount2, umount           # no filesystem mounting
-init_module, finit_module, delete_module  # no kernel modules
-reboot                           # no direct reboot
-ptrace                           # no process tracing
-setuid, setgid, setresuid, setresgid, setfsuid, setfsgid  # no privilege escalation
-capset, prctl(PR_SET_SECCOMP)    # no capability changes
-sysctl, nfsservctl               # no kernel parameter changes
-kexec_load, kexec_file_load      # no kernel replacement
-iopl, ioperm                     # no direct I/O port access
-perf_event_open                  # no performance counters (in retail builds)
+mount, umount2, pivot_root, chroot, acct, swapon, swapoff, quotactl,
+_sysctl, uselib, init_module, finit_module, delete_module
+setuid, setgid, setreuid, setregid, setresuid, setresgid, setfsuid,
+setfsgid, capset
+ptrace, process_vm_readv, process_vm_writev
+reboot, kexec_load, kexec_file_load, settimeofday, clock_settime,
+adjtimex, sethostname, setdomainname, iopl, ioperm, personality,
+vhangup, mknod, unshare, setns
+seccomp, bpf, perf_event_open, userfaultfd, add_key, request_key,
+keyctl, name_to_handle_at, open_by_handle_at
+prctl(PR_SET_SECCOMP)   # games cannot stack/replace filters; other
+                        # prctl calls are allowed
 ```
 
 ### ioctl restrictions
-`ioctl` is allowed only with these device categories:
-- Wayland socket (AF_UNIX)
-- `/dev/dri/renderD*` (DRI render node — needed for EGL)
-- `/dev/dri/card*` — **blocked** (prevents DRM master)
+
+Device-node access is enforced by Landlock + group membership, not by
+`ioctl` filtering: `/dev/dri/*` and `/dev/input/*` are outside the
+Landlock allowlist and the game is not in `drm`/`input`.
 
 ---
 
 ## 7. Landlock Filesystem Restrictions
 
-Requires Linux ≥ 5.13 (ROG Ally ships with kernels that support this). Falls back to logging-only if unavailable.
+Requires Linux ≥ 5.13 (ROG Ally ships with kernels that support this). Falls back to logging-only if unavailable. Implemented in `playos-init/src/security/landlock.c`; rule construction is data-driven by launch identity.
 
 ### Allowed paths for game processes
 
 | Path | Access |
 |---|---|
-| `/data/games/<game-id>/` | Read-only |
-| `/data/saves/<game-id>/` | Read + write + create + remove |
-| `/data/cache/<game-id>/` | Read + write + create + remove |
-| `/run/playos/playos-0` (Wayland socket) | Connect (execute) |
-| `/dev/dri/renderD*` | Read (for EGL) |
-| `/dev/urandom`, `/dev/random` | Read |
-| `/proc/self/` | Read-only |
-| `/tmp/game-<id>/` | Read + write + create + remove |
+| `/data/games/<game-id>/` | Read + execute (read-only game content, dynamic traversal) |
+| `/data/saves/<game-id>/` | Read + write + create + remove + truncate |
+| `/data/cache/<game-id>/` | Read + write + create + remove + truncate |
+| `/tmp` | Read + write + create + remove (shared scratch) |
+| `/run/playos/` | Read + execute (Wayland socket path) |
+| `/lib`, `/usr/lib` | Read + execute (musl dynamic loader + shared libraries) |
+| `/dev/snd` | Read + write (ALSA PCM/control nodes) |
+| `/dev/shm` | Read + write + create + remove (wl_shm fallback) |
+| `/etc/asound.conf` | Read (single-file rule, optional) |
 
 ### Denied (implicitly — not in allowed set)
 
@@ -219,22 +198,21 @@ Requires Linux ≥ 5.13 (ROG Ally ships with kernels that support this). Falls b
 - `/data/log/` — system logs (games write via `playos_log()`, not direct fs access)
 - `/run/playos/control.sock` — control IPC
 - `/run/playos/compositor.sock` — compositor control
-- `/sys/`, `/proc/<other-pid>/` — system and process snooping
-- `/dev/dri/card*` — DRM primary nodes
+- `/sys/`, `/proc/` — system and process snooping
+- `/dev/dri/*` — all DRM nodes (primary **and** render nodes; games reach the GPU through the Wayland seat, so no direct render-node access is granted)
+- `/dev/input/event*` — raw input devices
 
 ---
 
 ## 8. Input Security
 
-> **Current gap (pre-Sprint 12):** The target model below is **not yet
-> implemented**. Today reserved buttons are stripped only by a software
-> bitmask in `libplayos` (`playos_input.c`), and games are spawned via a plain
-> `fork()`+`exec()` from PID 1 (root) with no credential drop, so a game can
-> open `/dev/input/event*` directly and read the reserved buttons — bypassing
-> the mask. Sprint 12 closes this gap (see `Sprint-12.md` §Input Device
-> Isolation).
-
-**Reserved system actions** (`PLAYOS_BUTTON_SYSTEM`, `PLAYOS_BUTTON_QUICK_MENU`) are intercepted at the Wayland compositor's libinput layer before any event reaches a client. They are never present in the game's input stream.
+**Implemented (Sprint 12).** Reserved system actions (`PLAYOS_BUTTON_SYSTEM`:
+`BTN_MODE`/`KEY_PROG1`/`BTN_TRIGGER_HAPPY1`; `PLAYOS_BUTTON_QUICK_MENU`:
+`KEY_PROG2`/`BTN_TRIGGER_HAPPY2`) are consumed by `playos-compositor` at the
+seat layer (`src/system_button.c`) before any event reaches a client. Games
+are additionally denied raw evdev: they run as `playos-game` (not in
+`input`), and Landlock default-deny blocks `/dev/input/event*`. The
+`libplayos` bitmask remains defense-in-depth only.
 
 **Input routing hierarchy:**
 ```
@@ -292,9 +270,17 @@ A/B update bundles
 ```
 
 ### Development key setup (Sprint 12)
-- Self-signed certificate used for development and CI builds
-- Production: HSM-backed key, never leaves the signing server
-- `sbsign` used in the release pipeline
+- Dev keys live in `playos-refdistro/keys/dev/`:
+  - `efi-signing-key.pem` + `efi-signing-cert.pem` — self-signed EFI
+    signing key used by `scripts/sign-efi.sh` (`sbsign`) for development
+    and CI builds
+  - `manifest-key.pub` / `manifest-key.sec` — Ed25519 game-manifest
+    signing key used by `scripts/sign-manifest.sh`; the public key is
+    embedded in `playos-init` (`src/security/game_key.h`) for warn-only
+    manifest verification
+- Production: HSM-backed keys, never leave the signing server (post-MVP)
+- `sbsign` is the release-pipeline signing tool; `pesign` is an
+  acceptable alternative for RPM-oriented flows
 
 ### Recovery
 If Secure Boot verification fails:
