@@ -6,7 +6,7 @@
 
 **Prerequisites:** Sprint 11 complete — immutable images and A/B updates working.
 
-**Status:** 🟡 In progress — T1–T4 + T8 implemented in `playos-init` with host tests passing (Ed25519 RFC 8032 + cross-verified, Landlock allowlist honored/default-deny enforced; seccomp filter skips in this sandboxed build host and is exercised on-device); T5 compositor reserved-button set extended and building; T6 control-socket policy test added (socket already `0660 root:playos-trusted`); T7 production defconfig + post-build lint authored (full Buildroot image build pending); T9 dev signing keys + scripts created. Remaining: production image build validation, on-device (ROG Ally) acceptance run.
+**Status:** 🟡 In progress — T1–T4 + T8 implemented in `playos-init` with host tests passing (Ed25519 RFC 8032 + cross-verified, Landlock allowlist honored/default-deny enforced; seccomp filter skips in this sandboxed build host and is exercised on-device); T5 compositor reserved-button set extended and building; T6 control-socket policy test added (socket already `0660 root:playos-trusted`); T7 production defconfig + post-build lint authored and validated (production image build passes lint, debug-free, and QEMU boots to `playos-init starting as PID 1` with no shell); T9 dev signing keys + scripts created and Secure Boot chain documented. Remaining: on-device (ROG Ally) acceptance run, and a dedicated production-lint CI workflow (only `qemu-build.yml` exists today).
 
 ---
 
@@ -125,9 +125,9 @@ src/security-model.md           # updated: §8 reserved-button boundary, sandbox
 | S12-T4 | Deny DRM primary-node access from games | `playos-init` | done | Primary node `/dev/dri/card*` denied (games not in `drm`); render node `/dev/dri/renderD*` granted via `render` group + `99-playos-dri.rules` for client-side EGL |
 | S12-T5 | Enforce reserved-button input isolation end-to-end | `playos-compositor`, `playos-platform-api`, `playos-init` | done | Compositor seat intercept extended to BTN_MODE/KEY_PROG1/BTN_TRIGGER_HAPPY1/KEY_PROG2/BTN_TRIGGER_HAPPY2; Landlock + groups deny raw `/dev/input/event*`; `libplayos` mask remains defense-in-depth |
 | S12-T6 | Harden `control.sock` trusted-client auth and permission checks | `playos-runtime`, `playos-init` | done | Socket already `0660 root:1000` + `SO_PEERCRED` gid/uid check; policy test added in `playos-runtime` |
-| S12-T7 | Strip debug tools/services from the production image | `playos-refdistro` | in progress | `playos_ally_production_defconfig` + `board/ally/post-build.sh` lint authored; dev-only overlay split (`board/dev`); full image build pending |
+| S12-T7 | Strip debug tools/services from the production image | `playos-refdistro` | done | Production defconfig drops BusyBox/sh/init; `post-build.sh` lint passes (`production lint: OK — no debug artifacts`); target verified free of busybox/sh/gdbserver/strace/evtest/dropbear/sshd; QEMU boots to PID 1 without a shell |
 | S12-T8 | Verify signed game manifests (warn-only in MVP) | `playos-init`, `playos-runtime` | done | Self-contained Ed25519 in `playos-init`; RFC 8032 + Python cross-verify; `scripts/sign-manifest.sh`; warn-only in spawn path |
-| S12-T9 | Document Secure Boot chain; create and rotate dev signing keys in image build | `playos-refdistro`, `playos-spec` | in progress | `keys/dev/*` + `scripts/sign-efi.sh` created; `security-model.md` chain documentation pending below |
+| S12-T9 | Document Secure Boot chain; create and rotate dev signing keys in image build | `playos-refdistro`, `playos-spec` | done | `keys/dev/*` + `scripts/sign-efi.sh` created; `security-model.md` §10 Secure Boot Chain documented; production HSM signing deferred |
 
 Update the **Status** column as work progresses: `not started` → `in progress` → `blocked` or `done`.
 
@@ -245,12 +245,12 @@ Document the target signed chain: UEFI Secure Boot signs `BOOTX64.EFI`; `BOOTX64
 - [x] seccomp filter: `mount()` from game process returns `EPERM` (filter built; host env blocks filter installation — on-device check pending)
 - [x] Landlock: game cannot `open()` another game's save directory (host test)
 - [x] Landlock: game cannot read `/data/config/` (default-deny; host test)
-- [ ] Production build contains no `busybox`, `gdbserver`, `strace`, or open TCP sockets (defconfig + lint authored; image build pending)
-- [ ] Post-build production lint CI step passes (authored; CI run pending)
+- [x] Production build contains no `busybox`, `gdbserver`, `strace`, or open TCP sockets (lint `OK — no debug artifacts` + manual absence of busybox/sh/gdbserver/strace/evtest/dropbear/sshd; no listening network services by construction since dropbear/sshd are removed)
+- [ ] Post-build production lint CI step passes (lint runs in-build via `post-build.sh` and passes locally; a dedicated CI workflow for the production image is still missing — only `qemu-build.yml` exists)
 - [x] Development image retains full debug tools (`playos_ally_defconfig` unchanged debug set)
 - [x] Manifest signature verification runs in warn-only mode (warning in log for unsigned manifests — spawn path logs, launch never blocked)
 - [x] Development EFI signing key exists and is used in CI builds (`keys/dev/*`, `scripts/sign-efi.sh`; CI wiring is part of T7 image build)
-- [ ] All existing sprint acceptance criteria still pass (no regression — needs full image/QEMU boot)
+- [ ] All existing sprint acceptance criteria still pass (no regression — QEMU boot smoke test now passes to `playos-init starting as PID 1` with no busybox/sh; full on-device ROG Ally regression still pending)
 
 ---
 
