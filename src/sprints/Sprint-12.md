@@ -99,6 +99,7 @@ src/system_button.c             # reserved-button interception at the libinput/s
 ```text
 br2-external/board/ally/users-table.txt          # playos-game UID 1001, groups audio,render,input
 br2-external/board/common/rootfs-overlay/etc/udev/rules.d/99-playos-dri.rules  # renderD* -> root:render 0660
+br2-external/board/common/rootfs-overlay/etc/udev/rules.d/99-playos-input.rules  # ASUS EC (0b05:1abe) -> root:root 0600
 br2-external/board/ally/post-build.sh            # production lint: assert no debug binaries
 br2-external/configs/playos_ally_production_defconfig
 scripts/sign-efi.sh                              # sbsign/pesign with the development key
@@ -123,7 +124,7 @@ src/security-model.md           # updated: §8 reserved-button boundary, sandbox
 | S12-T2 | Apply Landlock allowed/denied path policy to game processes | `playos-init` | done | `src/security/landlock.c`; host test: allowlist honored, default-deny enforced; unsupported-kernel fallback logs and continues |
 | S12-T3 | Apply seccomp syscall deny-list (see Decisions) | `playos-init` | done | `src/security/seccomp_filter.c`; host test skips in seccomp-blocked sandbox, exercised on-device |
 | S12-T4 | Deny DRM primary-node access from games | `playos-init` | done | Primary node `/dev/dri/card*` denied (games not in `drm`); render node `/dev/dri/renderD*` granted via `render` group + `99-playos-dri.rules` + a `/dev/dri` read-write Landlock rule for client-side EGL |
-| S12-T5 | Enforce reserved-button input isolation end-to-end | `playos-compositor`, `playos-platform-api`, `playos-init` | done | Compositor seat intercept extended to BTN_MODE/KEY_PROG1/BTN_TRIGGER_HAPPY1/KEY_PROG2/BTN_TRIGGER_HAPPY2; `libplayos` snapshot mask strips reserved buttons; `/dev/input` is granted read-only for the controller (raw vendor/home nodes remain a deferred hardening gap) |
+| S12-T5 | Enforce reserved-button input isolation end-to-end | `playos-compositor`, `playos-platform-api`, `playos-init`, `playos-refdistro` | done | Compositor seat intercept extended to BTN_MODE/KEY_PROG1/BTN_TRIGGER_HAPPY1/KEY_PROG2/BTN_TRIGGER_HAPPY2; `libplayos` snapshot mask strips reserved buttons; `/dev/input` granted read-only for the gamepad, and `99-playos-input.rules` moves the ASUS EC (`0b05:1abe`) to `root:root 0600` so games cannot read Command Center/M1-M2 directly |
 | S12-T6 | Harden `control.sock` trusted-client auth and permission checks | `playos-runtime`, `playos-init` | done | Socket already `0660 root:1000` + `SO_PEERCRED` gid/uid check; policy test added in `playos-runtime` |
 | S12-T7 | Strip debug tools/services from the production image | `playos-refdistro` | done | Production defconfig drops BusyBox/sh/init; `post-build.sh` lint passes (`production lint: OK — no debug artifacts`); target verified free of busybox/sh/gdbserver/strace/evtest/dropbear/sshd; QEMU boots to PID 1 without a shell |
 | S12-T8 | Verify signed game manifests (warn-only in MVP) | `playos-init`, `playos-runtime` | done | Self-contained Ed25519 in `playos-init`; RFC 8032 + Python cross-verify; `scripts/sign-manifest.sh`; warn-only in spawn path |
@@ -170,9 +171,9 @@ The **primary node** `/dev/dri/card*` is owned by the `drm` group; games are not
 
 ### S12-T5 — Enforce reserved-button input isolation
 
-Reserved buttons (`SYSTEM`, `QUICK_MENU`, `POWER`) are stripped from the game-facing input stream by two layers: `playos-platform-api`'s snapshot mask (`playos_input.c`) clears `PLAYOS_RESERVED_BUTTONS` from `state->buttons`, and `playos-compositor`'s seat-level listener (`system_button.c`) consumes the same keycodes before any client can receive them. The game is in the `input` group and `/dev/input` is granted read-only so the built-in controller (raw evdev via `libplayos`) works; reserved-button isolation is therefore enforced at the snapshot + seat layers, not by denying `/dev/input`.
+Reserved buttons (`SYSTEM`, `QUICK_MENU`, `POWER`) are stripped from the game-facing input stream by two layers plus a udev boundary: `playos-platform-api`'s snapshot mask (`playos_input.c`) clears `PLAYOS_RESERVED_BUTTONS` from `state->buttons`, and `playos-compositor`'s seat-level listener (`system_button.c`) consumes the same keycodes before any client can receive them. The gamepad node (`045e:028e`) stays in `input` and `/dev/input` is granted read-only so the built-in controller (raw evdev via `libplayos`) works. `99-playos-input.rules` additionally moves the ASUS embedded-controller node (`0b05:1abe`, `event6/7/8`) to `root:root 0600`, so a game in `input` cannot open it and read Command Center (`KEY_PROG1`/`KEY_PROG2`) or M1/M2 directly; the compositor and shell read those as root.
 
-**Done when:** `SYSTEM`/`QUICK_MENU` never appear in a game's input stream, and pressing them while a game is focused still drives shell/overlay behavior.
+**Done when:** `SYSTEM`/`QUICK_MENU` never appear in a game's input stream, pressing them while a game is focused still drives shell/overlay behavior, and `open("/dev/input/event8")` from a game process returns `EACCES`.
 
 ### S12-T6 — Harden control socket
 

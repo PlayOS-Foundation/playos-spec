@@ -124,10 +124,11 @@ A normal game **must not** be able to:
 |---|---|---|---|
 | `/dev/dri/card*` | `root:drm` | `0660` | ❌ Not in `drm` group |
 | `/dev/dri/renderD*` | `root:render` | `0660` | ✅ In `render` group (needed for Wayland/EGL) |
-| `/dev/input/event*` | `root:input` | `0660` | ✅ In `input` group (built-in controller via libplayos evdev) |
+| `/dev/input/event*` — gamepad (`045e:028e`) | `root:input` | `0660` | ✅ In `input` group (built-in controller via libplayos evdev) |
+| `/dev/input/event*` — ASUS EC (`0b05:1abe`) | `root:root` | `0600` | ❌ Reserved (Command Center/M1-M2/brightness/volume/power); compositor/shell read as root |
 | `/run/playos/*.sock` | `root:playos-trusted` | `0660` | ❌ Not in `playos-trusted` |
 
-Note: Games render client-side by opening `/dev/dri/renderD*` directly (in the `render` group); the compositor scans out the resulting buffer. Primary nodes (`/dev/dri/card*`) remain denied via the `drm` group.
+Note: Games render client-side by opening `/dev/dri/renderD*` directly (in the `render` group); the compositor scans out the resulting buffer. Primary nodes (`/dev/dri/card*`) remain denied via the `drm` group. The gamepad input node stays in `input`, while the ASUS embedded-controller input nodes are moved to `root:root 0600` by `99-playos-input.rules` so a game cannot read reserved system buttons directly.
 
 ---
 
@@ -208,16 +209,26 @@ Requires Linux ≥ 5.13 (ROG Ally ships with kernels that support this). Falls b
 
 ## 8. Input Security
 
-**Implemented (Sprint 12).** Reserved system actions (`PLAYOS_BUTTON_SYSTEM`:
-`BTN_MODE`/`KEY_PROG1`/`BTN_TRIGGER_HAPPY1`; `PLAYOS_BUTTON_QUICK_MENU`:
-`KEY_PROG2`/`BTN_TRIGGER_HAPPY2`) are consumed by `playos-compositor` at the
-seat layer (`src/system_button.c`) before any event reaches a client. Games
-read the built-in controller directly through raw evdev: `/dev/input` is
-granted read-only and the game runs in the `input` group. The boundary is
-dual-layer — the `libplayos` snapshot mask strips reserved buttons from the
-game's view (defense in depth), and the compositor seat intercept keeps them
-PlayOS-only. The remaining hardening gap is udev group separation of the
-vendor/home input nodes (see the security-on-device runbook).
+**Implemented (Sprint 12).** Reserved system actions are consumed by
+`playos-compositor` at the seat layer (`src/system_button.c`) before any event
+reaches a client, and are stripped from the game's view by the `libplayos`
+snapshot mask (`playos_input.c`). On the ROG Ally the controls are split across
+two evdev nodes:
+
+- **Gamepad** (`Microsoft X-Box 360 pad`, `045e:028e`, `event5`): face buttons,
+  sticks, triggers, d-pad, and **HOME** (`BTN_MODE`). Games read this node via
+  raw evdev; it stays in the `input` group.
+- **ASUS embedded controller** (`Asus Keyboard`, `0b05:1abe`, `event6/7/8`):
+  Command Center (`KEY_PROG1`/`KEY_PROG2`), M1/M2, brightness, volume, and
+  power/sleep. `99-playos-input.rules` moves these nodes to `root:root 0600`,
+  so a game (in `input`) cannot open them; the compositor and shell run as root
+  and still read them.
+
+HOME (`BTN_MODE`) lives on the gamepad node, so it is kept out of the game's
+snapshot by the mask + seat intercept (not by udev). The i8042 "AT Translated
+Set 2 keyboard" (`event3`) is left in `input` — it carries only volume/power/
+sleep/wakeup, with power/sleep intercepted at the seat and `reboot`
+seccomp-blocked.
 
 **Input routing hierarchy:**
 ```
@@ -230,7 +241,7 @@ libinput event
     └── otherwise      → shell Wayland client
 ```
 
-Games read the built-in controller through raw evdev via `libplayos`. Reserved buttons (`BTN_MODE`, `KEY_PROG1/2`, `BTN_TRIGGER_HAPPY1/2`) never reach the game: `libplayos` masks them out of the controller snapshot, and the compositor seat intercept strips them before any event reaches a client.
+Games read the built-in controller through raw evdev via `libplayos`. Reserved buttons (`BTN_MODE`, `KEY_PROG1/2`, and the EC's M1/M2) never reach the game: the EC node is `root:root 0600` (udev), `libplayos` masks reserved buttons out of the controller snapshot, and the compositor seat intercept strips them before any event reaches a client.
 
 ---
 
