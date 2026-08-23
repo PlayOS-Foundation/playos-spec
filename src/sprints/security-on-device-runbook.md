@@ -26,7 +26,7 @@ The self-test must run **as the game identity, inside the sandbox**. It is not u
      | socat - UNIX-CONNECT:/run/playos/control.sock
    ```
 
-   For the LaunchGame path to find the binary, `/data/games/security-selftest/` needs a `manifest.json` whose `executable` points at `/usr/bin/playos-security-selftest` (a single-file "game" with no assets). If that's awkward on the dev image, a stopgap is to drop to a shell and simulate the identity manually — see "Manual identity simulation" below — but that is weaker evidence because it skips the actual spawn path.
+   For the LaunchGame path to find the binary, `/data/games/security-selftest/` needs a `manifest.json`, and the self-test binary must live **inside that game directory**. The spawn path always resolves the executable as `/data/games/<game_id>/<executable>` where `<executable>` is relative to the game directory (default `bin/game`), so copy the built `playos-security-selftest` to `/data/games/security-selftest/bin/game` and either omit `executable` from `manifest.json` (to use the `bin/game` default) or set it to the relative path `bin/game`. Do **not** set `executable` to `/usr/bin/playos-security-selftest` — that would resolve to `/data/games/security-selftest//usr/bin/...` and the game will not launch. If that's awkward on the dev image, a stopgap is to drop to a shell and simulate the identity manually — see "Manual identity simulation" below — but that is weaker evidence because it skips the actual spawn path.
 
 3. Read the result:
 
