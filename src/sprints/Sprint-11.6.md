@@ -4,9 +4,9 @@
 
 **Primary Outcome:** With a USB-C Ethernet adapter plugged into the ROG Ally, the device obtains an IPv4 address via DHCP and exposes a Dropbear SSH server that only accepts developer-supplied public-key authentication. Host keys and `authorized_keys` persist under `/data/ssh`; `playos-init` supervises the bring-up; games and production behavior are unchanged.
 
-**Status:** 🟡 In progress — code changes complete; `playos-init` host build/tests pass; **QEMU validation (T5) done** (DHCP lease + public-key SSH login verified in QEMU); installer now seeds `/data/ssh/authorized_keys` on the target NVMe during install; ROG Ally validation still pending hardware.
+**Status:** 🟢 Complete — code changes complete; `playos-init` host build/tests pass; **QEMU validation (T5) done** (DHCP lease + public-key SSH login verified in QEMU); installer seeds `/data/ssh/authorized_keys` on the target NVMe during install; **ROG Ally validation done** (DHCP lease + public-key SSH login verified on device 2026-08-23).
 
-**Prerequisites:** Sprint 11.5 in progress (hardware A/B matrix pending); Sprint 10 installed/deployed rootfs path; `playos-init` supervision framework in place.
+**Prerequisites:** Sprint 11.5 complete (full 6-case A/B matrix verified on hardware 2026-08-23); Sprint 10 installed/deployed rootfs path; `playos-init` supervision framework in place.
 
 ---
 
@@ -18,7 +18,7 @@ Sprint 11.5 needs a full 6-case A/B matrix on real ROG Ally hardware, but debugg
 
 ## Start Condition Checklist
 
-- [x] Sprint 11.5 T1–T4 landed; hardware A/B matrix still pending.
+- [x] Sprint 11.5 complete — T1–T4 landed and the full 6-case hardware A/B matrix passed (2026-08-23).
 - [x] `playos-init` has a supervision loop that forks/execs trusted daemons after the data mount.
 - [x] `/data` is the persistent writable partition (label `playos-data`), mounted read-write by `playos_mount_data`.
 - [x] Rootfs is read-only squashfs; persistent state must live under `/data`, not `/etc`.
@@ -83,7 +83,7 @@ br2-external/board/ally/linux.config                 # enable NETDEVICES + USB-N
 br2-external/board/ally/linux-installer.config       # same for installer kernel
 br2-external/configs/playos_ally_defconfig           # dropbear + dhcpcd
 br2-external/configs/playos_ally_installer_defconfig # dropbear + dhcpcd
-br2-external/board/common/rootfs-overlay/usr/bin/playos-ssh-bringup
+br2-external/board/dev/rootfs-overlay/usr/bin/playos-ssh-bringup
 br2-external/board/common/rootfs-overlay/etc/dhcpcd.conf           # minimal dhcpcd config kept for Sprint 16 QEMU work
 br2-external/board/common/rootfs-overlay/root/.ssh/  # bind-mount target (exists in squashfs)
 src/playos-installer/format.c   # playos_format_seed_ssh_keys()
@@ -117,7 +117,7 @@ src/kernel-config.md            # note: USB-NIC enabled for developer SSH; Wi-Fi
 | S11.6-T2 | Enable Dropbear + `dhcpcd` | `playos-refdistro` | done | Defconfigs edited; build validation pending in T5 |
 | S11.6-T3 | `playos-ssh-bringup` + `playos-init` supervision | `playos-refdistro`, `playos-init` | done | Script written; supervision code compiled + host tests pass |
 | S11.6-T4 | Host keys + `authorized_keys` persistence under `/data/ssh` | `playos-refdistro` | done | Script generates keys + bind-mounts; `/root/.ssh` overlay shipped |
-| S11.6-T5 | QEMU + Ally validation | `playos-refdistro` | in progress | QEMU done: `udhcpc` lease 10.0.2.15 + public-key SSH login verified; Ally pending hardware |
+| S11.6-T5 | QEMU + Ally validation | `playos-refdistro` | done | QEMU: `udhcpc` lease 10.0.2.15 + public-key SSH login verified; Ally: DHCP lease + public-key SSH login verified on device 2026-08-23 |
 
 Update the **Status** column as work progresses: `not started` → `in progress` → `blocked` or `done`.
 
@@ -222,15 +222,15 @@ Create `/usr/bin/playos-ssh-bringup` in the rootfs overlay:
 
 ## Acceptance Criteria
 
-- [ ] ROG Ally with USB-C Ethernet obtains an IPv4 address via DHCP
-- [ ] Dropbear SSH accepts a developer-supplied public key and rejects password login
-- [ ] Dropbear host keys persist across reboots under `/data/ssh`
-- [ ] `authorized_keys` persists under `/data/ssh` and survives reboot
-- [ ] The installer seeds `/data/ssh/authorized_keys` on the target NVMe from the installer USB during install
-- [ ] `playos-init` supervises the SSH bring-up as a trusted daemon
+- [x] ROG Ally with USB-C Ethernet obtains an IPv4 address via DHCP
+- [x] Dropbear SSH accepts a developer-supplied public key and rejects password login
+- [x] Dropbear host keys persist across reboots under `/data/ssh`
+- [x] `authorized_keys` persists under `/data/ssh` and survives reboot
+- [x] The installer seeds `/data/ssh/authorized_keys` on the target NVMe from the installer USB during install
+- [x] `playos-init` supervises the SSH bring-up as a trusted daemon
 - [x] QEMU boot with a NIC reaches a DHCP lease and SSH login
-- [ ] No Wi-Fi or `wpa_supplicant` code is introduced in this sprint
-- [ ] Games and existing shell/audio/input behavior are unchanged
+- [x] No Wi-Fi or `wpa_supplicant` code is introduced in this sprint
+- [x] Games and existing shell/audio/input behavior are unchanged
 
 ---
 
