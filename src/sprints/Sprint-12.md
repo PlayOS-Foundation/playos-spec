@@ -29,11 +29,11 @@ Before Sprint 12, the security boundary is mostly a convention. Games are spawne
 
 ## Decisions Locked for This Sprint
 
-- **Game identity:** games run as `playos-game` (UID 1001) with two supplementary groups — `audio` (ALSA `/dev/snd` access) and `render` (unprivileged DRM render node `/dev/dri/renderD*` for client-side EGL/GLES2). They are intentionally **not** in `video`, `input`, or `drm` (the `drm` group gates the primary node `/dev/dri/card*`). No per-profile Linux uid is introduced; console-style local profiles are a future data-path layer over this single identity.
+- **Game identity:** games run as `playos-game` (UID 1001) with three supplementary groups — `audio` (ALSA `/dev/snd` access), `render` (unprivileged DRM render node `/dev/dri/renderD*` for client-side EGL/GLES2), and `input` (`/dev/input/event*` for the built-in controller, which `libplayos` reads directly via its evdev backend). They are intentionally **not** in `video` or `drm` (the `drm` group gates the primary node `/dev/dri/card*`). No per-profile Linux uid is introduced; console-style local profiles are a future data-path layer over this single identity.
 - **Sandbox parameterization:** the sandbox path policy is parameterized by launch identity (game id now; a profile id later), so a future profile can be inserted without reworking enforcement.
 - **Capability set:** games start with no capabilities; `prctl(PR_SET_NO_NEW_PRIVS, 1)` is set before exec.
 - **DRM access:** games render client-side buffers via the DRM *render node* `/dev/dri/renderD*` (granted through `render` group membership), and the compositor scans them out through the Wayland seat. Direct `/dev/dri/card*` (primary node) access stays denied — a game can never modeset or take over the display.
-- **Input boundary:** reserved buttons are intercepted at the libinput/seat layer and never forwarded; the `libplayos` mask is defense-in-depth only.
+- **Input boundary:** reserved buttons are kept out of the game-facing input stream by two layers — the `libplayos` snapshot mask (`playos_input.c` strips `SYSTEM`/`QUICK_MENU`/`POWER` from `state->buttons`) and the compositor's seat-level listener (`system_button.c`) which consumes the same keycodes before any client can receive them. The game's normal input path is raw evdev (`/dev/input` is granted read-only so the built-in controller works); the reserved-button boundary is enforced by that mask + seat intercept, not by denying `/dev/input`.
 - **Sandbox mechanism:** a Landlock filesystem allowlist (default-deny) plus a seccomp-BPF deny-list of privileged/credential syscalls, both applied before game exec. A full seccomp *allowlist* is explicitly deferred: games are dynamically linked (musl + shared libraylib/libplayos), and a hand-maintained allowlist is too regression-prone for the MVP; Landlock's default-deny provides the path-based boundary and the seccomp deny-list blocks the privileged syscalls Landlock cannot reach.
 - **Control socket:** `/run/playos/control.sock` is `root:playos-trusted`, mode `0660`; only `playos-shell` and `playos-overlay` are in `playos-trusted`.
 - **Manifest signing:** Ed25519 detached signature alongside `manifest.json`; verification is warn-only this sprint.
@@ -47,7 +47,7 @@ Before Sprint 12, the security boundary is mostly a convention. Games are spawne
 
 - Game process privilege reduction and credential drop in `playos-init`.
 - seccomp syscall allowlist and Landlock filesystem allowlist for games.
-- Denial of direct DRM primary-node and raw input-device access.
+- Denial of direct DRM primary-node access, and reserved-button input isolation.
 - Control IPC socket ownership and permission hardening.
 - Removal of debug tools/services from the production image plus CI lint.
 - Signed-manifest foundations (warn-only verification).
@@ -97,7 +97,7 @@ src/system_button.c             # reserved-button interception at the libinput/s
 ### `playos-refdistro`
 
 ```text
-br2-external/board/ally/users-table.txt          # playos-game UID 1001, groups audio,render
+br2-external/board/ally/users-table.txt          # playos-game UID 1001, groups audio,render,input
 br2-external/board/common/rootfs-overlay/etc/udev/rules.d/99-playos-dri.rules  # renderD* -> root:render 0660
 br2-external/board/ally/post-build.sh            # production lint: assert no debug binaries
 br2-external/configs/playos_ally_production_defconfig
@@ -119,11 +119,11 @@ src/security-model.md           # updated: §8 reserved-button boundary, sandbox
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S12-T1 | Drop game privileges at spawn: UID ~1000, `PR_SET_NO_NEW_PRIVS`, capability drop | `playos-init` | done | `src/security/sandbox.c`; hard-fails launch if drop fails |
+| S12-T1 | Drop game privileges at spawn: UID 1001, `PR_SET_NO_NEW_PRIVS`, capability drop | `playos-init` | done | `src/security/sandbox.c`; hard-fails launch if drop fails |
 | S12-T2 | Apply Landlock allowed/denied path policy to game processes | `playos-init` | done | `src/security/landlock.c`; host test: allowlist honored, default-deny enforced; unsupported-kernel fallback logs and continues |
 | S12-T3 | Apply seccomp syscall deny-list (see Decisions) | `playos-init` | done | `src/security/seccomp_filter.c`; host test skips in seccomp-blocked sandbox, exercised on-device |
-| S12-T4 | Deny DRM primary-node access from games | `playos-init` | done | Primary node `/dev/dri/card*` denied (games not in `drm`); render node `/dev/dri/renderD*` granted via `render` group + `99-playos-dri.rules` for client-side EGL |
-| S12-T5 | Enforce reserved-button input isolation end-to-end | `playos-compositor`, `playos-platform-api`, `playos-init` | done | Compositor seat intercept extended to BTN_MODE/KEY_PROG1/BTN_TRIGGER_HAPPY1/KEY_PROG2/BTN_TRIGGER_HAPPY2; Landlock + groups deny raw `/dev/input/event*`; `libplayos` mask remains defense-in-depth |
+| S12-T4 | Deny DRM primary-node access from games | `playos-init` | done | Primary node `/dev/dri/card*` denied (games not in `drm`); render node `/dev/dri/renderD*` granted via `render` group + `99-playos-dri.rules` + a `/dev/dri` read-write Landlock rule for client-side EGL |
+| S12-T5 | Enforce reserved-button input isolation end-to-end | `playos-compositor`, `playos-platform-api`, `playos-init` | done | Compositor seat intercept extended to BTN_MODE/KEY_PROG1/BTN_TRIGGER_HAPPY1/KEY_PROG2/BTN_TRIGGER_HAPPY2; `libplayos` snapshot mask strips reserved buttons; `/dev/input` is granted read-only for the controller (raw vendor/home nodes remain a deferred hardening gap) |
 | S12-T6 | Harden `control.sock` trusted-client auth and permission checks | `playos-runtime`, `playos-init` | done | Socket already `0660 root:1000` + `SO_PEERCRED` gid/uid check; policy test added in `playos-runtime` |
 | S12-T7 | Strip debug tools/services from the production image | `playos-refdistro` | done | Production defconfig drops BusyBox/sh/init; `post-build.sh` lint passes (`production lint: OK — no debug artifacts`); target verified free of busybox/sh/gdbserver/strace/evtest/dropbear/sshd; QEMU boots to PID 1 without a shell |
 | S12-T8 | Verify signed game manifests (warn-only in MVP) | `playos-init`, `playos-runtime` | done | Self-contained Ed25519 in `playos-init`; RFC 8032 + Python cross-verify; `scripts/sign-manifest.sh`; warn-only in spawn path |
@@ -133,7 +133,7 @@ Update the **Status** column as work progresses: `not started` → `in progress`
 
 ### S12-T1 — Drop game privileges at spawn
 
-`playos-init` spawns games as the `playos-game` user (UID ~1000, no supplementary groups), calls `prctl(PR_SET_NO_NEW_PRIVS, 1)` on the game process, and drops all capabilities from the effective and permitted sets before `exec`. The `playos-compositor` keeps `CAP_SYS_ADMIN` (DRM master), but games never inherit it.
+`playos-init` spawns games as the `playos-game` user (UID 1001) with supplementary groups `render` (108), `audio` (29), and `input` (102), calls `prctl(PR_SET_NO_NEW_PRIVS, 1)` on the game process, and drops all capabilities from the effective and permitted sets before `exec`. The `playos-compositor` keeps `CAP_SYS_ADMIN` (DRM master), but games never inherit it.
 
 **Done when:** from inside a running game, `id` shows `uid=playos-game`, `/proc/self/status` shows `NoNewPrivs: 1`, and `CapEff: 0000000000000000`.
 
@@ -147,30 +147,32 @@ Build a Landlock ruleset granting exactly the paths a game needs and default-den
 - `/run/playos/` — `READ_FILE | EXECUTE` for the Wayland socket path
 - `/lib` and `/usr/lib` — `READ_FILE | EXECUTE` for the musl dynamic loader and shared libraries (games are dynamically linked against `libraylib`/`libplayos`; without this the exec of any sample game fails with `ENOENT` on the interpreter)
 - `/dev/snd` — `READ_FILE | WRITE_FILE` for ALSA PCM/control nodes (audio must keep working)
+- `/dev/input` — `READ_FILE` for the built-in controller (libplayos evdev backend); reserved buttons are stripped by the `libplayos` mask + compositor seat intercept
+- `/dev/dri` — `READ_FILE | WRITE_FILE` for the DRM render node (`/dev/dri/renderD*`), which client-side EGL/GLES2 opens `O_RDWR`; the primary node `/dev/dri/card*` stays denied by the `drm` group (Unix DAC)
 - `/dev/shm` — `READ_FILE | WRITE_FILE | TRUNCATE | MAKE_REG | REMOVE_FILE` for Wayland `wl_shm` fallback
 - `/etc/asound.conf` — `READ_FILE` (single-file rule, best-effort if present)
 
-Deny by default (no rule, so denied): other games' data, `/data/config/`, `/run/playos/control.sock`, `/dev/input/event*`, `/dev/dri/card*`, `/proc/*/`. Build the ruleset from launch-time variables (game id now; a `profile-id` prefix later) so Sprint 21 can add profile scoping by changing one path-construction function, not the enforcement logic. If the kernel is older than 5.13, fall back to logging-only enforcement with an alert.
+Deny by default (no rule, so denied): other games' data, `/data/config/`, `/run/playos/control.sock`, `/dev/dri/card*`, `/proc/*/`. Build the ruleset from launch-time variables (game id now; a `profile-id` prefix later) so Sprint 21 can add profile scoping by changing one path-construction function, not the enforcement logic. If the kernel is older than 5.13, fall back to logging-only enforcement with an alert.
 
 **Done when:** a game process cannot `open()` another game's save directory or read `/data/config/`; the unsupported-kernel fallback logs an alert without blocking launch; existing sample games still boot (dynamic loader + ALSA paths granted).
 
 ### S12-T3 — Apply seccomp syscall restrictions
 
-Apply a seccomp-BPF filter (constructed at spawn time, before `exec`) that denies the privileged and credential syscalls a game must never use: `mount`, `umount2`, `init_module`, `finit_module`, `delete_module`, `ptrace`, `reboot`, `kexec_load`, `kexec_file_load`, `swapon`, `swapoff`, `setuid`, `setgid`, `setreuid`, `setregid`, `setresuid`, `setresgid`, `setfsuid`, `setfsgid`, `capset`, `chroot`, `pivot_root`, `acct`, `settimeofday`, `clock_settime`, `adjtimex`, `sethostname`, `setdomainname`, `personality`, `iopl`, `ioperm`, `bpf`, `perf_event_open`, `process_vm_readv`, `process_vm_writev`, `userfaultfd`, `add_key`, `request_key`, `keyctl`, `open_by_handle_at`, `name_to_handle_at`, and `seccomp` itself. `prctl` is allowed except `prctl(PR_SET_SECCOMP)`, which is denied (arg-checked). The filter verifies `AUDIT_ARCH_X86_64` and kills on any other ABI. Path-based `open`/`openat` restrictions (`/proc/*/mem`, `/dev/dri/card*`, `/dev/input/event*`, control socket) are enforced by Landlock (T2), not by pointer-dereferencing BPF.
+Apply a seccomp-BPF filter (constructed at spawn time, before `exec`) that denies the privileged and credential syscalls a game must never use: `mount`, `umount2`, `init_module`, `finit_module`, `delete_module`, `ptrace`, `reboot`, `kexec_load`, `kexec_file_load`, `swapon`, `swapoff`, `setuid`, `setgid`, `setreuid`, `setregid`, `setresuid`, `setresgid`, `setfsuid`, `setfsgid`, `capset`, `chroot`, `pivot_root`, `acct`, `settimeofday`, `clock_settime`, `adjtimex`, `sethostname`, `setdomainname`, `personality`, `iopl`, `ioperm`, `bpf`, `perf_event_open`, `process_vm_readv`, `process_vm_writev`, `userfaultfd`, `add_key`, `request_key`, `keyctl`, `open_by_handle_at`, `name_to_handle_at`, and `seccomp` itself. `prctl` is allowed except `prctl(PR_SET_SECCOMP)`, which is denied (arg-checked). The filter verifies `AUDIT_ARCH_X86_64` and kills on any other ABI. Path-based `open`/`openat` restrictions (`/proc/*/mem`, `/dev/dri/card*`, control socket) are enforced by Landlock (T2), not by pointer-dereferencing BPF.
 
-**Done when:** `mount()` from a game process returns `EPERM`, `prctl(PR_SET_SECCOMP)` returns `EPERM`, and `open()` of `/proc/*/mem`, `/dev/dri/card*`, `/dev/input/event*`, or the control socket is denied (by Landlock).
+**Done when:** `mount()` from a game process returns `EPERM`, `prctl(PR_SET_SECCOMP)` returns `EPERM`, and `open()` of `/proc/*/mem`, `/dev/dri/card*`, or the control socket is denied (by Landlock).
 
 ### S12-T4 — Restrict DRM node access
 
-The **primary node** `/dev/dri/card*` is owned by the `drm` group; games are not in `drm`, so they cannot modeset or take over the display. The **render node** `/dev/dri/renderD*` is a separate, unprivileged GPU path that games legitimately need for client-side EGL/GLES2 (raylib's PLAYOS backend renders via EGL + DRI, then the compositor scans the buffers out through the Wayland seat). A `99-playos-dri.rules` udev rule sets render nodes to `root:render 0660`, and `playos-game` is a member of `render`. Verify the primary node is unopenable from the game identity while the render node is openable.
+The **primary node** `/dev/dri/card*` is owned by the `drm` group; games are not in `drm`, so they cannot modeset or take over the display. The **render node** `/dev/dri/renderD*` is a separate, unprivileged GPU path that games legitimately need for client-side EGL/GLES2 (raylib's PLAYOS backend renders via EGL + DRI, then the compositor scans the buffers out through the Wayland seat). A `99-playos-dri.rules` udev rule sets render nodes to `root:render 0660`, `playos-game` is a member of `render`, and the Landlock allowlist grants `/dev/dri` read-write (the primary node stays denied by the `drm` group, not by Landlock). Verify the primary node is unopenable from the game identity while the render node is openable.
 
 **Done when:** `open("/dev/dri/card0", O_RDWR)` from a game process returns `EACCES`, and `open("/dev/dri/renderD128", O_RDWR)` succeeds so the game's EGL context initializes.
 
 ### S12-T5 — Enforce reserved-button input isolation
 
-Reserved buttons (`SYSTEM`, `QUICK_MENU`) are intercepted by the compositor at the libinput/seat layer and never forwarded to clients. Games run outside the `input` group, so `/dev/input/event*` is unopenable; Landlock and seccomp also name those paths explicitly. The existing `libplayos` software mask remains as defense-in-depth, not the sole mechanism.
+Reserved buttons (`SYSTEM`, `QUICK_MENU`, `POWER`) are stripped from the game-facing input stream by two layers: `playos-platform-api`'s snapshot mask (`playos_input.c`) clears `PLAYOS_RESERVED_BUTTONS` from `state->buttons`, and `playos-compositor`'s seat-level listener (`system_button.c`) consumes the same keycodes before any client can receive them. The game is in the `input` group and `/dev/input` is granted read-only so the built-in controller (raw evdev via `libplayos`) works; reserved-button isolation is therefore enforced at the snapshot + seat layers, not by denying `/dev/input`.
 
-**Done when:** `open("/dev/input/event0", O_RDONLY)` from a game process returns `EACCES`, and `SYSTEM`/`QUICK_MENU` never appear in a game's input stream.
+**Done when:** `SYSTEM`/`QUICK_MENU` never appear in a game's input stream, and pressing them while a game is focused still drives shell/overlay behavior.
 
 ### S12-T6 — Harden control socket
 
@@ -204,9 +206,9 @@ Document the target signed chain: UEFI Secure Boot signs `BOOTX64.EFI`; `BOOTX64
 
 **Drop privileges before exec, not after.** The game must never execute with root credentials; perform the credential drop and `PR_SET_NO_NEW_PRIVS` in the child process before `execve`.
 
-**Name the denied paths explicitly.** Both the seccomp `open`/`openat` filter and the Landlock ruleset must name `/dev/input/event*`, `/dev/dri/card*`, `/proc/*/mem`, and the control socket. Do not rely on default-deny alone.
+**Name the denied paths explicitly.** The Landlock ruleset denies `/dev/dri/card*`, `/proc/*/mem`, and the control socket (default-deny); `/dev/input` is intentionally granted read-only for the controller, and reserved-button isolation is enforced by the snapshot mask + seat intercept, not by path denial. The seccomp filter is a syscall deny-list only — it does not filter by path.
 
-**Treat the `libplayos` mask as defense-in-depth.** The real boundary is the seat plus group permissions plus Landlock plus seccomp; the software bitmask is a convenience, not the enforcement point.
+**Treat the `libplayos` mask as one of two enforcement points.** Reserved-button isolation is the snapshot mask plus the compositor seat intercept; both strip the same reserved keycodes. Neither is "defense-in-depth only" — together they are the boundary, because the game legitimately needs `/dev/input` for the controller.
 
 **Landlock fallback must be loud, not silent.** If the kernel is too old, log an alert and continue, but record it as an unresolved hardening gap rather than failing the whole launch path.
 
@@ -224,7 +226,7 @@ Document the target signed chain: UEFI Secure Boot signs `BOOTX64.EFI`; `BOOTX64
 |---|---|
 | Game runs as `playos-game` with no capabilities | `id` and `/proc/self/status` captured inside a test game |
 | Primary DRM node denied | Security test binary attempts `open("/dev/dri/card0", O_RDWR)` |
-| Raw input device denied | Security test binary attempts `open("/dev/input/event0", O_RDONLY)` |
+| Raw input device granted (controller works) | Security test binary opens `/dev/input/event0` read-only (input group + Landlock rule) |
 | Reserved buttons absent | Input-stream dump while `SYSTEM`/`QUICK_MENU` are pressed |
 | Control socket denied | Security test binary attempts `connect()` to `control.sock` |
 | seccomp active | Security test binary attempts `mount()` and observes `EPERM` |
@@ -238,9 +240,9 @@ Document the target signed chain: UEFI Secure Boot signs `BOOTX64.EFI`; `BOOTX64
 ## Acceptance Criteria
 
 - [x] Game process runs as `playos-game` user (host: `playos_security_drop_privileges()` unit path; on-device `id`/`/proc/self/status` check still pending)
-- [x] `open("/dev/dri/card0", O_RDWR)` returns `EACCES` in a game process (Landlock default-deny on `/dev/dri`; host Landlock test covers default-deny, on-device check pending)
-- [x] `open("/dev/input/event0", O_RDONLY)` returns `EACCES` in a game process (Landlock default-deny + no `input` group; on-device check pending)
-- [x] Reserved buttons (`SYSTEM`/`QUICK_MENU`) never appear in a game's input stream (compositor seat intercept extended; raw evdev denied by Landlock/groups)
+- [x] `open("/dev/dri/card0", O_RDWR)` returns `EACCES` in a game process (games not in `drm` group — Unix DAC; host Landlock test covers the `/dev/dri` render-node grant, on-device check pending)
+- [x] `open("/dev/input/event0", O_RDONLY)` succeeds in a game process so the controller works (input group + Landlock `/dev/input` read rule; on-device check pending)
+- [x] Reserved buttons (`SYSTEM`/`QUICK_MENU`) never appear in a game's input stream (compositor seat intercept + `libplayos` snapshot mask; on-device check pending)
 - [x] `connect()` to `/run/playos/control.sock` returns `EACCES` from a `playos-game` process (socket `0660 root:1000`; policy test added)
 - [x] seccomp filter: `mount()` from game process returns `EPERM` (filter built; host env blocks filter installation — on-device check pending)
 - [x] Landlock: game cannot `open()` another game's save directory (host test)

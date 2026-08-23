@@ -45,7 +45,7 @@
 │  User: playos-game (unprivileged)                             │
 │  No access to Zone 2 sockets                                  │
 │  No DRM primary nodes                                         │
-│  No raw input devices                                         │
+│  Raw evdev via libplayos (reserved buttons stripped)         │
 │  Restricted to own save/cache directories                     │
 │  seccomp + Landlock enforced                                  │
 └───────────────────────────────────────────────────────────────┘
@@ -61,7 +61,7 @@
 | `playos-compositor` | `root` | All | Sprint 12 scopes privilege reduction to games; dropping system-component privileges is deferred |
 | `playos-shell` | `root` | All | Trusted; root accepted by control-socket check |
 | `playos-overlay` | `root` | All | Trusted; root accepted by control-socket check |
-| Active game | `playos-game` (uid 1001, gid 1001) | None | `PR_SET_NO_NEW_PRIVS = 1`; supplementary group `audio` only; seccomp + Landlock before exec |
+| Active game | `playos-game` (uid 1001, gid 1001) | None | `PR_SET_NO_NEW_PRIVS = 1`; supplementary groups `audio`, `render`, `input`; seccomp + Landlock before exec |
 | `playos-installer` | `root` | All | Only present in installer image |
 
 ---
@@ -124,10 +124,10 @@ A normal game **must not** be able to:
 |---|---|---|---|
 | `/dev/dri/card*` | `root:drm` | `0660` | ❌ Not in `drm` group |
 | `/dev/dri/renderD*` | `root:render` | `0660` | ✅ In `render` group (needed for Wayland/EGL) |
-| `/dev/input/event*` | `root:input` | `0660` | ❌ Not in `input` group (input via Wayland seat only) |
+| `/dev/input/event*` | `root:input` | `0660` | ✅ In `input` group (built-in controller via libplayos evdev) |
 | `/run/playos/*.sock` | `root:playos-trusted` | `0660` | ❌ Not in `playos-trusted` |
 
-Note: Games access GPU rendering through the Wayland EGL surface, not directly through render nodes.
+Note: Games render client-side by opening `/dev/dri/renderD*` directly (in the `render` group); the compositor scans out the resulting buffer. Primary nodes (`/dev/dri/card*`) remain denied via the `drm` group.
 
 ---
 
@@ -167,8 +167,9 @@ prctl(PR_SET_SECCOMP)   # games cannot stack/replace filters; other
 ### ioctl restrictions
 
 Device-node access is enforced by Landlock + group membership, not by
-`ioctl` filtering: `/dev/dri/*` and `/dev/input/*` are outside the
-Landlock allowlist and the game is not in `drm`/`input`.
+`ioctl` filtering. `/dev/dri` (render node) and `/dev/input` are granted
+via the Landlock allowlist and `render`/`input` group membership;
+`/dev/dri/card*` (primary nodes) remain denied via the `drm` group.
 
 ---
 
@@ -187,6 +188,8 @@ Requires Linux ≥ 5.13 (ROG Ally ships with kernels that support this). Falls b
 | `/run/playos/` | Read + execute (Wayland socket path) |
 | `/lib`, `/usr/lib` | Read + execute (musl dynamic loader + shared libraries) |
 | `/dev/snd` | Read + write (ALSA PCM/control nodes) |
+| `/dev/input` | Read (built-in controller evdev nodes) |
+| `/dev/dri` | Read + write (DRM render node for client-side rendering) |
 | `/dev/shm` | Read + write + create + remove (wl_shm fallback) |
 | `/etc/asound.conf` | Read (single-file rule, optional) |
 
@@ -199,8 +202,7 @@ Requires Linux ≥ 5.13 (ROG Ally ships with kernels that support this). Falls b
 - `/run/playos/control.sock` — control IPC
 - `/run/playos/compositor.sock` — compositor control
 - `/sys/`, `/proc/` — system and process snooping
-- `/dev/dri/*` — all DRM nodes (primary **and** render nodes; games reach the GPU through the Wayland seat, so no direct render-node access is granted)
-- `/dev/input/event*` — raw input devices
+- `/dev/dri/card*` — primary DRM nodes (games render via the `render` node; primary scanout remains compositor-only)
 
 ---
 
@@ -210,9 +212,12 @@ Requires Linux ≥ 5.13 (ROG Ally ships with kernels that support this). Falls b
 `BTN_MODE`/`KEY_PROG1`/`BTN_TRIGGER_HAPPY1`; `PLAYOS_BUTTON_QUICK_MENU`:
 `KEY_PROG2`/`BTN_TRIGGER_HAPPY2`) are consumed by `playos-compositor` at the
 seat layer (`src/system_button.c`) before any event reaches a client. Games
-are additionally denied raw evdev: they run as `playos-game` (not in
-`input`), and Landlock default-deny blocks `/dev/input/event*`. The
-`libplayos` bitmask remains defense-in-depth only.
+read the built-in controller directly through raw evdev: `/dev/input` is
+granted read-only and the game runs in the `input` group. The boundary is
+dual-layer — the `libplayos` snapshot mask strips reserved buttons from the
+game's view (defense in depth), and the compositor seat intercept keeps them
+PlayOS-only. The remaining hardening gap is udev group separation of the
+vendor/home input nodes (see the security-on-device runbook).
 
 **Input routing hierarchy:**
 ```
@@ -225,7 +230,7 @@ libinput event
     └── otherwise      → shell Wayland client
 ```
 
-Games receive input exclusively through the **Wayland seat** (not raw evdev). They cannot open `/dev/input/event*` (not in the `input` group; Landlock also blocks the path).
+Games read the built-in controller through raw evdev via `libplayos`. Reserved buttons (`BTN_MODE`, `KEY_PROG1/2`, `BTN_TRIGGER_HAPPY1/2`) never reach the game: `libplayos` masks them out of the controller snapshot, and the compositor seat intercept strips them before any event reaches a client.
 
 ---
 

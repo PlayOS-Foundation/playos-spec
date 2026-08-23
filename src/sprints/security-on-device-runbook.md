@@ -62,7 +62,7 @@ Each probe prints `[PASS]`, `[FAIL]`, or `[SKIP]`, plus an errno/value detail.
 | `no_new_privs` | `no_new_privs=1` | `PR_SET_NO_NEW_PRIVS` was not applied before exec |
 | `capabilities` | `eff=0x0 perm=0x0` | Capabilities remain — seccomp/capset ordering broken |
 | `dri_card0_denied` | open fails (`EACCES`) | Game reached the primary DRM node → could modeset/take over display |
-| `dri_render_allowed` | render node opens | EGL/GLES2 client rendering would fail (see Known tensions) |
+| `dri_render_allowed` | render node opens | EGL/GLES2 client rendering would fail |
 | `input_allowed` | evdev node opens | Built-in controller backend would get no input |
 | `audio_allowed` | ALSA PCM opens | Game audio would break |
 | `control_sock_denied` | `connect` fails | Game reached the trusted control socket |
@@ -76,11 +76,13 @@ Each probe prints `[PASS]`, `[FAIL]`, or `[SKIP]`, plus an errno/value detail.
 
 ## Known tensions to flag during the run
 
-1. **`/dev/dri` is absent from the Landlock allowlist.** `landlock.c` grants `/dev/snd`, `/dev/input`, and `/dev/shm` but not `/dev/dri`. Sprint 12 intends `open("/dev/dri/renderD128", O_RDWR)` to succeed (S12-T4), and the game holds the `render` group, but Landlock default-deny will still return `EACCES` on the render node because there is no `/dev/dri` rule. **Expected result:** `dri_render_allowed` currently FAILs. This is a real sandbox gap, not a test bug. Fix: add a `/dev/dri` read/write rule (and, if needed, a `99-playos-dri.rules`-compatible `root:render 0660` path) to the Landlock allowlist, then re-run.
+1. **`/dev/dri` Landlock rule — RESOLVED.** `landlock.c` now grants `/dev/dri` read-write (S12-T4), so `dri_render_allowed` PASSes on a fully-up Ally where `renderD128` exists. The primary node `/dev/dri/card0` stays denied by the `drm` group (Unix DAC), not by Landlock.
 
-2. **`/dev/input` is granted, so `input_allowed` will PASS.** That is consistent with the current implementation (games read evdev through `libplayos`, reserved buttons stripped by the compositor seat + `libplayos` mask), but it does **not** prove a malicious game can't read raw evdev directly — a game with `input` group membership can. Sprint 12's acceptance text says `/dev/input/event0` should return `EACCES`, which contradicts the current implementation. Resolve this explicitly: either keep raw-input access and rely on the seat boundary (document the residual risk), or move to a broker that forwards sanitized input and remove `input` from the game's supplementary groups.
+2. **`/dev/input` is granted by design — RESOLVED.** `input_allowed` PASSes because the game is in the `input` group and Landlock grants `/dev/input` read-only; the built-in controller works via raw evdev through `libplayos`. Reserved-button isolation is enforced by the `libplayos` snapshot mask + the compositor seat intercept, not by denying `/dev/input`. Sprint 12's spec has been reconciled to this.
 
-3. **`mount_denied`, `config_denied`, `other_saves_denied`, `dri_card0_denied`, `control_sock_denied`, `identity`, `no_new_privs`, `capabilities` should all PASS** on the real spawn path. If any of these FAILs in Phase A, the sandbox ordering or allowlist is wrong.
+3. **Remaining hardening gap (deferred, not implemented).** A malicious game that bypasses `libplayos` and reads the raw evdev nodes directly can still observe the reserved-button vendor/home nodes, because `/dev/input` is granted to the `input` group and those nodes are not separated from the gamepad node. The correct OS-level fix is udev group separation: keep the gamepad node in `input`, but move the home node (BTN_MODE-only) and the vendor node (`hid-asus-ally`: `KEY_PROG1`/`KEY_PROG2`, `BTN_TRIGGER_HAPPY1`/`BTN_TRIGGER_HAPPY2`) to `root:root 0600` (or a `playos-trusted` group) so a game cannot read them. This needs the actual device/udev attributes and must be tested on the Ally — do not ship blind. Track as a follow-up hardening item, not a Sprint 12 acceptance blocker.
+
+4. **`mount_denied`, `config_denied`, `other_saves_denied`, `dri_card0_denied`, `control_sock_denied`, `identity`, `no_new_privs`, `capabilities` should all PASS** on the real spawn path. If any of these FAILs in Phase A, the sandbox ordering or allowlist is wrong.
 
 ---
 
