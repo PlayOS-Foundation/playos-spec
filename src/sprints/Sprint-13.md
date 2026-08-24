@@ -129,14 +129,14 @@ src/sprints/Sprint-13.md        # this sprint
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S13-T1 | Validate GPU discovery by PCI vendor and scoring model on Intel hardware | `playos-compositor` | not started | |
-| S13-T2 | Add Intel PC kernel configuration and firmware | `playos-refdistro` | not started | |
-| S13-T3 | Enable Mesa Iris Gallium backend for Intel | `playos-refdistro` | not started | |
-| S13-T4 | Confirm evdev input is portable to Intel (no new backend) | `playos-platform-api` | not started | |
-| S13-T5 | Validate Intel power sysfs paths and device strings | `playos-platform-api` | not started | |
-| S13-T6 | Add `make intel-*` Buildroot targets and USB image generation | `playos-refdistro` | not started | |
-| S13-T7 | Validate sample-game portability on the Intel PC | `playos-samples` | not started | |
-| S13-T8 | Document dual-vendor support in the specs | `playos-spec` | not started | |
+| S13-T1 | Validate GPU discovery by PCI vendor and scoring model on Intel hardware | `playos-compositor` | in progress | Host part done: scoring extracted to `src/gpu_score.c`, `tests/test_gpu_select.c` added (ctest `gpu-select` passes, commit `195664c`), `gpu_discovery.h` comment updated, no `card0` in compositor; **on-device ZenBook log pending** |
+| S13-T2 | Add Intel PC kernel configuration and firmware | `playos-refdistro` | in progress | `playos_intel_pc_defconfig` + `board/intel/linux-fragment.cfg` + `firmware.list` authored; defconfig generates clean (i915/Iris symbols verified); **full `make intel-build` kernel build pending CI** |
+| S13-T3 | Enable Mesa Iris Gallium backend for Intel | `playos-refdistro` | in progress | `BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_IRIS=y` + `BR2_PACKAGE_MESA3D_LLVM=y` + EGL/ES/GBM in the Intel defconfig; **runtime Mesa Intel renderer string pending on-device** |
+| S13-T4 | Confirm evdev input is portable to Intel (no new backend) | `playos-platform-api` | in progress | Code review confirms evdev backend is vendor-agnostic; no code changes required; **on-device evdev confirmation pending** |
+| S13-T5 | Validate Intel power sysfs paths and device strings | `playos-platform-api`, `playos-init` | in progress | Code done + host tests: platform-api `d9d5bae` and init `41c071b` (hwmon matchers accept `i915`/`coretemp`); **on-device Intel sysfs values pending** |
+| S13-T6 | Add `make intel-*` Buildroot targets and USB image generation | `playos-refdistro` | in progress | `intel-config/build/usb-image/flash` Makefile targets + `scripts/gen-intel-usb-image.sh` + `.github/workflows/intel-build.yml` added; **CI run of `make intel-build` pending** |
+| S13-T7 | Validate sample-game portability on the Intel PC | `playos-samples` | not started | Requires ZenBook hardware |
+| S13-T8 | Document dual-vendor support in the specs | `playos-spec` | done | `hardware-matrix.md` + `backend-portability.md` added and linked from `SUMMARY.md` |
 
 Update the **Status** column as work progresses: `not started` → `in progress` → `blocked` or `done`.
 

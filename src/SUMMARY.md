@@ -11,6 +11,8 @@
 - [Runtime IPC Protocol](runtime-ipc.md)
 - [Wayland Protocol](wayland-protocol.md)
 - [Security Model](security-model.md)
+- [Supported Hardware Matrix](hardware-matrix.md)
+- [Backend Portability](backend-portability.md)
 
 ---
 
