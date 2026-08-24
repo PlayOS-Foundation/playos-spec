@@ -6,7 +6,7 @@
 
 **Prerequisites:** Sprint 11 complete — immutable images and A/B updates working.
 
-**Status:** 🟢 Complete — all T1–T9 implemented and validated. The on-device (ROG Ally) acceptance run surfaced one real gap: Landlock was not active because the Ally kernel had `CONFIG_SECURITY` disabled (and `CONFIG_SECURITY_LANDLOCK` depends on `SECURITY`), so `config_denied` failed (a game could read `/data/config`). Fixed by enabling `CONFIG_SECURITY` + `CONFIG_SECURITY_LANDLOCK` in `br2-external/board/ally/linux.config`; the rebuilt kernel `.config` now shows `CONFIG_SECURITY=y`, `CONFIG_SECURITY_LANDLOCK=y`, and `CONFIG_LSM="landlock,lockdown,yama,loadpin,safesetid,ipe,bpf"`. **Remaining user action:** flash the rebuilt image and re-run the self-test to confirm 11/11 on-device. Production-lint CI is satisfied by `playos-refdistro/.github/workflows/production-build.yml` (builds the production image, asserts no debug artifacts, QEMU boot-checks `--production`).
+**Status:** 🟢 Complete — all T1–T9 implemented and validated. The on-device (ROG Ally) acceptance run surfaced one real gap: Landlock was not active because the Ally kernel had `CONFIG_SECURITY` disabled (and `CONFIG_SECURITY_LANDLOCK` depends on `SECURITY`), so `config_denied` failed (a game could read `/data/config`). Fixed by enabling `CONFIG_SECURITY` + `CONFIG_SECURITY_LANDLOCK` in `br2-external/board/ally/linux.config`; the rebuilt kernel `.config` now shows `CONFIG_SECURITY=y`, `CONFIG_SECURITY_LANDLOCK=y`, and `CONFIG_LSM="landlock,lockdown,yama,loadpin,safesetid,ipe,bpf"`. After re-flashing the rebuilt image, the on-device security self-test passed **11/11** on the ROG Ally (2026-08-23), confirming Landlock default-deny, the seccomp deny-list, credential drop, DRM/input/control-socket boundaries, and cross-game data isolation on real hardware. Production-lint CI is satisfied by `playos-refdistro/.github/workflows/production-build.yml` (builds the production image, asserts no debug artifacts, QEMU boot-checks `--production`).
 
 ---
 
@@ -240,12 +240,12 @@ Document the target signed chain: UEFI Secure Boot signs `BOOTX64.EFI`; `BOOTX64
 
 ## Acceptance Criteria
 
-- [x] Game process runs as `playos-game` user (host: `playos_security_drop_privileges()` unit path; on-device `id`/`/proc/self/status` check still pending)
-- [x] `open("/dev/dri/card0", O_RDWR)` returns `EACCES` in a game process (games not in `drm` group — Unix DAC; host Landlock test covers the `/dev/dri` render-node grant, on-device check pending)
-- [x] `open("/dev/input/event0", O_RDONLY)` succeeds in a game process so the controller works (input group + Landlock `/dev/input` read rule; on-device check pending)
-- [x] Reserved buttons (`SYSTEM`/`QUICK_MENU`) never appear in a game's input stream (compositor seat intercept + `libplayos` snapshot mask; on-device check pending)
+- [x] Game process runs as `playos-game` user (host: `playos_security_drop_privileges()` unit path; on-device self-test `identity` PASS)
+- [x] `open("/dev/dri/card0", O_RDWR)` returns `EACCES` in a game process (games not in `drm` group — Unix DAC; host Landlock test covers the `/dev/dri` render-node grant; on-device self-test `dri_card0_denied`/`dri_render_allowed` PASS)
+- [x] `open("/dev/input/event0", O_RDONLY)` succeeds in a game process so the controller works (input group + Landlock `/dev/input` read rule; on-device self-test `input_allowed` PASS)
+- [x] Reserved buttons (`SYSTEM`/`QUICK_MENU`) never appear in a game's input stream (compositor seat intercept + `libplayos` snapshot mask; on-device manual smoke PASS — reserved presses drive shell/overlay, never game input)
 - [x] `connect()` to `/run/playos/control.sock` returns `EACCES` from a `playos-game` process (socket `0660 root:1000`; policy test added)
-- [x] seccomp filter: `mount()` from game process returns `EPERM` (filter built; host env blocks filter installation — on-device check pending)
+- [x] seccomp filter: `mount()` from game process returns `EPERM` (filter built; host env blocks filter installation — on-device self-test `mount_denied` PASS)
 - [x] Landlock: game cannot `open()` another game's save directory (host test)
 - [x] Landlock: game cannot read `/data/config/` (default-deny; host test)
 - [x] Production build contains no `busybox`, `gdbserver`, `strace`, or open TCP sockets (lint `OK — no debug artifacts` + manual absence of busybox/sh/gdbserver/strace/evtest/dropbear/sshd; no listening network services by construction since dropbear/sshd are removed)
@@ -253,7 +253,7 @@ Document the target signed chain: UEFI Secure Boot signs `BOOTX64.EFI`; `BOOTX64
 - [x] Development image retains full debug tools (`playos_ally_defconfig` unchanged debug set)
 - [x] Manifest signature verification runs in warn-only mode (warning in log for unsigned manifests — spawn path logs, launch never blocked)
 - [x] Development EFI signing key exists and is used in CI builds (`keys/dev/*`, `scripts/sign-efi.sh`; CI wiring is part of T7 image build)
-- [x] All existing sprint acceptance criteria still pass (no regression — QEMU boot smoke test passes to `playos-init starting as PID 1` with no busybox/sh; host + QEMU regression passes; **on-device 11/11 self-test re-verify pending the user flashing the rebuilt image** — the Landlock gap was found on-device and the kernel-config fix is rebuilt but not yet re-flashed)
+- [x] All existing sprint acceptance criteria still pass (no regression — QEMU boot smoke test passes to `playos-init starting as PID 1` with no busybox/sh; host + QEMU regression passes; **on-device 11/11 self-test PASSED after re-flashing the rebuilt image (2026-08-23)** — the Landlock gap was found on-device, the kernel-config fix was rebuilt, re-flashed, and re-verified)
 
 ---
 
