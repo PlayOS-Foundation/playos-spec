@@ -2,7 +2,7 @@
 
 **Goal:** Deliver a signed preview release of PlayOS with a stable, versioned public Platform API, complete documentation, a validated release pipeline, and a full smoke-test pass on physical ROG Ally hardware.
 
-**Primary Outcome:** PlayOS v0.1.0 is a signed, installable release that meets all 19 MVP criteria. The `libplayos` C ABI is documented and stable. A second developer can build a game using only the public API documentation.
+**Primary Outcome:** PlayOS v0.3.0 is a signed, installable release that meets all 19 MVP criteria. The `libplayos` C ABI is documented and stable. A second developer can build a game using only the public API documentation.
 
 **Prerequisites:** Sprint 13 complete — all MVP features implemented, Intel expansion validated.
 
@@ -17,8 +17,8 @@ All MVP features are implemented by the end of Sprint 13, but the project is not
 ## Start Condition Checklist
 
 - Sprint 13 complete: all MVP features are implemented and Intel expansion is validated.
-- The seven public headers exist in `playos-platform-api/include/playos/`: `playos_input.h`, `playos_lifecycle.h`, `playos_system.h`, `playos_storage.h`, `playos_audio.h`, `playos_power.h`, `playos_logging.h`.
-- The public API is currently unversioned — no `PLAYOS_API_VERSION`, no library version, no SONAME policy.
+- The eight public headers exist in `playos-platform-api/include/playos/`: `playos_audio.h`, `playos_display.h`, `playos_input.h`, `playos_lifecycle.h`, `playos_logging.h`, `playos_power.h`, `playos_storage.h`, `playos_system.h`.
+- The public API is already versioned — `PLAYOS_API_VERSION 1` and `PLAYOS_API_VERSION_MAJOR/MINOR/PATCH 0.3.0` are set, with SONAME `libplayos.so.0` (S14-T1/T2 already done; this sprint formalizes and documents them).
 - Release images are produced manually; there is no `release.yml` workflow.
 - Recovery mode is partially specified: A/B rollback and factory reset exist from Sprint 10, but the recovery UI is not implemented.
 - No performance baseline has been measured or documented.
@@ -27,13 +27,13 @@ All MVP features are implemented by the end of Sprint 13, but the project is not
 
 ## Decisions Locked for This Sprint
 
-- **API version:** set `PLAYOS_API_VERSION 1` in `playos.h`.
-- **Library version:** `LIBPLAYOS_VERSION_MAJOR 0`, `MINOR 1`, `PATCH 0`.
-- **SONAME:** `libplayos.so.0` for this release.
+- **API version:** `PLAYOS_API_VERSION 1` (already set in `playos.h`).
+- **Library version:** `PLAYOS_API_VERSION_MAJOR 0`, `MINOR 3`, `PATCH 0` (already set in `playos.h`).
+- **SONAME:** `libplayos.so.0` for this release (already set in `CMakeLists.txt`).
 - **Compatibility policy:** minor versions are backward-compatible; a major version bump is breaking.
-- **Breaking-change process:** breaking changes after v0.1.0 require an RFC in `playos-spec`, an ADR, a major version bump, and a migration guide.
-- **Release trigger and tag:** the pipeline runs on a version tag push such as `v0.1.0`.
-- **Release artifacts:** `playos-v0.1.0-rog-ally-installer.img`, `playos-v0.1.0-rog-ally-update.playosb`, `playos-v0.1.0-sdk-headers.tar.gz`, plus SHA256 checksums and signatures.
+- **Breaking-change process:** breaking changes after v0.3.0 require an RFC in `playos-spec`, an ADR, a major version bump, and a migration guide.
+- **Release trigger and tag:** the pipeline runs on a version tag push such as `v0.3.0`.
+- **Release artifacts:** `playos-v0.3.0-rog-ally-installer.img`, `playos-v0.3.0-rog-ally-update.playosb`, `playos-v0.3.0-sdk-headers.tar.gz`, plus SHA256 checksums and signatures.
 - **Recovery rendering:** recovery must work without AMDGPU, using SimpleDRM or software rendering.
 - **Performance targets:** the baseline table below is the acceptance target; any metric more than 2× over target is a documented gap.
 
@@ -43,7 +43,7 @@ All MVP features are implemented by the end of Sprint 13, but the project is not
 
 ### In Scope
 
-- Formal API compatibility review of all seven public headers.
+- Formal API compatibility review of all eight public headers.
 - Versioning: `PLAYOS_API_VERSION 1`, library version, and SONAME `libplayos.so.0`.
 - Doxygen documentation plus code examples and a getting-started guide for every API group.
 - Game-developer guides in `playos-spec/docs/`.
@@ -56,7 +56,7 @@ All MVP features are implemented by the end of Sprint 13, but the project is not
 
 ### Explicitly Out of Scope
 
-- Breaking changes to the public API (this sprint freezes v0.1.0; changes go through the post-v0.1.0 process).
+- Breaking changes to the public API (this sprint freezes v0.3.0; changes go through the post-v0.3.0 process).
 - Production HSM-backed signing — the pipeline uses the development signing key only.
 - Intel Vulkan (ANV) and multi-GPU work (deferred to future sprints).
 - Network stack (no network in the MVP).
@@ -72,7 +72,7 @@ All MVP features are implemented by the end of Sprint 13, but the project is not
 | `playos-init` | Recovery entry logic: boot-count exceeded, button hold, repeated compositor failure |
 | `playos-shell` | Minimal recovery UI (text or simple Raylib on SimpleDRM/framebuffer) |
 | `playos-spec` | Authoritative reference completion: README, architecture, roadmap, platform API, IPC, security, ADRs, game-dev docs |
-| All repos | Version tags and CHANGELOG updates for the `v0.1.0` release |
+| All repos | Version tags and CHANGELOG updates for the `v0.3.0` release |
 
 ---
 
@@ -81,7 +81,7 @@ All MVP features are implemented by the end of Sprint 13, but the project is not
 ### `playos-platform-api`
 
 ```text
-include/playos/playos.h          # PLAYOS_API_VERSION 1 + LIBPLAYOS_VERSION_* macros
+include/playos/playos.h          # PLAYOS_API_VERSION 1 + PLAYOS_API_VERSION_* macros
 CMakeLists.txt                    # SONAME libplayos.so.0
 docs/api/                         # rendered Doxygen output
 examples/                         # per-API-group code examples + minimal game
@@ -91,7 +91,7 @@ docs/getting-started.md           # minimal game using input, lifecycle, storage
 ### `playos-refdistro`
 
 ```text
-.github/workflows/release.yml     # tag-triggered v0.1.0 release pipeline
+.github/workflows/release.yml     # tag-triggered v0.3.0 release pipeline
 versions.lock                     # all component versions pinned
 br2-external/board/ally/recovery/ # recovery menu sources and SimpleDRM/framebuffer config
 br2-external/configs/playos_ally_recovery_defconfig
@@ -130,39 +130,39 @@ docs/                             # game-developer guides
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S14-T1 | Freeze the public API and set `PLAYOS_API_VERSION 1` | `playos-platform-api` | not started | |
-| S14-T2 | Set library version and SONAME `libplayos.so.0` | `playos-platform-api` | not started | |
+| S14-T1 | Freeze the public API and set `PLAYOS_API_VERSION 1` | `playos-platform-api` | done | `playos.h` already defines `PLAYOS_API_VERSION 1` |
+| S14-T2 | Set library version and SONAME `libplayos.so.0` | `playos-platform-api` | done | Already `0.3.0` + SONAME `libplayos.so.0` |
 | S14-T3 | Complete Doxygen docs and code examples | `playos-platform-api` | not started | |
 | S14-T4 | Implement the tag-triggered release pipeline | `playos-refdistro` | not started | |
 | S14-T5 | Run the full 19-criterion MVP smoke test | `playos-refdistro` | not started | |
 | S14-T6 | Implement recovery mode | `playos-init`, `playos-shell`, `playos-refdistro` | not started | |
 | S14-T7 | Measure and document the performance baseline | `playos-refdistro` | not started | |
 | S14-T8 | Complete `playos-spec` and game-developer guides | `playos-spec` | not started | |
-| S14-T9 | Enforce production image hygiene and signed artifacts | `playos-refdistro` | not started | |
+| S14-T9 | Enforce production image hygiene and signed artifacts | `playos-refdistro` | in progress | Production defconfig, `production-build.yml`, and sign scripts exist; `release.yml` + SDK tarball pending |
 
 Update the **Status** column as work progresses: `not started` → `in progress` → `blocked` or `done`.
 
 ### S14-T1 — Freeze the public API
 
-Conduct a formal API compatibility review for every public header in `include/playos/`. For each API, check enum-value stability (adding is safe, removing is breaking), struct-layout stability (adding fields without versioning is ABI-breaking), function-signature stability, return-value semantics, error handling, and thread-safety guarantees. Set `PLAYOS_API_VERSION 1` in `playos.h`. Any breaking change found must be resolved before the freeze — either avoided or deferred behind the post-v0.1.0 process.
+Conduct a formal API compatibility review for every public header in `include/playos/`. For each API, check enum-value stability (adding is safe, removing is breaking), struct-layout stability (adding fields without versioning is ABI-breaking), function-signature stability, return-value semantics, error handling, and thread-safety guarantees. Set `PLAYOS_API_VERSION 1` in `playos.h`. Any breaking change found must be resolved before the freeze — either avoided or deferred behind the post-v0.3.0 process.
 
-**Done when:** `playos.h` defines `PLAYOS_API_VERSION 1`, the review checklist is documented for all seven headers, and no unresolved breaking change remains.
+**Done when:** `playos.h` defines `PLAYOS_API_VERSION 1`, the review checklist is documented for all eight headers, and no unresolved breaking change remains.
 
 ### S14-T2 — Version the library and SONAME
 
-Set `LIBPLAYOS_VERSION_MAJOR 0`, `MINOR 1`, `PATCH 0`, and set the SONAME to `libplayos.so.0` in the `playos-platform-api` build. Document the compatibility policy: minor versions are backward-compatible; a major version bump is breaking. Document the breaking-change process: RFC in `playos-spec`, ADR, major version bump, and migration guide.
+Set `PLAYOS_API_VERSION_MAJOR 0`, `MINOR 3`, `PATCH 0`, and set the SONAME to `libplayos.so.0` in the `playos-platform-api` build. Both are already done; this task documents and verifies them. Document the compatibility policy: minor versions are backward-compatible; a major version bump is breaking. Document the breaking-change process: RFC in `playos-spec`, ADR, major version bump, and migration guide.
 
 **Done when:** the built library reports SONAME `libplayos.so.0`, the version macros are exported, and the compatibility policy is documented in `playos-spec`.
 
 ### S14-T3 — Complete Doxygen documentation
 
-Add Doxygen comments to every public symbol across the seven public headers, generate rendered docs into `docs/api/`, and write code examples for each API group. Write the "Getting Started" guide: create a minimal game that uses input, lifecycle, storage, and logging using only the public API.
+Add Doxygen comments to every public symbol across the eight public headers, generate rendered docs into `docs/api/`, and write code examples for each API group. Write the "Getting Started" guide: create a minimal game that uses input, lifecycle, storage, and logging using only the public API.
 
 **Done when:** Doxygen generates clean output with no undocumented public symbols, and the getting-started example compiles against the public headers.
 
 ### S14-T4 — Implement the release pipeline
 
-Create `playos-refdistro/.github/workflows/release.yml`, triggered by a version tag push such as `v0.1.0`. The pipeline locks component versions in `versions.lock`, builds the production ROG Ally image (no debug tools, signed EFI artifact), builds the installer image, runs the QEMU boot test suite, verifies production lint, signs the EFI artifact and update bundle with the development key, and packages `installer.img`, `update.playosb`, and `sdk-headers.tar.gz` with SHA256 checksums and signatures before creating a GitHub Release.
+Create `playos-refdistro/.github/workflows/release.yml`, triggered by a version tag push such as `v0.3.0`. The pipeline locks component versions in `versions.lock`, builds the production ROG Ally image (no debug tools, signed EFI artifact), builds the installer image, runs the QEMU boot test suite, verifies production lint, signs the EFI artifact and update bundle with the development key, and packages `installer.img`, `update.playosb`, and `sdk-headers.tar.gz` with SHA256 checksums and signatures before creating a GitHub Release.
 
 **Done when:** pushing a test tag runs the pipeline end-to-end and produces all three artifacts plus checksums and a GitHub Release.
 
@@ -194,7 +194,7 @@ Make `playos-spec` the authoritative reference: `README.md` (overview and naviga
 
 Confirm the production image ships without debug tools, the EFI artifact is signed with the development key, and the update bundle is signed. Verify the release pipeline's production-lint step fails on any debug binary. Produce the SDK headers tarball and confirm it compiles a minimal game on a Linux host.
 
-**Done when:** the `v0.1.0` artifacts are signed and pass lint, and `sdk-headers.tar.gz` compiles a minimal game on a Linux host.
+**Done when:** the `v0.3.0` artifacts are signed and pass lint, and `sdk-headers.tar.gz` compiles a minimal game on a Linux host.
 
 ---
 
@@ -222,7 +222,7 @@ Confirm the production image ships without debug tools, the EFI artifact is sign
 | SONAME correct | `readelf -d libplayos.so` shows `SONAME libplayos.so.0` |
 | API fully documented | Doxygen output with zero undocumented public symbols |
 | Release pipeline works | CI log from a test tag produces installer, update bundle, and SDK tarball |
-| Installer boots a clean device | Physical install of `playos-v0.1.0-rog-ally-installer.img` on a clean ROG Ally |
+| Installer boots a clean device | Physical install of `playos-v0.3.0-rog-ally-installer.img` on a clean ROG Ally |
 | Update applies via A/B | `update.playosb` applied through the A/B flow |
 | MVP criteria met | Committed smoke-test report with all 19 criteria passing |
 | SDK usable by a second developer | Minimal game compiled from `sdk-headers.tar.gz` on a Linux host |
@@ -239,8 +239,8 @@ Confirm the production image ships without debug tools, the EFI artifact is sign
 - [ ] `PLAYOS_API_VERSION 1` defined; SONAME is `libplayos.so.0`
 - [ ] "Building Your First PlayOS Game" guide is complete and tested
 - [ ] Release pipeline produces signed `installer.img` and `update.playosb` from a tag push
-- [ ] `playos-v0.1.0-rog-ally-installer.img` installs successfully on a clean ROG Ally
-- [ ] `playos-v0.1.0-rog-ally-update.playosb` applies successfully via A/B update flow
+- [ ] `playos-v0.3.0-rog-ally-installer.img` installs successfully on a clean ROG Ally
+- [ ] `playos-v0.3.0-rog-ally-update.playosb` applies successfully via A/B update flow
 - [ ] SDK headers tarball compiles a minimal game on a Linux host
 - [ ] Recovery mode is reachable and shows the recovery menu without AMDGPU
 - [ ] Performance baseline documented; no metric is more than 2× over target
@@ -254,8 +254,8 @@ Confirm the production image ships without debug tools, the EFI artifact is sign
 
 Sprint 15 may assume:
 
-- PlayOS v0.1.0 is a signed, installable release that passes all 19 MVP criteria.
-- The public `libplayos` C ABI is frozen at `PLAYOS_API_VERSION 1`, versioned `0.1.0`, with SONAME `libplayos.so.0`.
+- PlayOS v0.3.0 is a signed, installable release that passes all 19 MVP criteria.
+- The public `libplayos` C ABI is frozen at `PLAYOS_API_VERSION 1`, versioned `0.3.0`, with SONAME `libplayos.so.0`.
 - The SDK headers tarball exists and compiles a minimal game on a Linux host.
 - Doxygen docs and game-developer guides are published in `playos-spec/docs/`.
 - Recovery mode, performance baseline, and the tag-triggered release pipeline are in place.
@@ -265,6 +265,6 @@ Sprint 15 may assume:
 
 ## Exit Gate
 
-PlayOS v0.1.0 is a signed, installable release that passes all 19 MVP criteria on physical ROG Ally hardware. The public API is documented, stable, and versioned. A second developer can build and run a game using only the published SDK.
+PlayOS v0.3.0 is a signed, installable release that passes all 19 MVP criteria on physical ROG Ally hardware. The public API is documented, stable, and versioned. A second developer can build and run a game using only the published SDK.
 
 *Previous: [Sprint 13](Sprint-13.md) | Next: [Sprint 15](Sprint-15.md)*
