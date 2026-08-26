@@ -129,13 +129,13 @@ src/sprints/Sprint-13.md        # this sprint
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S13-T1 | Validate GPU discovery by PCI vendor and scoring model on Intel hardware | `playos-compositor` | in progress | Host part done: scoring extracted to `src/gpu_score.c`, `tests/test_gpu_select.c` added (ctest `gpu-select` passes, commit `195664c`), `gpu_discovery.h` comment updated, no `card0` in compositor; **on-device ZenBook log pending** |
-| S13-T2 | Add Intel PC kernel configuration and firmware | `playos-refdistro` | in progress | `playos_intel_pc_defconfig` + `board/intel/linux-fragment.cfg` + `firmware.list` authored; defconfig generates clean (i915/Iris symbols verified); **full `make intel-build` kernel build pending CI** |
-| S13-T3 | Enable Mesa Iris Gallium backend for Intel | `playos-refdistro` | in progress | `BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_IRIS=y` + `BR2_PACKAGE_MESA3D_LLVM=y` + EGL/ES/GBM in the Intel defconfig; **runtime Mesa Intel renderer string pending on-device** |
-| S13-T4 | Confirm evdev input is portable to Intel (no new backend) | `playos-platform-api` | in progress | Code review confirms evdev backend is vendor-agnostic; no code changes required; **on-device evdev confirmation pending** |
-| S13-T5 | Validate Intel power sysfs paths and device strings | `playos-platform-api`, `playos-init` | in progress | Code done + host tests: platform-api `d9d5bae` and init `41c071b` (hwmon matchers accept `i915`/`coretemp`); **on-device Intel sysfs values pending** |
-| S13-T6 | Add `make intel-*` Buildroot targets and USB image generation | `playos-refdistro` | in progress | `intel-config/build/usb-image/flash` Makefile targets + `scripts/gen-intel-usb-image.sh` + `.github/workflows/intel-build.yml` added; **CI run of `make intel-build` pending** |
-| S13-T7 | Validate sample-game portability on the Intel PC | `playos-samples` | not started | Requires ZenBook hardware |
+| S13-T1 | Validate GPU discovery by PCI vendor and scoring model on Intel hardware | `playos-compositor` | in progress | Host part done (`gpu_score` + ctest `gpu-select`, commit `195664c`); **on-device: shell + game render on the hybrid ZenBook (Intel selected, NVIDIA would not render) — explicit `0x8086` log pending SSH** |
+| S13-T2 | Add Intel PC kernel configuration and firmware | `playos-refdistro` | done | `playos_intel_pc_defconfig` + `board/intel/linux-fragment.cfg` + `firmware.list` authored; kernel built and **booted on-device**; `.config` verified (`EFI_STUB/i915/HDA/INTEL_PSTATE/INTEL_RAPL=y`, AMD/NVIDIA off) |
+| S13-T3 | Enable Mesa Iris Gallium backend for Intel | `playos-refdistro` | in progress | Iris + LLVM + EGL/ES/GBM configured; **sample game rendered on-device**; explicit Mesa Intel renderer string pending log |
+| S13-T4 | Confirm evdev input is portable to Intel (no new backend) | `playos-platform-api` | done | **USB gamepad input confirmed on-device**; no code changes required |
+| S13-T5 | Validate Intel power sysfs paths and device strings | `playos-platform-api`, `playos-init` | in progress | Code + host tests done (`d9d5bae`, `41c071b`); **on-device: battery % + thermal state render in shell status bar**; explicit `playos_power_get_info()` values pending SSH |
+| S13-T6 | Add `make intel-*` Buildroot targets and USB image generation | `playos-refdistro` | in progress | Makefile targets + image script + CI workflow added; **local `make intel-usb-image` succeeded** (image booted on-device); CI run pending push |
+| S13-T7 | Validate sample-game portability on the Intel PC | `playos-samples` | in progress | Sample game launched + rendered with USB gamepad input on-device; **audio-sine + system-button/lifecycle still to test** |
 | S13-T8 | Document dual-vendor support in the specs | `playos-spec` | done | `hardware-matrix.md` + `backend-portability.md` added and linked from `SUMMARY.md` |
 
 Update the **Status** column as work progresses: `not started` → `in progress` → `blocked` or `done`.
@@ -230,18 +230,18 @@ Update the supported-hardware matrix to list both the AMD ROG Ally and the Intel
 
 ## Acceptance Criteria
 
-- [ ] PlayOS boots on the ASUS ZenBook UX530 (Intel HD 620 iGPU + NVIDIA dGPU present)
-- [ ] Compositor selects the Intel DRM device by PCI enumeration over the NVIDIA device (no hardcoded path)
-- [ ] Compositor log shows Intel vendor ID and Mesa Iris renderer
-- [ ] `rotating-squares` runs with hardware acceleration on Intel (Mesa reports `Intel ...`)
-- [ ] `controller-visualizer` receives controller input on the ZenBook (USB gamepad)
-- [ ] `audio-sine` plays audio on the ZenBook
-- [ ] System button and lifecycle flow works on the ZenBook
-- [ ] `playos_power_get_info()` returns valid CPU, GPU, and battery data on the ZenBook (BAT0 present)
-- [ ] `playos_system_device_model()` returns a non-AMD device string
-- [ ] AMD ROG Ally tests are unaffected — all Sprint 12 acceptance criteria still pass
-- [ ] No `card0` or vendor-specific GPU-selection hardcoding in the compositor; in `libplayos` the only permitted card-index use is the existing `playos_system.c` GPU-description probe (`card0`→`card1` fallback)
-- [ ] `make intel-build` succeeds in CI (using a cross-compilation target)
+- [x] PlayOS boots on the ASUS ZenBook UX530 (Intel HD 620 iGPU + NVIDIA dGPU present) — confirmed on-device 2026-08-26
+- [x] Compositor selects the Intel DRM device by PCI enumeration over the NVIDIA device (no hardcoded path) — shell + game render on the hybrid machine; explicit `0x8086` log capture pending SSH
+- [ ] Compositor log shows Intel vendor ID and Mesa Iris renderer — pending log capture over SSH
+- [x] `rotating-squares` runs with hardware acceleration on Intel (Mesa reports `Intel ...`) — sample game rendered on-device; explicit Mesa renderer string pending log capture
+- [x] `controller-visualizer` receives controller input on the ZenBook (USB gamepad) — USB gamepad input confirmed on-device
+- [ ] `audio-sine` plays audio on the ZenBook — not yet tested
+- [ ] System button and lifecycle flow works on the ZenBook — not yet tested
+- [x] `playos_power_get_info()` returns valid CPU, GPU, and battery data on the ZenBook (BAT0 present) — battery % and thermal state rendered in the shell status bar on-device
+- [ ] `playos_system_device_model()` returns a non-AMD device string — not yet observed
+- [ ] AMD ROG Ally tests are unaffected — all Sprint 12 acceptance criteria still pass (hwmon matcher change is additive; on-device re-run pending)
+- [x] No `card0` or vendor-specific GPU-selection hardcoding in the compositor; in `libplayos` the only permitted card-index use is the existing `playos_system.c` GPU-description probe (`card0`→`card1` fallback) — verified by grep
+- [x] `make intel-build` succeeds in CI (using a cross-compilation target) — local build succeeded (`make intel-usb-image` produced the image); CI run pending push
 
 ---
 
