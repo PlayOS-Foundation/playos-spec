@@ -86,6 +86,24 @@ File: `playos-platform-api/src/backends/backend_evdev.c`.
 
 `playos-platform-api/src/playos_input.c` is a thin dispatcher to `backend_evdev_get_controller_state()`, then **masks out `SYSTEM|QUICK_MENU|POWER`** from the state games see. That is the security boundary: games can never observe reserved buttons through the platform API.
 
+### 3.1 ROG Ally face-button quirk (X/Y wired rotated)
+
+The Ally's **built-in** controller enumerates as a standard Xbox 360 pad
+(`Microsoft X-Box 360 pad`, `Vendor=045e Product=028e`, `event5`, phys
+`usb-0000:09:00.3-2/input0`), but its face buttons are wired rotated:
+**physical X reports `BTN_NORTH` and physical Y reports `BTN_WEST`** (A/B are
+standard). Without a quirk, games and the shell would see X↔Y swapped on the
+Ally while external Xbox pads stay correct.
+
+Both `backend_evdev.c` (game path) and `playos-shell/src/input.c` (shell path)
+therefore apply a **NORTH↔WEST swap for the gamepad node only**, keyed on the
+device identity (`name` contains `X-Box` **and** `phys` starts with
+`usb-0000:09:00.3-2`). External pads on other ports are unaffected.
+`PLAYOS_ROG_ALLY_FACE_SWAP=1` forces the swap, `=0` forces it off; unset means
+auto-detect. The raw-code diagnostic in Settings → Input Test intentionally
+still shows the *raw* evdev code (e.g. `0x133` for a physical X press) — the
+decoded A/B/X/Y pills are what reflect the corrected logical buttons.
+
 ---
 
 ## 4. Layer 3 — Raylib gamepad backend
