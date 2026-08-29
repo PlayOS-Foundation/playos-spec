@@ -106,14 +106,17 @@ decoded A/B/X/Y pills are what reflect the corrected logical buttons.
 
 ### 3.2 Gamepad identifier database (Sprint 13.6)
 
-The game path now resolves the per-device button/axis remap from the embedded
+The game path and the trusted shell path both resolve the per-device
+button/axis remap from the embedded
 **SDL_GameControllerDB** (Linux entries, `gamecontrollerdb.inc`) before falling
-back to the Xbox-standard table. Matching is by the SDL GUID derived from
+back to the Xbox-standard table. The shell vendor-copies `gamepad_db.{c,h}` +
+`gamecontrollerdb.inc` so the trusted path stays independent of libplayos.
+Matching is by the SDL GUID derived from
 `EVIOCGID` (bustype/vendor/product/version); GLFW/SDL evdev enumeration order
 is reproduced exactly. When a DB entry matches, it already encodes the correct
 X/Y for xpad-style pads (`x` binds the `BTN_NORTH` index, `y` the `BTN_WEST`
 index), so the §3.1 quirk is **disabled on the DB path** to avoid a double
-swap. The quirk still patches the fallback path and the shell path. See
+swap. The quirk still patches the fallback path. See
 [Sprint-13.6.md](Sprint-13.6.md).
 
 ---
