@@ -52,6 +52,7 @@ The first meaningful PlayOS MVP is complete when all of the following are true o
 | [11.6](Sprint-11.6.md) | Developer SSH (Dropbear) + Minimal Wired Network Bring-Up | USB-C Ethernet SSH (key auth) for on-device debugging; full Wi-Fi stays Sprint 16 |
 | [12](Sprint-12.md) | Security Hardening | Hardened boundary between public Platform API, trusted runtime control, and games |
 | [13](Sprint-13.md) | Intel Expansion | Architecture and Platform API backend portable to Intel graphics |
+| [13.6](Sprint-13.6.md) | Gamepad Identifier Database (SDL mappings) | Embed SDL_GameControllerDB so known pads map correctly via bus/vendor/product/version |
 | [14](Sprint-14.md) | Production Readiness | Signed preview release with versioned public Platform API |
 | [15](Sprint-15.md) | Game Developer SDK | Self-contained `playos-sdk` (musl toolchain + `libplayos`/`libraylib`) with device/desktop/emulator testing |
 | [16](Sprint-16.md) | `playos-net` (Wi-Fi) | D-Bus-free Wi-Fi (`wpa_supplicant` + `dhcpcd` + `playos-net` bridge) driven through `playos-runtime` |
