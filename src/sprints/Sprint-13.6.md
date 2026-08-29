@@ -43,9 +43,10 @@ per-device bindings for thousands of pads; embedding it moves PlayOS from
 - **Precedence:** device-specific quirks (ROG Ally face-swap, reserved-button
   stripping) are applied to raw evdev codes **before** database resolution;
   database entry wins over the Xbox-standard fallback; no entry → fallback.
-- **Scope of first cut:** the game path only (`playos-platform-api`). The
-  trusted shell keeps the static map + Ally quirk for this sprint; porting the
-  shell to the database is a follow-up (shell only needs A/B/X/Y/d-pad).
+- **Scope:** both paths. The game path (`playos-platform-api`) and the trusted
+  shell path (`playos-shell/src/input.c`) resolve the same database; the shell
+  vendor-copies `gamepad_db.{c,h}` + `gamecontrollerdb.inc` so the trust
+  boundary keeps the two decoders independent.
 - **Unmapped SDL elements:** `misc1`, paddles and touchpad have no PlayOS
   logical equivalent yet — parsed and ignored (logged at debug level).
 
@@ -60,19 +61,19 @@ per-device bindings for thousands of pads; embedding it moves PlayOS from
 
 | Task ID | Task | Primary repo | Status |
 |---|---|---|---|
-| S13.6-T1 | Vendor Linux entries of the SDL2 DB as an embedded C table | `playos-platform-api` | not started |
-| S13.6-T2 | evdev enumeration + GUID matcher + mapping parser | `playos-platform-api` | not started |
-| S13.6-T3 | Resolve remap and use it in `backend_evdev.c` (fallback preserved) | `playos-platform-api` | not started |
-| S13.6-T4 | Host test: every embedded entry parses; Xbox fallback and Ally quirk precedence | `playos-platform-api` | not started |
-| S13.6-T5 | Spec docs + links | `playos-spec` | not started |
+| S13.6-T1 | Vendor Linux entries of the SDL2 DB as an embedded C table | `playos-platform-api` | done |
+| S13.6-T2 | evdev enumeration + GUID matcher + mapping parser | `playos-platform-api` | done |
+| S13.6-T3 | Resolve remap and use it in `backend_evdev.c` + shell `input.c` (fallback preserved) | `playos-platform-api` | done |
+| S13.6-T4 | Host test: every embedded entry parses; Xbox fallback and Ally quirk precedence | `playos-platform-api` | done |
+| S13.6-T5 | Spec docs + links | `playos-spec` | done |
 
 ## Acceptance Criteria
 
-- [ ] Every embedded DB entry parses (host test) and at least one non-Xbox entry resolves to a different binding than the fallback
-- [ ] Xbox 360 pad (045e:028e) still decodes A/B/X/Y correctly via its DB entry
-- [ ] ROG Ally internal pad (045e:028e on phys `usb-0000:09:00.3-2`) still gets the face-swap quirk and decodes X/Y correctly
-- [ ] Unknown pad (no DB entry) falls back to the Xbox-standard table
-- [ ] Host build + tests green; no public `playos_*.h` ABI change
+- [x] Every embedded DB entry parses (host test) and at least one non-Xbox entry resolves to a different binding than the fallback
+- [x] Xbox 360 pad (045e:028e) still decodes A/B/X/Y correctly via its DB entry (host-tested SDL semantics)
+- [ ] ROG Ally internal pad (045e:028e on phys `usb-0000:09:00.3-2`) decodes X/Y via its DB entry; face-swap quirk only patches the fallback path (awaiting on-device re-test)
+- [x] Unknown pad (no DB entry) falls back to the Xbox-standard table (host-tested)
+- [x] Host build + tests green; no public `playos_*.h` ABI change
 
 ## Exit Gate
 
