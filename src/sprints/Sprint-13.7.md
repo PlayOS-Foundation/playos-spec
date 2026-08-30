@@ -171,7 +171,7 @@ scripts/gen-intel-usb-image.sh                        # same
 |---|---|---|---|---|
 | S13.7-T1 | `StartInstaller` IPC + trusted wrapper | `playos-runtime`, `playos-init` | done | init `18679c8`, runtime `85acbb9`; tests green |
 | S13.7-T2 | `playos-init` runtime installer handoff | `playos-init` | done (code) | init `18679c8`; on-device validation pending in T7 |
-| S13.7-T3 | Shell Settings install action | `playos-shell` | not started | Confirm dialog → `playos_trusted_start_installer(-1)`, gated on payload |
+| S13.7-T3 | Shell Settings install action | `playos-shell` | done (code) | shell `d1729a4`; on-device validation pending in T7 |
 | S13.7-T4 | Merge installer into dev + prod defconfigs | `playos-refdistro` | not started | `BR2_PACKAGE_PLAYOS_INSTALLER` + tools on ally + intel dev/prod |
 | S13.7-T5 | Stage flavor-matched payload in gen scripts | `playos-refdistro` | not started | `rootfs.squashfs` + normal `BOOTX64.EFI` on `playos-a`, dev/prod split |
 | S13.7-T6 | Delete installer-only artifacts | `playos-refdistro` | not started | defconfigs, gen-installer script, linux-installer configs, Makefile targets |
