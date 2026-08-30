@@ -423,4 +423,4 @@ Sprint 6 should deepen storage and real discovery behaviour rather than rebuildi
 
 The ROG Ally boots directly into a persistent Raylib shell that renders through the PlayOS backend, loads stub game entries, and supports controller-first navigation using the public `libplayos` API surface.
 
-*Previous: [Sprint 4](Sprint-4.md) | Next: [Sprint 6](Sprint-6.md)*
+*Previous: [Sprint 4](Sprint-4.md) | Next: [Sprint 5.5](Sprint-5.5.md)*

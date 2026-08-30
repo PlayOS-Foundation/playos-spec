@@ -320,4 +320,4 @@ Sprint 11 may assume:
 
 A PlayOS USB installer image successfully installs PlayOS to the ROG Ally internal NVMe. After removal of the USB drive, the Ally boots PlayOS from internal storage and shows the shell.
 
-*Previous: [Sprint 9](Sprint-9.md) | Next: [Sprint 11](Sprint-11.md)*
+*Previous: [Sprint 9.5](Sprint-9.5.md) | Next: [Sprint 11](Sprint-11.md)*

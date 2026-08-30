@@ -243,4 +243,4 @@ After this sprint:
 
 The assessment is written, indexed, and link-verified; it concludes that a controller-first native media/browser client strategy (Spotify `librespot`, YouTube/YouTube Music `mpv`+`yt-dlp`, browser `WPE WebKit`+`Cog`) is viable as a post-MVP direction **without** reopening the musl/ALSA ADRs, while Netflix is explicitly out of scope — and it scopes an optional bounded host-only spike while leaving all device integration unplanned.
 
-*Previous: [Sprint 19](Sprint-19.md)*
+*Previous: [Sprint 19](Sprint-19.md) | Next: [Sprint 21](Sprint-21.md)*

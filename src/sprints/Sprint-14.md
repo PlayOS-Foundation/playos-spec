@@ -267,4 +267,4 @@ Sprint 15 may assume:
 
 PlayOS v0.3.0 is a signed, installable release that passes all 19 MVP criteria on physical ROG Ally hardware. The public API is documented, stable, and versioned. A second developer can build and run a game using only the published SDK.
 
-*Previous: [Sprint 13](Sprint-13.md) | Next: [Sprint 15](Sprint-15.md)*
+*Previous: [Sprint 13.7](Sprint-13.7.md) | Next: [Sprint 15](Sprint-15.md)*

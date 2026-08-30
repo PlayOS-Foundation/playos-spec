@@ -272,4 +272,4 @@ Sprint 3 must focus on physical hardware bring-up, not rebuild the software sess
 
 **Current status:** Complete — all acceptance criteria met (QEMU Buildroot build and boot verified in Sprint 2.5).
 
-*Previous: [Sprint 1](Sprint-1.md) | Next: [Sprint 3](Sprint-3.md)*
+*Previous: [Sprint 1](Sprint-1.md) | Next: [Sprint 2.5](Sprint-2.5.md)*

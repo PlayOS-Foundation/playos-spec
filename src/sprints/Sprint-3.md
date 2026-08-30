@@ -310,7 +310,7 @@ Sprint 4 should consume this hardware baseline and focus on native compositor ow
 
 A PlayOS USB image boots on physical ROG Ally hardware, essential devices enumerate correctly, and the first hardware-backed `libplayos` input API contract and evdev prototype are in place.
 
-*Previous: [Sprint 2](Sprint-2.md) | Next: [Sprint 4](Sprint-4.md)*
+*Previous: [Sprint 2.5](Sprint-2.5.md) | Next: [Sprint 4](Sprint-4.md)*
 
 ---
 

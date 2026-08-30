@@ -286,4 +286,4 @@ After this sprint, post-MVP features may assume:
 
 A finger tap lands in the focused surface, and the same system on-screen keyboard serves both the shell and games — invoked by the client, rendered by the overlay, and delivering committed text to the focused client through the standard `zwp_text_input_v3` protocol.
 
-*Previous: [Sprint 16](Sprint-16.md)*
+*Previous: [Sprint 16](Sprint-16.md) | Next: [Sprint 19](Sprint-19.md)*

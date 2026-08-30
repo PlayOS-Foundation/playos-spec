@@ -40,24 +40,29 @@ The first meaningful PlayOS MVP is complete when all of the following are true o
 | [0](Sprint-0.md) | Build and UEFI Foundation | Reproducible Buildroot factory boots a minimal PlayOS EFI image in QEMU/OVMF |
 | [1](Sprint-1.md) | `playos-init` and Minimal Boot Supervision | Real `playos-init` as PID 1 with versioned private control IPC skeleton |
 | [2](Sprint-2.md) | Compositor Skeleton and Wayland Session | Minimal wlroots compositor with a Wayland session and one trusted fullscreen client |
+| [2.5](Sprint-2.5.md) | Cross-Sprint Audit Remediation | All Sprint 1-2 audit findings resolved; bit-identical `make setup` from `versions.lock` |
 | [3](Sprint-3.md) | ROG Ally Kernel and Device Bring-Up | Reliable USB boot, essential ROG Ally devices working, first Platform API input contract |
 | [4](Sprint-4.md) | AMDGPU and Native DRM/KMS | Compositor permanently owns the Ally display via AMDGPU and DRM/KMS |
 | [5](Sprint-5.md) | Raylib-Powered PlayOS Shell | Hardware-accelerated Raylib shell consuming the public PlayOS Platform API |
+| [5.5](Sprint-5.5.md) | Shell → Raylib 6.0 Migration | Same controller-first shell rendered through Raylib 6.0 via a custom Wayland/EGL backend |
+| [5.6](Sprint-5.6.md) | ReposCleanUp | `playos-init` and `playos-shell` become first-class repos, cloned and pinned by `make setup` |
 | [6](Sprint-6.md) | Persistent Storage and Game Discovery | Persistent ext4 storage, Platform API paths, shell-visible game discovery |
 | [7](Sprint-7.md) | Game Launch, Lifecycle, System Button, and Overlay | Complete console lifecycle: launch, overlay, background, resume, crash recovery |
 | [8](Sprint-8.md) | ALSA Audio | Reliable ALSA audio with safe public controls across lifecycle transitions |
 | [9](Sprint-9.md) | Power, Battery, Thermal, and Suspend Foundations | Safe power behavior exposed through a restricted public Platform API |
+| [9.5](Sprint-9.5.md) | Display Brightness Control | Settings → Display brightness gauge writes the backlight through `/sys/class/backlight` |
 | [10](Sprint-10.md) | Installer and Internal-Disk Deployment | Tested installation path from removable media to ROG Ally internal SSD |
 | [11](Sprint-11.md) | Immutable Images and A/B Updates | Signed, atomic A/B system updates with automatic rollback |
+| [11.5](Sprint-11.5.md) | Pivot-to-Squashfs Boot and A/B Validation | Initramfs pivots into a read-only squashfs slot; 3-strike rollback verified on QEMU + Ally |
 | [11.6](Sprint-11.6.md) | Developer SSH (Dropbear) + Minimal Wired Network Bring-Up | USB-C Ethernet SSH (key auth) for on-device debugging; full Wi-Fi stays Sprint 16 |
 | [12](Sprint-12.md) | Security Hardening | Hardened boundary between public Platform API, trusted runtime control, and games |
 | [13](Sprint-13.md) | Intel Expansion | Architecture and Platform API backend portable to Intel graphics |
 | [13.6](Sprint-13.6.md) | Gamepad Identifier Database (SDL mappings) | Embed SDL_GameControllerDB so known pads map correctly via bus/vendor/product/version |
+| [13.7](Sprint-13.7.md) | Live-USB / Installer Image Consolidation | Two per-target images (dev + prod) each boot live to shell and install to internal disk via a Settings action (runtime installer handoff, Option B) |
 | [14](Sprint-14.md) | Production Readiness | Signed preview release with versioned public Platform API |
 | [15](Sprint-15.md) | Game Developer SDK | Self-contained `playos-sdk` (musl toolchain + `libplayos`/`libraylib`) with device/desktop/emulator testing |
 | [16](Sprint-16.md) | `playos-net` (Wi-Fi) | D-Bus-free Wi-Fi (`wpa_supplicant` + `dhcpcd` + `playos-net` bridge) driven through `playos-runtime` |
 | [17](Sprint-17.md) | Touch Input + On-Screen Keyboard (OSK) | Touch end-to-end (compositor → raylib backend) plus a reusable system OSK |
-| [18](Sprint-18.md) | C# Shell Reimplementation Assessment (Post-MVP Spike) | Feasibility assessment only — no C# shell implemented |
 | [19](Sprint-19.md) | Marketplace Assessment (Post-MVP) | Assessment and spec-first sequencing only — no marketplace code |
 | [20](Sprint-20.md) | Native Media & Browser Client Strategy (Post-MVP) | Assessment of native Spotify/YouTube/YouTube Music/browser clients — Netflix out of scope |
 | [21](Sprint-21.md) | Multiple Local User Profiles (Post-MVP) | Assessment/design of console-style local profiles with per-profile isolated saves/settings — no implementation |

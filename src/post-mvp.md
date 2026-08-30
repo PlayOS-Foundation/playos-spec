@@ -113,12 +113,6 @@ These features are most commonly requested and have direct dependencies on shipp
 **Testing story:** Because graphics/input/audio come from raylib (already cross-platform) and only the thin `libplayos` surface is PlayOS-specific, the SDK should expose three build profiles so developers can test without hardware: (1) `device` — musl + `PLATFORM_PLAYOS` raylib backend + real `libplayos` (evdev), the shipped artifact; (2) `desktop` — native `gcc` + raylib's default desktop backend (X11/Wayland on Linux, Win32/GLFW on Windows) + a host `libplayos` shim that maps keyboard/gamepad to the controller ABI and no-ops lifecycle, so the game runs in a normal desktop window; (3) `emulator` — run the device build inside the PlayOS QEMU/container image for high-fidelity testing. The `libplayos` `stub` backend (`PLAYOS_BACKEND=stub`) already exists as the seed for the desktop shim.  
 **Depends on:** Versioned public Platform API (MVP); stable game ABI (Raylib backend + `libplayos` ABI)
 
-### C# Shell Reimplementation (Investigation)
-**Motivation:** Assess whether re-implementing `playos-shell` in C# would reduce memory-safety/manual-parsing risk and speed UI iteration.  
-**Status:** Assessment only — **not** a planned feature direction. The default recommendation is to *not* pursue a C# rewrite; only a bounded host-only de-risking spike is documented.  
-**Decisive factors:** .NET-on-musl/NativeAOT risk (ADR-0003), Buildroot toolchain effort, and loss of the single Raylib backend (`rcore_playos.c`, ADR-0006).  
-**Sprint:** [Sprint 18](sprints/Sprint-18.md)
-
 ### LVGL Shell UI Spike
 **Motivation:** Assess whether [LVGL](https://lvgl.io/) v9 can build a resolution-adaptive, controller-first shell UI inside the existing raylib-backed shell, without replacing `rcore_playos.c` or the game ABI.  
 **Status:** Bounded spike only — **not** a planned shell rewrite. The recommended path is LVGL rendering to a raylib-managed texture (`flush_cb` → `glTexSubImage2D`), keeping raylib as the Wayland/EGL/vsync owner.  

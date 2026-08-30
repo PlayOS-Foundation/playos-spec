@@ -248,4 +248,4 @@ After this sprint, post-MVP features may assume:
 
 The ROG Ally connects to Wi-Fi and reaches the network end-to-end, driven entirely through the existing `playos-runtime` control IPC, with no D-Bus and no BusyBox in the production image.
 
-*Previous: [Sprint 15](Sprint-15.md)*
+*Previous: [Sprint 15](Sprint-15.md) | Next: [Sprint 17](Sprint-17.md)*

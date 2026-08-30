@@ -230,4 +230,4 @@ After this sprint:
 
 The assessment is written, indexed, and link-verified; it clearly concludes that `playos-marketplace` is a necessary post-MVP complement that is currently **spec-blocked** (missing Part X/Part XI, unresolved `.gpk` vs `.play`, undefined catalog/entitlements), and it defines a spec-first sequencing so implementation can proceed only after the contracts exist.
 
-*Previous: [Sprint 18](Sprint-18.md)*
+*Previous: [Sprint 17](Sprint-17.md) | Next: [Sprint 20](Sprint-20.md)*

@@ -262,4 +262,4 @@ Sprint 14 may assume:
 
 PlayOS runs the full console lifecycle on the ASUS ZenBook UX530 (Intel HD Graphics 620, NVIDIA dGPU present but unselected). No hardcoded AMD/Intel paths remain in the compositor; the only card-index use in `libplayos` is the GPU-description probe. The `playos-platform-api` backend model is validated as portable.
 
-*Previous: [Sprint 12](Sprint-12.md) | Next: [Sprint 14](Sprint-14.md)*
+*Previous: [Sprint 12](Sprint-12.md) | Next: [Sprint 13.6](Sprint-13.6.md)*

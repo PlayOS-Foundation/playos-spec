@@ -305,4 +305,4 @@ Sprint 10 may assume:
 
 Battery, thermal, and power status are live in the shell and overlay. Thermal throttling prevents dangerous temperatures. Performance profiles can be requested by games and set via the overlay.
 
-*Previous: [Sprint 8](Sprint-8.md) | Next: [Sprint 10](Sprint-10.md)*
+*Previous: [Sprint 8](Sprint-8.md) | Next: [Sprint 9.5](Sprint-9.5.md)*

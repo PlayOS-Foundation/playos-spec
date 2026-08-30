@@ -243,4 +243,4 @@ After this sprint:
 
 The assessment is written, indexed, and link-verified; it concludes that console-style local profiles are feasible post-MVP via **path-scoped profiles** (single `playos-game` uid + `PLAYOS_PROFILE_ID` + profile-scoped Landlock), it aligns Sprint 12 as the isolation foundation, and it leaves all profile implementation unplanned.
 
-*Previous: [Sprint 20](Sprint-20.md)*
+*Previous: [Sprint 20](Sprint-20.md) | Next: [Sprint 22](Sprint-22.md)*

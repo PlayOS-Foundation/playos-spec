@@ -254,4 +254,4 @@ Sprint 12 (Security Hardening) may assume:
 
 The system boots from the read-only squashfs active slot, and signed A/B updates — including automatic 3-strike rollback — are functional end-to-end on the ROG Ally (all 6 matrix cases verified on hardware 2026-08-22/23). The S11.5-T5 follow-up fixes (boot.json auto-create + mark-good squashfs gate) are applied and verified on-device. The installer's inactive-slot wipe is now hardened (`playos_format_zero_head()` zeros 16 KiB of every partition head before `wipefs -a`, applied 2026-08-24), so a stale squashfs cannot survive a reinstall.
 
-*Previous: [Sprint 11](Sprint-11.md) | Next: [Sprint 12](Sprint-12.md)*
+*Previous: [Sprint 11](Sprint-11.md) | Next: [Sprint 11.6](Sprint-11.6.md)*

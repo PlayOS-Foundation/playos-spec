@@ -11,6 +11,8 @@ through its own mapping entry; unknown pads fall back to the Xbox-standard table
 the existing ROG Ally face-button quirk still wins over the database for the
 Ally's internal controller.
 
+**Status:** 🟡 Implemented — host tests green; on-device ROG Ally decode re-test (AC#3) pending
+
 **Prerequisites:** Sprint 13 landed (platform-api evdev backend + ROG Ally
 face-button quirk); the raylib tree ships GLFW's embedded copy of the SDL2
 database (`external/raylib/src/external/glfw/src/mappings.h`) to vendor from.
@@ -80,3 +82,5 @@ per-device bindings for thousands of pads; embedding it moves PlayOS from
 Known controllers decode through their database entry; unknown controllers still
 work via the Xbox-standard fallback; the ROG Ally quirk remains authoritative for
 its internal pad.
+
+*Previous: [Sprint 13](Sprint-13.md) | Next: [Sprint 13.7](Sprint-13.7.md)*
