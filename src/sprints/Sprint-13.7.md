@@ -9,7 +9,7 @@
 
 The dedicated installer defconfigs and `gen-installer-usb-image.sh` are deleted. The only dev/prod difference is SSH/DropBear presence.
 
-**Status:** 🟡 Planned — not started. Design locked on **Option B (runtime installer handoff)**, two-flavor (dev + prod).
+**Status:** 🟢 In progress — Phase 1 (T1/T2 IPC + init handoff) implemented and host-tested; Phase 2 (shell) and Phase 3 (refdistro consolidation) pending. Design locked on **Option B (runtime installer handoff)**, two-flavor (dev + prod).
 
 **Prerequisites:** Sprint 13 complete (Intel expansion, two live targets); Sprint 10 installer (`src/playos-installer`) verified; `playos-init` supervision + `playos_supervisor_spawn_installer` path present; `playos-runtime` trusted-control IPC in place.
 
@@ -169,8 +169,8 @@ scripts/gen-intel-usb-image.sh                        # same
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S13.7-T1 | `StartInstaller` IPC + trusted wrapper | `playos-runtime`, `playos-init` | not started | Constant + `playos_trusted_start_installer(fd)` |
-| S13.7-T2 | `playos-init` runtime installer handoff | `playos-init` | not started | Unmount `/data`+`/EFI`, supervisor swap, reboot on exit |
+| S13.7-T1 | `StartInstaller` IPC + trusted wrapper | `playos-runtime`, `playos-init` | done | init `18679c8`, runtime `85acbb9`; tests green |
+| S13.7-T2 | `playos-init` runtime installer handoff | `playos-init` | done (code) | init `18679c8`; on-device validation pending in T7 |
 | S13.7-T3 | Shell Settings install action | `playos-shell` | not started | Confirm dialog → `playos_trusted_start_installer(-1)`, gated on payload |
 | S13.7-T4 | Merge installer into dev + prod defconfigs | `playos-refdistro` | not started | `BR2_PACKAGE_PLAYOS_INSTALLER` + tools on ally + intel dev/prod |
 | S13.7-T5 | Stage flavor-matched payload in gen scripts | `playos-refdistro` | not started | `rootfs.squashfs` + normal `BOOTX64.EFI` on `playos-a`, dev/prod split |
