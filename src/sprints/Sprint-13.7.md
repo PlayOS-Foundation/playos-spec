@@ -40,15 +40,44 @@ Option B removes the duplication by making the **live image itself** the install
 - **Option B — runtime installer handoff.** The shell triggers installation at runtime; there is **no** reboot-into-installer-mode and **no** separate installer defconfig. This is the locked design; Option A (keep two images) is rejected.
 - **Two consolidated images per target — dev + prod.** Each image boots live to shell *and* carries its own install payload (`rootfs.squashfs` + the flavor's normal `BOOTX64.EFI`) on the `playos-a` partition for the installer to discover. Exact final filenames are a T5 detail; the proposed names are `playos-ally-dev-usb.img` / `playos-ally-prod-usb.img` (and `-intel-` equivalents).
 - **Dev/Prod split = SSH/Dropbear presence only.** The dev image has Dropbear/SSH on the live session and the installed system; the prod image has neither on live nor installed. The installer and the Settings install action are present in **both** live images (otherwise a prod image could not install). Nothing else differs between the flavors.
-- **Handoff path.** `StartInstaller` IPC → `playos-init` unmounts `/data` then `/EFI` (so the target disk is not busy during repartition) → supervisor terminates the current shell + overlay and calls `playos_supervisor_spawn_installer(s)`. This reuses the existing spawn path, decoupled from `s->install_mode`.
+- **Handoff path (review-corrected order).** `StartInstaller` IPC → `playos-init` sets a runtime-installer flag, **stops the current shell + overlay first** (closes their `/data` log fds), then unmounts `/data` → `/EFI`, then calls `playos_supervisor_spawn_installer(s)`. Unmounting *before* stopping the shell would hit EBUSY because init redirects shell/overlay stderr to `/data/log/*`. If an unmount still fails, init **respawns shell + overlay** and returns an ERROR ack, leaving the live session running. This reuses the existing spawn path, decoupled from `s->install_mode`.
 - **Post-install = reboot.** There is no "back to shell" mid-session; the installer completes and the device reboots into the installed OS. Unmount failures abort cleanly and keep the shell running.
 - **Payload stays on `playos-a`, flavor-matched.** The installer discovers its payload independently via `find_and_mount_payload()` (mount `playos-a` by label, check `rootfs.squashfs` + `BOOTX64.EFI`); it does not depend on init's mounts. **Dev stages the dev rootfs** (Dropbear/SSH present); **prod stages the prod rootfs** (no Dropbear/BusyBox). This is what preserves the SSH split across an install.
 - **Install action gated on payload discoverability.** The Settings install action is shown only when the `playos-a` payload partition (with `rootfs.squashfs` + `BOOTX64.EFI`) is discoverable. An installed system has no such partition, so it never offers "Install PlayOS" — re-install is always performed by booting the matching USB image again. This holds for both dev and prod.
-- **Two-kernel distinction preserved, flavor-matched.** The staged `playos-a/BOOTX64.EFI` is the flavor's *normal* kernel (no embedded initramfs — it boots the squashfs from the installed disk); the live ESP `EFI/BOOT/BOOTX64.EFI` remains the self-contained live kernel (embedded initramfs = live rootfs). The gen script therefore needs, per flavor, the live kernel (ESP) plus the installed kernel + `rootfs.squashfs` (`playos-a`). Do not collapse them.
+- **Kernel artifacts are the same per flavor (review correction).** All live defconfigs embed `rootfs.cpio` into `bzImage`; the installed system boots from that embedded rootfs exactly like the live session. The staged `playos-a/BOOTX64.EFI` is therefore the **same `bzImage` as the live ESP kernel** — do NOT build a second "no-initramfs" kernel. `playos-a` carries `rootfs.squashfs` (payload slot) + the flavor's `bzImage` (ESP kernel).
 - **Known trade-off (documented, default accepted).** Because each flavor is one build, the installed rootfs is the same artifact as the live rootfs — so the **installed prod** system still ships the inert `playos-installer` binary. It is harmless: there is no payload partition and the install action is gated off. If a truly installer-free installed-prod rootfs is later desired, stage a second, installer-stripped squashfs per flavor (optional follow-up, out of scope here).
 - **SSH-key seed follows the dev flavor only.** The dev image continues to seed `data/ssh/authorized_keys` (so a fresh dev install is immediately SSH-able — Sprint 11.6 dependency). The prod image does **not** seed an SSH key (no Dropbear present).
 - **Headless QEMU automation preserved.** Keep a scriptable path so CI can drive the install without a controller (e.g. a cmdline token that maps to the same supervisor transition, or a StartInstaller IPC sent over the existing trusted socket). Exact mechanism chosen at implementation time; it must not reintroduce a separate installer defconfig.
 - **Register-shell conflict resolved implicitly.** Because init terminates shell + overlay *before* spawning the installer, exactly one "shell" surface exists at any instant — no compositor or `register_shell` changes are needed.
+
+---
+
+## Review Findings (2026-08-30, implementation plan)
+
+Review of Sprint-13.7 against the current code verified all start-condition
+prerequisites and found four corrections that are now baked into the decisions
+above:
+
+1. **Installed kernel = the flavor's normal `bzImage`** (which embeds the full
+   rootfs via `rootfs.cpio`). The original "no embedded initramfs" claim did
+   not match any live defconfig; no second kernel build is needed.
+2. **Handoff order: stop shell+overlay → unmount `/data` → `/EFI` → spawn
+   installer.** The original order (unmount first) would EBUSY on the shell's
+   `/data/log/shell-stderr.log` fd. On unmount failure, respawn shell+overlay
+   and return an ERROR ack.
+3. **Runtime installer exit → reboot, not restart.** The supervisor's existing
+   exit path restarts the installer; a runtime-mode flag makes it reboot after
+   a Settings-triggered install. Boot-time `playos.mode=install` keeps the
+   restart behavior for QEMU automation.
+4. **Shell payload gating = shell-side check** of `/dev/disk/by-label/playos-a`
+   (mount read-only, stat `rootfs.squashfs` + `BOOTX64.EFI`). No IPC extension
+   beyond `StartInstaller` is required for T3.
+
+Also confirmed: `playos_supervisor_spawn_installer()` is already public and
+decoupled; the installer package already depends on `util-linux dosfstools
+e2fsprogs efibootmgr`; `find_and_mount_payload()` already mounts `playos-a` by
+label and validates both payload files; the live gen scripts already create an
+empty `playos-a` partition (populating it is T5).
 
 ---
 
@@ -57,7 +86,7 @@ Option B removes the duplication by making the **live image itself** the install
 ### In Scope
 
 - `playos-runtime` — add `PLAYOS_IPC_TYPE_START_INSTALLER "StartInstaller"` and `playos_trusted_start_installer(fd)`; mirror the constant in `playos-init/ipc/ipc.h`.
-- `playos-init` — handle `StartInstaller` in `ipc_handler.c`: unmount `/data` then `/EFI`, signal supervisor to swap shell → installer; on installer exit, reboot.
+- `playos-init` — handle `StartInstaller` in `ipc_handler.c`: stop shell + overlay, unmount `/data` then `/EFI`, spawn the installer via the supervisor; on installer exit in runtime mode, reboot.
 - `playos-shell` — Settings **Install PlayOS to internal disk** action + confirmation, calling `playos_trusted_start_installer(-1)` (mirrors reboot/shutdown), gated on payload discoverability; update `playos-shell/AGENTS.md` trusted-ops list.
 - `playos-refdistro` — merge `BR2_PACKAGE_PLAYOS_INSTALLER` and installer tools (`blockdev`, `fdisk`, `mkfs.fat`, `mkfs.ext2|4`, `efibootmgr`) into **both** the dev and prod defconfigs (ally + intel).
 - `playos-refdistro` — extend `gen-ally-usb-image.sh` and `gen-intel-usb-image.sh` (or their dev/prod variants) to stage the **flavor-matched** `rootfs.squashfs` + normal `BOOTX64.EFI` on `playos-a`; keep the SSH-key seed for the dev image only.
@@ -161,17 +190,18 @@ Update the **Status** column as work progresses: `not started` → `in progress`
 
 - In `ipc_handler.c`, handle `StartInstaller`:
   1. If `s->install_mode` (boot-time flag) is set, this is a no-op — the installer is already running.
-  2. Otherwise, unmount `/data` (`playos-data`) then `/EFI` (`ESP`), logging each result. If either unmount fails (busy), return an ERROR ack and leave the shell running.
-  3. Signal the supervisor to terminate the current shell + overlay and call `playos_supervisor_spawn_installer(s)`, reusing the existing `installer_pid` / `installer_restarts` / `installer_should_restart` machinery.
-- On installer exit, reboot into the installed OS (do not re-mount `/data`/`/EFI` mid-session).
+  2. Otherwise set `s->installer_runtime_mode = true` (new field), then ask the supervisor to **stop the current shell + overlay** (closing their `/data/log/*` fds).
+  3. Unmount `/data` (`playos-data`) then `/EFI` (`ESP`), logging each result. If either unmount fails (busy), **respawn shell + overlay**, clear the runtime flag, and return an ERROR ack (live session keeps running).
+  4. Call `playos_supervisor_spawn_installer(s)`, reusing the existing `installer_pid` / `installer_restarts` machinery.
+- In the supervisor's installer-exit path: if `installer_runtime_mode` is set, reboot into the installed OS instead of restarting the installer (do not re-mount `/data`/`/EFI` mid-session). Boot-time `playos.mode=install` keeps the existing restart behavior for QEMU automation.
 - Decouple this path from `s->install_mode`: the transition is driven by the IPC message, not the cmdline flag, while the boot-time flag keeps working for QEMU automation.
 
-**Done when:** sending `StartInstaller` from a live boot tears down the mounts, spawns the installer under supervisor, and reboots on completion; a busy-mount failure returns an error and keeps the shell alive.
+**Done when:** sending `StartInstaller` from a live boot stops shell+overlay, tears down the mounts, spawns the installer under supervisor, and reboots on completion; a busy-mount failure returns an error and the shell is respawned.
 
 ### S13.7-T3 — Shell Settings install action
 
 - Add a **System → Install PlayOS to internal disk** action in `screen_settings.c`, mirroring the reboot/shutdown confirm pattern at lines 251-279 (`#ifdef PLAYOS_TRUSTED_IPC` → `playos_trusted_reboot(-1)` / `playos_trusted_shutdown(-1)`).
-- Gate the action on payload discoverability: only render it when the `playos-a` partition with `rootfs.squashfs` + `BOOTX64.EFI` is present, so an installed system never shows it.
+- Gate the action on payload discoverability: only render it when the `playos-a` partition with `rootfs.squashfs` + `BOOTX64.EFI` is present, so an installed system never shows it. Implementation (review decision): shell checks `/dev/disk/by-label/playos-a`, mounts it read-only (e.g. at `/mnt/playos-payload-check`), stats `rootfs.squashfs` + `BOOTX64.EFI`, then unmounts — no IPC extension beyond `StartInstaller`.
 - On confirm, call `playos_trusted_start_installer(-1)`. Show an "Installing…" state and rely on the init handoff for the actual transition.
 - Update `playos-shell/AGENTS.md` (the trusted-ops list around lines 120-127) to include `start_installer`.
 
@@ -188,10 +218,10 @@ Update the **Status** column as work progresses: `not started` → `in progress`
 ### S13.7-T5 — Stage flavor-matched payload in gen scripts
 
 - Extend `scripts/gen-ally-usb-image.sh` and `scripts/gen-intel-usb-image.sh` (or their dev/prod variants) to:
-  - Mount/create the `playos-a` partition on the USB image.
-  - Copy the **flavor-matched** `rootfs.squashfs` and normal `BOOTX64.EFI` (the flavor's kernel without `playos.mode=install`/embedded initramfs) onto `playos-a`: dev image stages the dev rootfs/kernel; prod image stages the prod rootfs/kernel.
+  - Mount the existing empty `playos-a` partition on the USB image.
+  - Copy the **flavor-matched** `rootfs.squashfs` + `bzImage` (the same kernel that goes on the live ESP — review correction; no second kernel) onto `playos-a`: dev image stages the dev rootfs/kernel; prod image stages the prod rootfs/kernel.
   - Seed `data/ssh/authorized_keys` for the **dev image only** (no Dropbear on prod, so no key seed).
-- Keep the live ESP `EFI/BOOT/BOOTX64.EFI` as the self-contained live kernel; do **not** overwrite it with the staged kernel.
+- Keep the live ESP `EFI/BOOT/BOOTX64.EFI` as-is; the staged `playos-a/BOOTX64.EFI` is the same `bzImage` artifact.
 
 **Done when:** a dev image's `playos-a` carries the dev `rootfs.squashfs` + dev normal `BOOTX64.EFI`, and a prod image's `playos-a` carries the prod artifacts, discoverable by the installer's `find_and_mount_payload()`; the SSH-key seed is present on dev and absent on prod.
 
