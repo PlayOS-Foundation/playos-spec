@@ -175,7 +175,7 @@ scripts/gen-intel-usb-image.sh                        # same
 | S13.7-T4 | Merge installer into dev + prod defconfigs | `playos-refdistro` | done | refdistro `18d95a3` |
 | S13.7-T5 | Stage flavor-matched payload in gen scripts | `playos-refdistro` | done | refdistro `18d95a3`; gen scripts accept `[image-name] [flavor]` |
 | S13.7-T6 | Delete installer-only artifacts | `playos-refdistro` | done | refdistro `18d95a3`; no refs remain |
-| S13.7-T7 | QEMU + Ally validation | `playos-refdistro` | in progress | QEMU headless runtime-install PASSED (refdistro `31b9a57`); on-device Ally test pending |
+| S13.7-T7 | QEMU + Ally validation | `playos-refdistro` | done | QEMU headless runtime-install PASSED; on-device Ally validated: live USB boots without slot pivot (ESP marker), Settings install action works, reboot into installed NVMe, dev SSH key seeded and SSH reachable |
 
 Update the **Status** column as work progresses: `not started` → `in progress` → `blocked` or `done`.
 
