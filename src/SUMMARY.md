@@ -31,6 +31,7 @@
 - [Kernel Configuration](kernel-config.md)
 - [Developer Environment](dev-environment.md)
 - [Testing Strategy](testing.md)
+- [Performance Baseline](testing/performance-baseline.md)
 - [Installation Guide](installation-guide.md)
 - [Partition Layout](partition-layout.md)
 
