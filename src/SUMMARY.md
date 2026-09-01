@@ -36,6 +36,17 @@
 
 ---
 
+# Game Developer Guides
+
+- [Building Your First PlayOS Game](docs/building-your-first-game.md)
+- [Game Lifecycle](docs/game-lifecycle.md)
+- [Game Input](docs/game-input.md)
+- [Game Storage](docs/game-storage.md)
+- [Game Audio](docs/game-audio.md)
+- [Game Performance](docs/game-performance.md)
+
+---
+
 # Delivery
 
 - [Roadmap & MVP Criteria](sprints/roadmap.md)
@@ -85,6 +96,9 @@
 - [ADR-0006 — UI Framework (Raylib)](adr/ADR-0006-ui-framework.md)
 - [ADR-0007 — Audio Stack (ALSA)](adr/ADR-0007-audio-stack.md)
 - [ADR-0008 — GPU Discovery](adr/ADR-0008-gpu-discovery.md)
+- [ADR-0009 — Gamepad Identifier Database](adr/ADR-0009-gamepad-mapping-database.md)
+- [ADR-0010 — Live USB Is The Installer](adr/ADR-0010-live-usb-installer-consolidation.md)
+- [ADR-0011 — Recovery Mode UI](adr/ADR-0011-recovery-ui.md)
 
 ---
 
