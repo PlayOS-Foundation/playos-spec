@@ -32,6 +32,7 @@
 - [Developer Environment](dev-environment.md)
 - [Testing Strategy](testing.md)
 - [Performance Baseline](testing/performance-baseline.md)
+- [MVP Smoke Test](testing/mvp-smoke-test.md)
 - [Installation Guide](installation-guide.md)
 - [Partition Layout](partition-layout.md)
 
