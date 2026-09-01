@@ -136,11 +136,11 @@ docs/                             # game-developer guides
 | S14-T3 | Complete Doxygen docs and code examples | `playos-platform-api` | not started | |
 | S14-T4 | Implement the tag-triggered release pipeline | `playos-refdistro` | not started | |
 | S14-T5 | Run the full 19-criterion MVP smoke test | `playos-refdistro` | not started | |
-| S14-T6 | Implement recovery mode | `playos-init`, `playos-shell`, `playos-refdistro` | not started | |
-| S14-T7 | Measure and document the performance baseline | `playos-refdistro` | not started | |
-| S14-T8 | Complete `playos-spec` and game-developer guides | `playos-spec` | not started | |
-| S14-T9 | Enforce production image hygiene and signed artifacts | `playos-refdistro` | in progress | Production defconfig, `production-build.yml`, and sign scripts exist; `release.yml` + SDK tarball pending |
-| S14-T10 | Installer as a PlayOS app with seamless handoff | `playos-shell`, `playos-init`, `playos-refdistro` | not started | Launch like a fullscreen app; suppress kernel/console logs during the handoff |
+| S14-T6 | Implement recovery mode | `playos-init`, `playos-shell`, `playos-refdistro` | done | Entry: cmdline/Vol-Down-5s/data-missing/compositor-failure; menu: reboot/shutdown/reset/rollback/logs (`1729329`, `e3c0091`); SimpleDRM follow-up |
+| S14-T7 | Measure and document the performance baseline | `playos-refdistro` | done | Checklist `63a4d67` + collector script `59e3fd4` (on-device run pending) |
+| S14-T8 | Complete `playos-spec` and game-developer guides | `playos-spec` | done | Game-dev guides in `src/docs/`, ADRs 0009–0011, SUMMARY updated (`182b138`) |
+| S14-T9 | Enforce production image hygiene and signed artifacts | `playos-refdistro` | in progress | Production defconfig, `production-build.yml`, sign scripts, `release.yml` tag pipeline + SDK headers tarball (`acb7fe8`) | 
+| S14-T10 | Installer as a PlayOS app with seamless handoff | `playos-shell`, `playos-init`, `playos-refdistro` | in progress | Console-free handoff: init suppresses kernel console + blanks VT (`49fd28e`); installer fullscreen splash covers transition (`1a7ace4`); shell front-end entry still to be made app-style |
 
 Update the **Status** column as work progresses: `not started` → `in progress` → `blocked` or `done`.
 
