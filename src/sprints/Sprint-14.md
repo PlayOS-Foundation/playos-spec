@@ -53,6 +53,7 @@ All MVP features are implemented by the end of Sprint 13, but the project is not
 - `playos-spec` completion: README, architecture, roadmap, platform API, IPC, security model, ADRs, docs.
 - Performance baseline measurement and documentation.
 - Production image hygiene: no debug tools, signed EFI artifact, signed update bundle.
+- Installer presented as a PlayOS app (fullscreen system app) with a seamless, console-log-free handoff into the destructive install phase.
 
 ### Explicitly Out of Scope
 
@@ -68,9 +69,9 @@ All MVP features are implemented by the end of Sprint 13, but the project is not
 | Repo | Required work |
 |---|---|
 | `playos-platform-api` | API stability review, versioning and SONAME, Doxygen docs, code examples, getting-started guide |
-| `playos-refdistro` | Release pipeline, recovery image/menu, performance measurement, production image hygiene |
-| `playos-init` | Recovery entry logic: boot-count exceeded, button hold, repeated compositor failure |
-| `playos-shell` | Minimal recovery UI (text or simple Raylib on SimpleDRM/framebuffer) |
+| `playos-refdistro` | Release pipeline, recovery image/menu, performance measurement, production image hygiene, installer app registration + theme |
+| `playos-init` | Recovery entry logic: boot-count exceeded, button hold, repeated compositor failure; quiet console during installer handoff |
+| `playos-shell` | Minimal recovery UI (text or simple Raylib on SimpleDRM/framebuffer); fullscreen installer app launcher + shared theme |
 | `playos-spec` | Authoritative reference completion: README, architecture, roadmap, platform API, IPC, security, ADRs, game-dev docs |
 | All repos | Version tags and CHANGELOG updates for the `v0.3.0` release |
 
@@ -139,6 +140,7 @@ docs/                             # game-developer guides
 | S14-T7 | Measure and document the performance baseline | `playos-refdistro` | not started | |
 | S14-T8 | Complete `playos-spec` and game-developer guides | `playos-spec` | not started | |
 | S14-T9 | Enforce production image hygiene and signed artifacts | `playos-refdistro` | in progress | Production defconfig, `production-build.yml`, and sign scripts exist; `release.yml` + SDK tarball pending |
+| S14-T10 | Installer as a PlayOS app with seamless handoff | `playos-shell`, `playos-init`, `playos-refdistro` | not started | Launch like a fullscreen app; suppress kernel/console logs during the handoff |
 
 Update the **Status** column as work progresses: `not started` → `in progress` → `blocked` or `done`.
 
@@ -196,6 +198,17 @@ Confirm the production image ships without debug tools, the EFI artifact is sign
 
 **Done when:** the `v0.3.0` artifacts are signed and pass lint, and `sdk-headers.tar.gz` compiles a minimal game on a Linux host.
 
+### S14-T10 — Installer as a PlayOS app with seamless handoff
+
+Make the runtime installer launch like a normal fullscreen PlayOS app instead of a separate "foreign" UI, while keeping the proven destructive-install handoff:
+
+- Register `playos-installer` as a fullscreen system app launchable from the shell (e.g., a System utility entry or dedicated tile).
+- Front-end phase (disk selection + confirm) runs under the shell's compositor, styled with the shell's fonts/colors/layout so it feels like the same product.
+- On confirm, reuse the existing `StartInstaller` handoff: init stops shell/overlay/compositor, preserves the dev SSH key, unmounts `/data` + `/EFI`, restarts the compositor, and continues the installer in runtime mode.
+- **Seamless transition detail:** suppress Linux console/kernel log output during the handoff. Do not let raw `dmesg`/kernel lines appear on the visible framebuffer — e.g., `quiet loglevel=0` for the handoff, switch the VT to a blank/splash surface, and have the installer draw a fullscreen progress/splash layer that covers the transition.
+
+**Done when:** launching "Install PlayOS" opens an app-style fullscreen UI, the transition into the destructive phase shows no raw console logs, and the installer completes and reboots exactly as it does today.
+
 ---
 
 ## Implementation Guidance
@@ -227,6 +240,7 @@ Confirm the production image ships without debug tools, the EFI artifact is sign
 | MVP criteria met | Committed smoke-test report with all 19 criteria passing |
 | SDK usable by a second developer | Minimal game compiled from `sdk-headers.tar.gz` on a Linux host |
 | Recovery works | Boot into recovery from button hold and boot-count-exceeded; menu on SimpleDRM |
+| Installer app-like launch | Shell launch + handoff video/log shows the installer as a fullscreen app with no kernel console lines during the transition |
 | Performance baseline | Committed performance report with measurements and filed gaps |
 | Specs complete | `playos-spec` README/nav plus all referenced docs present and consistent |
 
@@ -243,6 +257,7 @@ Confirm the production image ships without debug tools, the EFI artifact is sign
 - [ ] `playos-v0.3.0-rog-ally-update.playosb` applies successfully via A/B update flow
 - [ ] SDK headers tarball compiles a minimal game on a Linux host
 - [ ] Recovery mode is reachable and shows the recovery menu without AMDGPU
+- [ ] Installer launches as a fullscreen PlayOS app and the handoff shows no raw console logs
 - [ ] Performance baseline documented; no metric is more than 2× over target
 - [ ] All ADRs from Sprints 0–14 are in `playos-spec/adr/`
 - [ ] CI release pipeline passes end-to-end on a test tag
