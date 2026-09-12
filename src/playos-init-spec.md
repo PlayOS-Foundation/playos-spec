@@ -61,6 +61,8 @@ Kernel starts /init (playos-init, PID 1)
   - On crash: set `crashed=true` in `GameExited`
 - **Overlay process:** Supervised same as compositor (restart on exit)
 
+**Event loop cadence.** The supervision loop waits on `poll()` over the control socket, the compositor socket and the shell listener with a 1 s timeout, rather than sleeping for a fixed second. The IPC polls themselves are non-blocking, so a fixed sleep delayed every control request by up to a second (most visibly the in-game COMMAND → pause-overlay path, shell → init → compositor). Housekeeping that used to count loop iterations (late audio snapshot ≈5 s, healthy-boot backstop ≈60 s) is time-based so early wakeups cannot fast-forward it.
+
 **Supervision table:**
 
 | Process | Restart policy | Failure action |

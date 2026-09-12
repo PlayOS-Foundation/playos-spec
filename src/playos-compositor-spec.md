@@ -204,6 +204,8 @@ The compositor implements the **server side** of:
 - `playos_shell_v1` — emits lifecycle events and game state to the shell
 - `playos_overlay_v1` — notifies overlay of show/hide; receives dismiss requests
 
+It also creates wlroots' **`zwlr_screencopy_manager_v1`** global (`wlr_screencopy_manager_v1_create`) so the shell can capture the composited output for screenshots. Screencopy is the only way a client can see game pixels; the compositor itself does not perform or encode captures.
+
 ---
 
 ## Crash Recovery Invariants

@@ -161,6 +161,27 @@ Updated every 30 seconds for battery/thermal; every 1 second for clock.
 
 ---
 
+## Screenshots
+
+A screenshot is a PNG of the **composited output** (game, pause overlay and shell together), written to `/data/screenshots/playos-<epoch>.<ms>.png` on the persistent data partition.
+
+**Capture path.** The shell cannot see game pixels through its own framebuffer, so it captures the output with the wlroots `zwlr_screencopy_manager_v1` protocol (`src/screencopy.c`): it binds `wl_shm`, `wl_output` and the screencopy manager on raylib's existing Wayland connection (`GetWindowHandle()`), copies the output into a shared-memory buffer, converts little-endian `B,G,R,X` to Raylib's RGBA, and writes the PNG with `ExportImage()`. If the manager is unavailable (nested/headless testing, compositor without screencopy) the shell falls back to `LoadImageFromScreen()`, which only covers its own surface and therefore only works while the shell is the foreground client.
+
+**Gesture (COMMAND reserved button).**
+
+| Context | Tap | Hold ≥ 700 ms |
+|---|---|---|
+| A game is running | open the pause overlay | screenshot |
+| Shell UI (home/library/detail/settings) | screenshot | screenshot |
+
+A screenshot is taken at the threshold while the button is still held, so the overlay is never opened by a long press. The same button therefore keeps the pause overlay on a tap and adds capture on a hold. `SHELL_COMMAND_HOLD_MS` is the threshold.
+
+**Preference.** The System tab's "Screenshot on COMMAND" toggle persists to `/data/config/screenshot` (`1`/`0`) and **defaults to on**; the file is written on every toggle and read at startup.
+
+**Feedback.** On shell screens a centred "Screenshot saved/failed" toast is shown for 1.5 s and the shell logs `screenshot -> <path> (ok=N)`. While a game or the overlay is on screen the shell surface is not visible, so the capture is silent on screen — check `/data/log/shell-stderr.log` or the file itself.
+
+---
+
 ## Trusted Client Identity
 
 The shell sets `PLAYOS_TRUSTED_SHELL=1` in its own environment before connecting to the Wayland display. The compositor verifies this at connection time and assigns the `playos_shell_v1` role.
