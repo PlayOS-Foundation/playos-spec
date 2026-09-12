@@ -133,13 +133,13 @@ docs/                             # game-developer guides
 |---|---|---|---|---|
 | S14-T1 | Freeze the public API and set `PLAYOS_API_VERSION 1` | `playos-platform-api` | done | `playos.h` already defines `PLAYOS_API_VERSION 1` |
 | S14-T2 | Set library version and SONAME `libplayos.so.0` | `playos-platform-api` | done | Already `0.3.0` + SONAME `libplayos.so.0` |
-| S14-T3 | Complete Doxygen docs and code examples | `playos-platform-api` | not started | |
-| S14-T4 | Implement the tag-triggered release pipeline | `playos-refdistro` | not started | |
-| S14-T5 | Run the full 19-criterion MVP smoke test | `playos-refdistro` | not started | |
-| S14-T6 | Implement recovery mode | `playos-init`, `playos-shell`, `playos-refdistro` | done | Entry: cmdline/Vol-Down-5s/data-missing/compositor-failure; menu: reboot/shutdown/reset/rollback/logs (`1729329`, `e3c0091`); SimpleDRM follow-up |
-| S14-T7 | Measure and document the performance baseline | `playos-refdistro` | done | Checklist `63a4d67` + collector script `59e3fd4` (on-device run pending) |
+| S14-T3 | Complete Doxygen docs and code examples | `playos-platform-api` | done | Doxygen HTML in `docs/api/`, examples 01–05 + minimal game, getting-started guide, docs CI (`f3e629c`) |
+| S14-T4 | Implement the tag-triggered release pipeline | `playos-refdistro` | done | `release.yml` tag pipeline (prod build → lint → QEMU boot-check → sign EFI → .playosb + SDK tarball → checksums → GitHub Release); `dev-v0.3.0` published |
+| S14-T5 | Run the full 19-criterion MVP smoke test | `playos-refdistro` | in progress | Checklist `24dd9c8` + `scripts/mvp-smoke.sh`; on-device 19-criterion run pending |
+| S14-T6 | Implement recovery mode | `playos-init`, `playos-shell`, `playos-refdistro` | done | Entry: cmdline/Vol-Down-5s/data-missing/compositor-failure; menu: reboot/shutdown/reset/rollback/logs (`1729329`, `e3c0091`); rollback via `RollbackSlot` IPC (shell no longer rewrites `boot.json`); late button watch non-blocking (no per-boot 4s delay/console prompt); SimpleDRM follow-up |
+| S14-T7 | Measure and document the performance baseline | `playos-refdistro` | in progress | Checklist `63a4d67` + collector script `59e3fd4` (on-device run pending) |
 | S14-T8 | Complete `playos-spec` and game-developer guides | `playos-spec` | done | Game-dev guides in `src/docs/`, ADRs 0009–0011, SUMMARY updated (`182b138`) |
-| S14-T9 | Enforce production image hygiene and signed artifacts | `playos-refdistro` | in progress | Production defconfig, `production-build.yml`, sign scripts, `release.yml` tag pipeline + SDK headers tarball (`acb7fe8`) | 
+| S14-T9 | Enforce production image hygiene and signed artifacts | `playos-refdistro` | in progress | Production defconfig, `production-build.yml`, sign scripts, `release.yml` tag pipeline + SDK headers tarball (`acb7fe8`); final v0.3.0 signed run + SDK-compile verification pending |
 | S14-T10 | Installer as a PlayOS app with seamless handoff | `playos-shell`, `playos-init`, `playos-refdistro` | in progress | Console-free handoff: init suppresses kernel console + blanks VT (`49fd28e`); installer fullscreen splash covers transition (`1a7ace4`); shell front-end entry still to be made app-style |
 
 Update the **Status** column as work progresses: `not started` → `in progress` → `blocked` or `done`.
@@ -177,6 +177,8 @@ Run the complete 19-criterion MVP checklist on physical ROG Ally hardware and re
 ### S14-T6 — Implement recovery mode
 
 Implement a minimal recovery UI (text or simple Raylib on SimpleDRM/framebuffer). Recovery entry points are: boot count exceeds the A/B limit with both slots bad, a button hold at boot (e.g. Volume Down for 5 seconds), and `playos-init` entering recovery after repeated compositor failure. The menu offers: view system logs (`/data/log/`), factory reset (Sprint 10 logic), rollback to the previous system slot when available, shutdown, and reboot. Recovery must work without AMDGPU.
+
+Rollback is a `RollbackSlot` IPC request: `playos-init` owns the `boot.json` schema and applies the full rollback semantics (current slot `bad`, target slot `pending`, boot count reset) before rebooting. The late button watch is polled non-blocking from the supervision loop so a normal boot is never delayed.
 
 **Done when:** recovery is reachable from all three entry points and shows the menu with software/SimpleDRM rendering on hardware without AMDGPU.
 

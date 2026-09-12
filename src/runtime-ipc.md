@@ -203,6 +203,14 @@ Requires no active game. Erases selected `/data/` subdirectories and recreates t
 
 ---
 
+#### `RollbackSlot`
+```json
+{ "v": 1, "type": "RollbackSlot" }
+```
+Recovery-menu action (S14). `playos-init` owns the A/B boot metadata and applies the full rollback to `/EFI/playos/boot.json` — the current slot is marked `bad`, the target slot becomes `pending`, and the target slot's boot count is reset — then reboots. No response is sent: on error `playos-init` logs the reason and leaves `boot.json` untouched so the running session can report the failure. Clients (the shell recovery menu) must not rewrite `boot.json` directly.
+
+---
+
 #### `SetPerfProfile`
 ```json
 { "v": 1, "type": "SetPerfProfile", "profile": "balanced" }
