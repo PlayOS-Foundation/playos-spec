@@ -211,6 +211,16 @@ Recovery-menu action (S14). `playos-init` owns the A/B boot metadata and applies
 
 ---
 
+#### `StartInstaller`
+```json
+{ "v": 1, "type": "StartInstaller", "target_disk": "/dev/nvme0n1" }
+{ "v": 1, "type": "StartInstallerAck" }
+{ "v": 1, "type": "StartInstallerError", "reason": "umount_failed" }
+```
+Hand the session over to the runtime installer (S13.7; extended by S14-T10). The shell's installer front-end picks the target disk and sends it here; `playos-init` stops the shell, overlay and compositor, preserves the dev SSH key in `/tmp`, unmounts `/data` and `/EFI`, restarts the compositor and spawns `playos-installer` with `PLAYOS_INSTALL_TARGET=<target_disk>`, which makes the installer skip its own disk picker and confirmation and start the destructive phase directly. `target_disk` is optional — when omitted, or when it matches no enumerated disk, the installer falls back to its interactive picker. On failure `playos-init` respawns the compositor/shell/overlay and answers `StartInstallerError`.
+
+---
+
 #### `SetPerfProfile`
 ```json
 { "v": 1, "type": "SetPerfProfile", "profile": "balanced" }
