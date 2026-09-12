@@ -22,6 +22,27 @@
 
 ---
 
+## Layout Conventions
+
+- **Every screen clears the frame first** with `render_begin_frame()`: the
+  renderer keeps the previous frame's pixels, so a screen that forgets leaves
+  the previous screen visible underneath it (seen on hardware with the installer
+  screen over Settings - see `playos-memorymap/08-gotchas.md`).
+- **Content column** is `x = 0.15 * width`, so labels, values, selection bars and
+  the settings tab strip all share the same left/right edges. The tab strip
+  splits that column into equal segments over a single track background.
+- **Row rhythm** is `8 * label_scale` for both the info block and the action
+  rows (the info block used to advance at `16 * label_scale`, which read as a
+  separate list).
+- **Selectable rows** highlight the full column width and carry a right-aligned
+  affordance: a chevron for rows that open something (confirmation, disk picker,
+  update check) or the relevant value (e.g. the pending version next to
+  "Restart to Apply"). Dimmed text stays at 0.5 alpha minimum, unselected rows
+  at 0.7.
+- **Hint lines** sit at `height - scale * 45` so they clear the status bar.
+
+---
+
 ## Screen Architecture
 
 ```
@@ -152,14 +173,14 @@ Shell receives PLAYOS_LIFECYCLE_FOREGROUND
 
 ## Status Bar
 
-Persistent footer visible on all shell screens:
+Persistent footer visible on all shell screens, laid out in three zones so the
+bar reads evenly instead of clustering everything on the left:
 
-| Element | Source |
-|---|---|
-| Battery % + charging icon | `playos_power_get_info()` |
-| Thermal indicator (color) | `playos_power_get_info().thermal_state` |
-| System time | `clock_gettime(CLOCK_REALTIME)` |
-| PlayOS version | `playos_system_os_version()` |
+| Zone | Content | Source |
+|---|---|---|
+| Left | Battery % + charging state | `playos_power_get_info()` |
+| Centre | CPU/GPU temperatures, centred between the other zones (dropped when the bar is too narrow to hold all three without touching) | `playos_power_get_info()` |
+| Right | Performance profile, then the colour-coded thermal chip | `playos_power_get_info().active_profile` / `.thermal_state` |
 
 Updated every 30 seconds for battery/thermal; every 1 second for clock.
 
