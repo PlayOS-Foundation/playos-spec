@@ -167,16 +167,18 @@ A screenshot is a PNG of the **composited output** (game, pause overlay and shel
 
 **Capture path.** The shell cannot see game pixels through its own framebuffer, so it captures the output with the wlroots `zwlr_screencopy_manager_v1` protocol (`src/screencopy.c`): it binds `wl_shm`, `wl_output` and the screencopy manager on raylib's existing Wayland connection (`GetWindowHandle()`), copies the output into a shared-memory buffer, converts little-endian `B,G,R,X` to Raylib's RGBA, and writes the PNG with `ExportImage()`. If the manager is unavailable (nested/headless testing, compositor without screencopy) the shell falls back to `LoadImageFromScreen()`, which only covers its own surface and therefore only works while the shell is the foreground client.
 
-**Gesture (COMMAND reserved button).**
+**Gesture (reserved buttons).**
 
-| Context | Tap | Hold ≥ 700 ms |
+| Button | In game | Shell UI |
 |---|---|---|
-| A game is running | open the pause overlay | screenshot |
-| Shell UI (home/library/detail/settings) | screenshot | screenshot |
+| **ARMOURY CRATE** (`SYSTEM`) | screenshot | screenshot |
+| **COMMAND** (`QUICK_MENU`) | open the pause overlay | screenshot |
 
-A screenshot is taken at the threshold while the button is still held, so the overlay is never opened by a long press. The same button therefore keeps the pause overlay on a tap and adds capture on a hold. `SHELL_COMMAND_HOLD_MS` is the threshold.
+Both gestures are **edge triggered** (`shell_input_button_pressed()`), not hold based. Hardware observation (ROG Ally, hid-asus): the Command Center button emits `KEY_F16` press+release **within the same poll**, and the Armoury Crate button emits `KEY_PROG1` the same way — a momentary pulse with no sustained down state, so a "hold the button" gesture is not implementable on this hardware. (The volume keys on the vendor node *do* report sustained presses, so the shell can see holds when a device produces them.) `shell_input_button_pressed()` explicitly catches a press+release that lands inside one poll.
 
-**Preference.** The System tab's "Screenshot on COMMAND" toggle persists to `/data/config/screenshot` (`1`/`0`) and **defaults to on**; the file is written on every toggle and read at startup.
+ARMOURY CRATE is used because it is reserved (never delivered to games) and otherwise unbound. A 0.4 s debounce suppresses repeat captures from a bouncing button. Each trigger logs `screenshot requested (ARMOURY CRATE|COMMAND)` before the capture so the path is diagnosable from the log alone.
+
+**Preference.** The System tab's "Screenshot on ARMOURY" toggle persists to `/data/config/screenshot` (`1`/`0`) and **defaults to on**; the file is written on every toggle and read at startup. It gates both buttons.
 
 **Feedback.** On shell screens a centred "Screenshot saved/failed" toast is shown for 1.5 s and the shell logs `screenshot -> <path> (ok=N)`. While a game or the overlay is on screen the shell surface is not visible, so the capture is silent on screen — check `/data/log/shell-stderr.log` or the file itself.
 
