@@ -53,7 +53,7 @@ playos-init spawns and supervises playos-overlay at boot
 
 The overlay is **always alive** but only visible when the compositor maps it. Its rendering is stopped when hidden.
 
-**Input ownership.** The overlay only reacts to the gamepad while it is visible. When hidden it still drains its own evdev fd but discards every decoded action, and the compositor sends `about_to_hide` whenever it clears overlay visibility — so the game keeps its buttons during play (notably B, which the overlay maps to Quit only while shown).
+**Input ownership.** The overlay only reacts to the gamepad while it is visible. When hidden it still drains its own evdev fd but discards every decoded action, and the compositor sends `about_to_hide` whenever it clears overlay visibility — so the game keeps its buttons during play. **B never quits the game**: it always means "resume" (hide the overlay), both in-game and in the quick menu.
 
 ---
 
@@ -63,21 +63,20 @@ The overlay is **always alive** but only visible when the compositor maps it. It
 
 ```
 ┌────────────────────────────────────────────┐
-│  [Game name]             [battery] [time]  │
-├────────────────────────────────────────────┤
-│                                            │
-│   ▶  Resume Game                           │
-│      Quit Game                             │
-│                                            │
-│   Volume:  ████████░░  75%                 │
-│   Profile: [Balanced ▼]                    │
-│                                            │
-│   CPU: 72°C  GPU: 68°C                     │
-│                                            │
+│  PlayOS                                    │
+│  Game: <game-id>                           │
+│  Elapsed: 42s                              │
+│  Battery: 80% (Charging)   Thermal: Normal │
+│  CPU: 52C   GPU: 48C                       │
+│  Volume: 75%                               │
+│  Menu:                                     │
+│   ▶ Resume Game                            │
+│     Quit Game                              │
+│     Performance Profile                    │
 └────────────────────────────────────────────┘
 ```
 
-Navigation (implemented): A = Resume, B = Quit game, D-pad Up/Down = volume step, D-pad Left/Right = performance profile, SELECT = power menu. Within the power menu: Up/Down = move cursor, A = confirm, B = back. Within the profile selector: Left/Right = change, A = apply, B = back. The d-pad is decoded from both `ABS_HAT0X/ABS_HAT0Y` (xpad / hid-asus on the ROG Ally) and `BTN_DPAD_*`.
+Navigation (implemented): the quick menu is a focus list — **Resume Game**, **Quit Game**, **Performance Profile**. D-pad Up/Down moves focus; A activates the focused item; B resumes (hides the overlay) and never quits; D-pad Left/Right steps the volume; SELECT opens the power menu. **Quit Game requires holding A for ~0.9 s**, with an on-screen percentage readout so the confirm is visible. Within the power menu: Up/Down = move cursor, A = confirm, B = back. Within the profile selector: Left/Right = change, A = apply, B = back. The d-pad is decoded from both `ABS_HAT0X/ABS_HAT0Y` (xpad / hid-asus on the ROG Ally) and `BTN_DPAD_*`.
 
 ### Power Menu (accessed from Quick Menu)
 
@@ -122,21 +121,22 @@ Notifications are queued; at most one is shown at a time.
 
 ## Volume Control
 
-Volume is adjusted via the overlay:
-- D-pad Left/Right on the volume slider: ±5% per step
+Volume is adjusted from the quick menu:
+- D-pad Left/Right: ±5% per step (one step per press edge)
 - Calls `playos_audio_set_master_volume(new_volume)`
-- Mute toggle: L1 button
-- Visual: filled/empty bar + percentage text
+- Visual: a `Volume: NN%` status line, plus `(muted)` when muted
+- Mute is not bound in the overlay (there is no L1 mute); the hardware volume keys and alsa handle system level
 
 ---
 
 ## Performance Profile Selector
 
-Displays `PLAYOS_PERF_BALANCED`, `PLAYOS_PERF_POWER_SAVE`, `PLAYOS_PERF_PERFORMANCE` in a dropdown.
+Opened from the quick menu's **Performance Profile** item. Displays `PLAYOS_PERF_BALANCED`, `PLAYOS_PERF_POWER_SAVE`, `PLAYOS_PERF_PERFORMANCE`.
 
 - D-pad Left/Right to cycle options
-- A to confirm → calls `playos_power_request_profile()`
-- If profile is denied (thermal override): shows "Performance limited — device is hot" notification
+- A to apply → sends `SetPerfProfile` over the trusted control socket
+- B returns to the quick menu
+- If the profile is denied (thermal override): the system reports `PerfProfileChanged` with the effective profile
 
 ---
 
