@@ -53,6 +53,8 @@ playos-init spawns and supervises playos-overlay at boot
 
 The overlay is **always alive** but only visible when the compositor maps it. Its rendering is stopped when hidden.
 
+**Input ownership.** The overlay only reacts to the gamepad while it is visible. When hidden it still drains its own evdev fd but discards every decoded action, and the compositor sends `about_to_hide` whenever it clears overlay visibility — so the game keeps its buttons during play (notably B, which the overlay maps to Quit only while shown).
+
 ---
 
 ## Screens
@@ -75,7 +77,7 @@ The overlay is **always alive** but only visible when the compositor maps it. It
 └────────────────────────────────────────────┘
 ```
 
-Navigation: D-pad Up/Down to move focus, A to confirm, B to dismiss (→ Resume).
+Navigation (implemented): A = Resume, B = Quit game, D-pad Up/Down = volume step, D-pad Left/Right = performance profile, SELECT = power menu. Within the power menu: Up/Down = move cursor, A = confirm, B = back. Within the profile selector: Left/Right = change, A = apply, B = back. The d-pad is decoded from both `ABS_HAT0X/ABS_HAT0Y` (xpad / hid-asus on the ROG Ally) and `BTN_DPAD_*`.
 
 ### Power Menu (accessed from Quick Menu)
 
@@ -83,15 +85,19 @@ Navigation: D-pad Up/Down to move focus, A to confirm, B to dismiss (→ Resume)
 ┌──────────────────────────────┐
 │       Power Options          │
 ├──────────────────────────────┤
-│   Sleep   (placeholder)      │
+│   Sleep                      │
 │   Restart                    │
 │   Shut Down                  │
-│   ─────                      │
-│   Factory Reset...           │
 └──────────────────────────────┘
 ```
 
-Factory Reset shows a sub-screen with per-category checkboxes and a hold-A confirmation (matches installer confirmation UX).
+Opened with SELECT from the quick menu; Up/Down moves the cursor, A confirms, B returns to the quick menu.
+
+- **Sleep** → `Suspend` IPC. `playos-init` delivers `PLAYOS_LIFECYCLE_SUSPEND` to the running game, writes `mem` to `/sys/power/state` (S3 suspend-to-RAM), then delivers `PLAYOS_LIFECYCLE_RESUME` after wake. If `/sys/power/state` is unavailable it logs `suspend unavailable` and is a no-op.
+- **Restart** → orderly reboot (`playos_shutdown(s, 1)` → `reboot(RB_AUTOBOOT)`).
+- **Shut Down** → orderly power-off (`playos_shutdown(s, 0)` → `reboot(RB_POWER_OFF)`).
+
+Factory Reset is not offered from the overlay; it lives in the shell Settings and the recovery menu.
 
 ---
 
