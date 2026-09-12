@@ -61,6 +61,8 @@ Additional screens:
 
 The shell surface **remains alive** (mapped as a Wayland surface) at all times. Only rendering is stopped, not the process.
 
+**A suspended shell ignores gamepad input.** While a game is foreground (`is_suspended`) the shell must not act on UI input at all: the main loop skips the entire screen-update dispatch, so no screen handler can react to a button the game is using. This is not cosmetic — the game-detail screen's B ("back to library") calls `playos_trusted_terminate_game()`, and with the update handlers running while suspended, pressing B during gameplay killed the running game and looked like the game quitting on B. Two deliberate exceptions stay live while suspended: the reserved-button gestures (COMMAND tap → pause overlay, ARMOURY CRATE tap → screenshot) and the hardware volume keys.
+
 ---
 
 ## Controller Navigation Rules
