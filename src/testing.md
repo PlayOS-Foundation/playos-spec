@@ -254,7 +254,16 @@ playos-ctl reboot
 
 Not present in production builds.
 
+> **Status 2026-09-12:** `playos-ctl` is specified here but **not implemented** —
+> `playos-tools` currently holds only docs and the SDK skeleton. On-device
+> lifecycle testing therefore needs a human at the device (or a new tool).
+> Tracked as gap P7 below.
+
 ### Useful third-party tools (development image)
+
+> **Status 2026-09-12:** none of these are present in the current dev image —
+> the tools set was never wired into the `ally` defconfig. Verifying GPU/input
+> paths on device currently means reading `/data/log/*` and `/sys`. Gap P6.
 
 | Tool | Purpose |
 |---|---|
@@ -267,3 +276,47 @@ Not present in production builds.
 | `perf stat` | CPU performance metrics |
 | `apitrace` | Trace OpenGL calls (debugging) |
 | `piglit` | OpenGL conformance tests |
+
+---
+
+## Performance baseline and known gaps (S14-T7)
+
+Measured on the ROG Ally on 2026-09-12. Full report:
+`playos-refdistro/docs/perf-baseline-report-2026-09-12.md`; raw collector output
+in `playos-refdistro/docs/evidence/perf-baseline-2026-09-12.md`. Latencies come
+from `init.log`, whose line prefix is **system uptime in seconds**.
+
+| Target | Measured | Verdict |
+|---|---|---|
+| Cold boot → shell < 5 s | 7.16 s (`/init` first log at 4.57 s, `ShellReady` 7.16 s) | miss, 1.43× — **P1** |
+| Shell → game first frame < 3 s | 1.00 s to `GameSurfaceReady`, 2.01 s to `GAME_FOREGROUND` | pass |
+| System button → overlay < 100 ms | 4–5 ms shell→init→compositor, plus ≤1 overlay frame | pass |
+| Game exit → shell < 500 ms | 28 ms | pass |
+| `sample-triangle` 60 FPS at native resolution | not measurable — no FPS counter, no `sample-triangle` in the image; the shell renders 55.5 fps | unverified — **P2** |
+| Direct scanout confirmed in the compositor log | no log evidence at the default wlroots log level | unverified — **P3** |
+| Idle shell CPU < 2 % | shell 6 %, compositor 4 %, overlay 0 % of one core | miss if per-core — **P4** |
+
+**Gaps, in priority order.**
+
+- **P1 — boot time.** ~4.6 s elapses before `playos-init` logs anything
+  (firmware + kernel + initramfs), then 2.6 s for init → udev → compositor →
+  shell. Attack the pre-init time first (defer module loading, trim udev
+  coldplug, silence the console), then the compositor/shell handshake.
+- **P2 — in-game frame rate is not instrumented.** Add a lightweight FPS
+  counter to the supervised game path (or ship `sample-triangle`) so the 60 FPS
+  target can be measured on demand.
+- **P3 — direct scanout is not observable.** Add a compositor-side counter or
+  log line when a game surface is scanned out directly.
+- **P4 — the shell renders continuously at 55 fps with a static UI** (6 % of a
+  core). Make rendering damage-driven (skip `BeginDrawing`/`EndDrawing` when
+  nothing changed and no animation is running) and define whether the < 2 %
+  target is per-core or system-wide.
+- **P5 — identity:** `uname -n` reports `(none)` despite `/etc/hostname`, and
+  the image carries no PlayOS version marker (`/etc/os-release` is stock
+  Buildroot), so build identity has to come from binary hashes.
+- **P6 — dev-image tools missing** (`evtest`, `modetest`, `weston-info`,
+  `speaker-test`, `stress-ng`, `perf`, `apitrace`, `piglit`).
+- **P7 — `playos-ctl` is specified but not implemented**, so on-device
+  lifecycle testing needs a human at the device. Implementing it (launch /
+  terminate / query-status / simulate-system-button) would let T5 and T7 run
+  unattended.

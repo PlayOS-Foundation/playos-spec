@@ -16,8 +16,8 @@ Source: [`sprints/roadmap.md`](../sprints/roadmap.md)
 | # | Criterion | Verify by | PASS | Notes |
 |---:|---|---|:---:|---|
 | 1 | Boots directly from UEFI into PlayOS | Power on → shell visible, no desktop | ☐ | |
-| 2 | UEFI-bootable EFI artifact | `ls /EFI/BOOT/BOOTX64.EFI` on live ESP | ☐ | |
-| 3 | `playos-init` is PID 1 | SSH: `awk '{print $4}' /proc/1/comm` → `playos-init` | ☐ | |
+| 2 | UEFI-bootable EFI artifact | `ls /EFI/EFI/BOOT/BOOTX64.EFI` (ESP mounted at `/EFI`; on the live USB it is `/EFI/BOOT/BOOTX64.EFI`) | ☐ | |
+| 3 | `playos-init` is PID 1 | `readlink /proc/1/exe` → `/init` and `strings /init \| grep -m1 playos-init`. (`/proc/1/comm` is just `init` — the binary is installed as `/init`; `/sbin/init` is BusyBox) | ☐ | |
 | 4 | Compositor owns DRM/KMS + Wayland | SSH: `pgrep playos-compositor`, `/run/playos/playos-0` socket | ☐ | |
 | 5 | Shell persistent controller-first UI | Home screen stays alive; background/return works | ☐ | |
 | 6 | wlroots + AMDGPU DRM/GBM/EGL/Mesa | `grep -E "AMDGPU|Radeon" /data/log/init.log`; compositor log | ☐ | |
@@ -55,3 +55,14 @@ All 19 criteria PASS: ☐ / 19
 
 Attach: mvp-evidence.md, shell screenshot, audio log.
 ```
+
+### 2026-09-12 — dev image — 18 / 19
+
+- Report: `playos-refdistro/docs/mvp-smoke-report-2026-09-12.md`
+- Raw collector output: `playos-refdistro/docs/evidence/mvp-evidence-2026-09-12.md`
+- Image: shell `0a76f93f…`, compositor `0837553f…`, overlay `f0394108…`,
+  libplayos `46000d67…` (refdistro `f0bd607`)
+- **Criterion 19 FAILS**: no software/SimpleDRM render path exists, so recovery
+  cannot display its menu when accelerated graphics are what broke (gap F3).
+  Every other criterion passed, with controller input, overlay background/resume,
+  screenshots, clean exit and crash recovery all exercised on hardware.
