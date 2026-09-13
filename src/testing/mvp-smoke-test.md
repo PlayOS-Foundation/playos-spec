@@ -33,7 +33,7 @@ Source: [`sprints/roadmap.md`](../sprints/roadmap.md)
 | 16 | Clean exit + crash return to shell | Exit sample; run crash sample → shell recovers | ☐ | |
 | 17 | Games/saves on separate ext4 | `mount | grep /data` → ext4; saves persist reboot | ☐ | |
 | 18 | System image immutable | `/` mounted squashfs ro: `mount | grep " / "` | ☐ | |
-| 19 | Recovery usable without accelerated graphics | Hold Vol-Down 5s at boot → recovery menu (SimpleDRM follow-up) | ☐ | |
+| 19 | Recovery usable without accelerated graphics | Hold Vol-Down 5s at boot → recovery menu | ☑ | 2026-09-13: software-rendered recovery menu with no GPU driver (QEMU cirrus VGA → SimplEDRM only); `scripts/qemu-recovery-check.sh`, evidence `playos-refdistro/docs/evidence/f3-recovery-menu-no-gpu-2026-09-13.png` |
 
 ## Automated evidence
 
@@ -62,7 +62,9 @@ Attach: mvp-evidence.md, shell screenshot, audio log.
 - Raw collector output: `playos-refdistro/docs/evidence/mvp-evidence-2026-09-12.md`
 - Image: shell `0a76f93f…`, compositor `0837553f…`, overlay `f0394108…`,
   libplayos `46000d67…` (refdistro `f0bd607`)
-- **Criterion 19 FAILS**: no software/SimpleDRM render path exists, so recovery
-  cannot display its menu when accelerated graphics are what broke (gap F3).
+- **Criterion 19 PASSES (2026-09-13)**: recovery renders through the software
+  (pixman) path over SimplEDRM when no accelerated GPU driver is available
+  (`scripts/qemu-recovery-check.sh`; report
+  `playos-refdistro/docs/f3-recovery-software-rendering-2026-09-13.md`).
   Every other criterion passed, with controller input, overlay background/resume,
   screenshots, clean exit and crash recovery all exercised on hardware.
