@@ -33,7 +33,7 @@ Source: [`sprints/roadmap.md`](../sprints/roadmap.md)
 | 16 | Clean exit + crash return to shell | Exit sample; run crash sample → shell recovers | ☐ | |
 | 17 | Games/saves on separate ext4 | `mount | grep /data` → ext4; saves persist reboot | ☐ | |
 | 18 | System image immutable | `/` mounted squashfs ro: `mount | grep " / "` | ☐ | |
-| 19 | Recovery usable without accelerated graphics | Boot with a recovery hold (START+SELECT 2 s, or Vol Up/Down 5 s) → recovery menu | ◐ | 2026-09-13 **PARTIAL**: the compositor's software (pixman/SimplEDRM) path renders the recovery menu with no GPU driver — verified in QEMU (`scripts/qemu-recovery-check.sh`, evidence `playos-refdistro/docs/evidence/f3-recovery-menu-no-gpu-2026-09-13.png`). On the Ally the shell is a GL client and cannot initialise EGL over a software-rendered compositor (eglInitialize 0x3001), so a recovery UI that needs no GL at all is still outstanding — see `playos-refdistro/docs/f3-recovery-software-rendering-2026-09-13.md` |
+| 19 | Recovery usable without accelerated graphics | Boot with a recovery hold (START+SELECT 2 s, or Vol Up/Down 5 s) → recovery menu | ☑ | 2026-09-13: **met** via the GL-free recovery client (`playos-recovery`, wl_shm + software text), which init starts when the GL shell cannot run in recovery; compositor-side software rendering over SimplEDRM verified in QEMU with a screenshot, and the client path verified with the `playos.noshell` hook. Evidence `playos-refdistro/docs/evidence/f3-recovery-client-no-gl-2026-09-13.png`, report `docs/f3-recovery-software-rendering-2026-09-13.md`. Not covered: a machine with no DRM device at all (no compositor) would need a kernel-console UI |
 
 ## Automated evidence
 
@@ -62,10 +62,10 @@ Attach: mvp-evidence.md, shell screenshot, audio log.
 - Raw collector output: `playos-refdistro/docs/evidence/mvp-evidence-2026-09-12.md`
 - Image: shell `0a76f93f…`, compositor `0837553f…`, overlay `f0394108…`,
   libplayos `46000d67…` (refdistro `f0bd607`)
-- **Criterion 19 is PARTIAL (2026-09-13)**: compositor-side software rendering
-  over SimplEDRM works with no GPU driver (QEMU-verified with a screenshot), but
-  the recovery *UI* still needs GL: the shell cannot initialise EGL against a
-  software-rendered compositor on the Ally. Closing this needs a GL-free recovery
-  client (`wl_shm`) or a shipped software rasteriser — see the F3 report.
+- **Criterion 19 PASSES (2026-09-13)**: the recovery UI no longer needs GL at
+  all. `playos-recovery` (wl_shm + software text rasteriser) takes over when the
+  GL shell cannot run, and the compositor itself can render in software over
+  SimplEDRM with no GPU driver. Verified in QEMU (client menu on screen) with the
+  `playos.noshell` hook reproducing the shell-failure case — see the F3 report.
   Every other criterion passed, with controller input, overlay background/resume,
   screenshots, clean exit and crash recovery all exercised on hardware.
