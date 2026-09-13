@@ -33,7 +33,7 @@ Source: [`sprints/roadmap.md`](../sprints/roadmap.md)
 | 16 | Clean exit + crash return to shell | Exit sample; run crash sample → shell recovers | ☐ | |
 | 17 | Games/saves on separate ext4 | `mount | grep /data` → ext4; saves persist reboot | ☐ | |
 | 18 | System image immutable | `/` mounted squashfs ro: `mount | grep " / "` | ☐ | |
-| 19 | Recovery usable without accelerated graphics | Hold Vol-Down 5s at boot → recovery menu | ☑ | 2026-09-13: software-rendered recovery menu with no GPU driver (QEMU cirrus VGA → SimplEDRM only); `scripts/qemu-recovery-check.sh`, evidence `playos-refdistro/docs/evidence/f3-recovery-menu-no-gpu-2026-09-13.png` |
+| 19 | Recovery usable without accelerated graphics | Boot with a recovery hold (START+SELECT 2 s, or Vol Up/Down 5 s) → recovery menu | ☑ | 2026-09-13: software-rendered recovery menu with no GPU driver (QEMU cirrus VGA → SimplEDRM only); `scripts/qemu-recovery-check.sh`, evidence `playos-refdistro/docs/evidence/f3-recovery-menu-no-gpu-2026-09-13.png` |
 
 ## Automated evidence
 
