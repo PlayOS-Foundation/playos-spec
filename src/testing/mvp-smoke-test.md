@@ -33,7 +33,7 @@ Source: [`sprints/roadmap.md`](../sprints/roadmap.md)
 | 16 | Clean exit + crash return to shell | Exit sample; run crash sample → shell recovers | ☐ | |
 | 17 | Games/saves on separate ext4 | `mount | grep /data` → ext4; saves persist reboot | ☐ | |
 | 18 | System image immutable | `/` mounted squashfs ro: `mount | grep " / "` | ☐ | |
-| 19 | Recovery usable without accelerated graphics | Boot with a recovery hold (START+SELECT 2 s, or Vol Up/Down 5 s) → recovery menu | ☑ | 2026-09-13: software-rendered recovery menu with no GPU driver (QEMU cirrus VGA → SimplEDRM only); `scripts/qemu-recovery-check.sh`, evidence `playos-refdistro/docs/evidence/f3-recovery-menu-no-gpu-2026-09-13.png` |
+| 19 | Recovery usable without accelerated graphics | Boot with a recovery hold (START+SELECT 2 s, or Vol Up/Down 5 s) → recovery menu | ◐ | 2026-09-13 **PARTIAL**: the compositor's software (pixman/SimplEDRM) path renders the recovery menu with no GPU driver — verified in QEMU (`scripts/qemu-recovery-check.sh`, evidence `playos-refdistro/docs/evidence/f3-recovery-menu-no-gpu-2026-09-13.png`). On the Ally the shell is a GL client and cannot initialise EGL over a software-rendered compositor (eglInitialize 0x3001), so a recovery UI that needs no GL at all is still outstanding — see `playos-refdistro/docs/f3-recovery-software-rendering-2026-09-13.md` |
 
 ## Automated evidence
 
@@ -62,9 +62,10 @@ Attach: mvp-evidence.md, shell screenshot, audio log.
 - Raw collector output: `playos-refdistro/docs/evidence/mvp-evidence-2026-09-12.md`
 - Image: shell `0a76f93f…`, compositor `0837553f…`, overlay `f0394108…`,
   libplayos `46000d67…` (refdistro `f0bd607`)
-- **Criterion 19 PASSES (2026-09-13)**: recovery renders through the software
-  (pixman) path over SimplEDRM when no accelerated GPU driver is available
-  (`scripts/qemu-recovery-check.sh`; report
-  `playos-refdistro/docs/f3-recovery-software-rendering-2026-09-13.md`).
+- **Criterion 19 is PARTIAL (2026-09-13)**: compositor-side software rendering
+  over SimplEDRM works with no GPU driver (QEMU-verified with a screenshot), but
+  the recovery *UI* still needs GL: the shell cannot initialise EGL against a
+  software-rendered compositor on the Ally. Closing this needs a GL-free recovery
+  client (`wl_shm`) or a shipped software rasteriser — see the F3 report.
   Every other criterion passed, with controller input, overlay background/resume,
   screenshots, clean exit and crash recovery all exercised on hardware.
