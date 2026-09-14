@@ -206,7 +206,17 @@ Make the runtime installer launch like a normal fullscreen PlayOS app instead of
 
 - Register `playos-installer` as a fullscreen system app launchable from the shell (e.g., a System utility entry or dedicated tile).
 - Front-end phase (disk selection + confirm) runs under the shell's compositor, styled with the shell's fonts/colors/layout so it feels like the same product.
-- On confirm, reuse the existing `StartInstaller` handoff: init stops shell/overlay/compositor, preserves the dev SSH key, unmounts `/data` + `/EFI`, restarts the compositor, and continues the installer in runtime mode.
+- On confirm, reuse the `StartInstaller` handoff, with `target_disk` so the
+  installer knows which disk to take: init stops **only the UI clients** (shell +
+  overlay, hard-stop with SIGKILL fallback), keeps the **compositor and `/data`
+  up**, releases **only the target disk's ESP** and continues the installer in
+  runtime mode. If the install fails, init restarts the shell, overlay **and**
+  SSH bring-up, remounts `/EFI`, and the session returns to the shell (the
+  installer's log is preserved at `/data/log/installer.log`). *Superseded
+  design:* the original plan tore the whole session down (compositor, `/data`,
+  `/EFI`) and restarted the compositor — rejected because installing should not
+  cost a reboot's worth of teardown, and a failed install must not strand the
+  user without a UI.
 - **Seamless transition detail:** suppress Linux console/kernel log output during the handoff. Do not let raw `dmesg`/kernel lines appear on the visible framebuffer — e.g., `quiet loglevel=0` for the handoff, switch the VT to a blank/splash surface, and have the installer draw a fullscreen progress/splash layer that covers the transition.
 
 **Done when:** launching "Install PlayOS" opens an app-style fullscreen UI, the transition into the destructive phase shows no raw console logs, and the installer completes and reboots exactly as it does today.
