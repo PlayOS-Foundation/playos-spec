@@ -277,6 +277,17 @@ Make the runtime installer launch like a normal fullscreen PlayOS app instead of
 
 ---
 
+## Follow-on: Sprint 14.5 (recorded 2026-09-13)
+
+T10 closed with the installer styled and the handoff seamless, but the shell's
+screen is still replaced by the standalone installer for the destructive phase.
+**[Sprint 14.5 — Shell-Owned Install Progress](Sprint-14.5.md)** tracks the small
+dedicated follow-on: extract `libplayos-install`, add `PrepareInstall` /
+`InstallProgress` IPC, run a supervised screen-less `playos-install-worker`, and
+let the shell draw progress, completion and errors. Not a gate for this sprint.
+
+---
+
 ## Handoff to Sprint 15
 
 Sprint 15 may assume:

@@ -75,6 +75,7 @@
 - [Sprint 13.6 — Gamepad Identifier Database (SDL mappings)](sprints/Sprint-13.6.md)
 - [Sprint 13.7 — Live-USB / Installer Image Consolidation](sprints/Sprint-13.7.md)
 - [Sprint 14 — Production Readiness](sprints/Sprint-14.md)
+- [Sprint 14.5 — Shell-Owned Install Progress](sprints/Sprint-14.5.md)
 - [Sprint 15 — Game Developer SDK](sprints/Sprint-15.md)
 - [Sprint 16 — `playos-net` (Wi-Fi)](sprints/Sprint-16.md)
 - [Sprint 17 — Touch Input + On-Screen Keyboard (OSK)](sprints/Sprint-17.md)

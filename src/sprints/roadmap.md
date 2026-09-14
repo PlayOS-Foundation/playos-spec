@@ -60,6 +60,7 @@ The first meaningful PlayOS MVP is complete when all of the following are true o
 | [13.6](Sprint-13.6.md) | Gamepad Identifier Database (SDL mappings) | Embed SDL_GameControllerDB so known pads map correctly via bus/vendor/product/version |
 | [13.7](Sprint-13.7.md) | Live-USB / Installer Image Consolidation | Two per-target images (dev + prod) each boot live to shell and install to internal disk via a Settings action (runtime installer handoff, Option B) |
 | [14](Sprint-14.md) | Production Readiness | Signed preview release with versioned public Platform API |
+| [14.5](Sprint-14.5.md) | Shell-Owned Install Progress | The install runs inside the shell: one engine (`libplayos-install`) + a supervised screen-less worker, progress/completion/errors drawn by the shell, standalone installer kept as the no-shell fallback |
 | [15](Sprint-15.md) | Game Developer SDK | Self-contained `playos-sdk` (musl toolchain + `libplayos`/`libraylib`) with device/desktop/emulator testing |
 | [16](Sprint-16.md) | `playos-net` (Wi-Fi) | D-Bus-free Wi-Fi (`wpa_supplicant` + `dhcpcd` + `playos-net` bridge) driven through `playos-runtime` |
 | [17](Sprint-17.md) | Touch Input + On-Screen Keyboard (OSK) | Touch end-to-end (compositor → raylib backend) plus a reusable system OSK |
