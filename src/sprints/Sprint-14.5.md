@@ -23,7 +23,14 @@ Keeping the presentation in the shell is small because everything else already e
 - [x] init supervises children with a restart policy and can start/stop them without touching the compositor (S14-T10 handoff).
 - [x] The shell already renders progress-shaped UI for the *update* path (`update_in_progress` → `draw_update_progress_row`), so the widgets and the state handling are proven.
 - [x] The trusted IPC has an event stream the shell already consumes (`UpdateProgress`), so a second progress channel follows an existing pattern.
-- [ ] Confirm which steps of `format.c`/`efi.c` need a caller-supplied callback (vs. logging) so the engine can be lifted into a library without behaviour change.
+- [x] Confirmed 2026-09-20 (re-alignment pass): **no `format.c`/`efi.c` entry point needs a caller-supplied
+  callback.** They already take `(device, partno, label, err, errlen)` and return an int, so they are
+  library-ready as they stand. The step *dispatch* is `main.c:run_install_step()`, and that is what T1 has
+  to lift: it currently takes the whole UI `struct installer`, so it needs a slim context (target device,
+  step index, step name, error buffer) plus one **step callback** (begin / end / error) that the worker
+  turns into `InstallProgress`. The only place that would want finer granularity is the payload write
+  (`playos_format_write_image`, a ~55 MB copy) - a byte-level callback there is optional, since a per-step
+  percentage (i/8) is enough for the first version.
 
 ## Decisions Locked for This Sprint
 
