@@ -108,3 +108,4 @@
 # Reference
 
 - [Original Design Notes](ideas.md)
+- [PlayOS Installer](playos-installer-spec.md)
