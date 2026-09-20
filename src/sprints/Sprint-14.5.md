@@ -73,7 +73,7 @@ playos-shell/src/screen_installer.c ← progress / complete / error stages
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S14.5-T1 | Extract `libplayos-install` from the installer's step engine | `playos-refdistro` | in progress | Behaviour-preserving: the standalone installer must still pass its on-device run  `libplayos-install` extracted (`install_lib.[ch]`, static lib, installer links it) and building; main.c still uses its own copy of the step switch - rewiring that is the rest of T1. |
+| S14.5-T1 | Extract `libplayos-install` from the installer's step engine | `playos-refdistro` | done (device check with T5) | Behaviour-preserving: the standalone installer must still pass its on-device run  `libplayos-install` extracted (`install_lib.[ch]`, static lib, installer links it) and building; main.c still uses its own copy of the step switch - rewiring that is the rest of T1.  `libplayos-install` extracted and building; `main.c` drives it through a thin wrapper with log + seed-key callbacks; the engine owns every format/EFI call and the step table has one definition. On-device "behaves identically" confirmation rides with T5. |
 | S14.5-T2 | `PrepareInstall` + `InstallProgress` IPC types, trusted wrapper, spec | `playos-init`, `playos-runtime`, `playos-spec` | not started | Mirrors `ApplyUpdate`/`UpdateProgress` |
 | S14.5-T3 | `playos-install-worker` package: runs the engine, reports progress, no surface | `playos-refdistro`, `playos-init` | not started | Supervised like shell/overlay; no restart mid-write |
 | S14.5-T4 | Shell draws progress, completion ("Reboot now") and errors | `playos-shell` | not started | Reuses the update-progress widgets and `SCREEN_INSTALLER` |
