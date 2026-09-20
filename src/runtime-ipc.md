@@ -221,6 +221,26 @@ Hand the session over to the runtime installer (S13.7; extended by S14-T10 and t
 
 ---
 
+#### `PrepareInstall`
+```json
+{ "v": 1, "type": "PrepareInstall", "target_disk": "/dev/nvme0n1" }
+{ "v": 1, "type": "PrepareInstallAck" }
+{ "v": 1, "type": "PrepareInstallError" }
+```
+Added by Sprint 14.5-T2. Validate an install target and release its mounts **before** the shell commits to a progress screen, so a target that cannot be installed fails while the user is still on the picker. `playos-init` rejects the request when the target is not present, or when it holds the running root (`/`) or `/data` — installing then would erase the system in use — and otherwise unmounts the target's own `/EFI` when the ESP sits on it (`playos_mount_is_on_target()`), because a mounted ESP makes `mkfs` refuse the target. The install engine repeats the release in step 0: this is the early answer, not a replacement. `PrepareInstallAck`/`PrepareInstallError` report only the check.
+
+---
+
+#### `InstallProgress`, `InstallComplete`, `InstallError`
+```json
+{ "v": 1, "type": "InstallProgress", "step": 3, "step_name": "Reserve system B", "percent": 37 }
+{ "v": 1, "type": "InstallComplete" }
+{ "v": 1, "type": "InstallError", "step": 3, "reason": "..." }
+```
+Added by Sprint 14.5-T2. These are **events, not requests**: the screen-less `playos-install-worker` (S14.5-T3) reports them like any other client and `playos-init` relays them to the registered shell listener — the same path `UpdateProgress` takes, and the only available one, because the shell's listener is a connection *to* init rather than a server the worker could dial. The shell therefore never talks to the worker. Init forwards only the fields that follow the message's `type` and re-adds `v`/`type` itself, so a worker's payload goes after the type.
+
+---
+
 #### `SetPerfProfile`
 ```json
 { "v": 1, "type": "SetPerfProfile", "profile": "balanced" }
