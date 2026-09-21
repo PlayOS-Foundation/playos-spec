@@ -7,6 +7,27 @@
 
 ---
 
+## Install screen stages (S14.5-T4)
+
+The shell owns the install experience end to end. `SCREEN_INSTALLER` is the single
+owner of the flow and has four stages:
+
+| Stage | Drawn by the shell | Input |
+|---|---|---|
+| picker | disk list (the target's own disk is hidden) | Up/Down, A to confirm, B to leave |
+| confirm | hold-A gauge (`Hold A to erase and install`) | hold A 3 s, B to cancel |
+| progress | step number, step name, percentage bar | none - the install must not be interrupted by a stray button |
+| complete | "Installation complete" + **A: Reboot now**, B: stay | A reboots, B returns to the picker |
+| error | the reason init gave, + "A/B: Back" | A or B returns to the picker |
+
+Confirming first sends `PrepareInstall` (see `runtime-ipc.md`), so an unusable
+target fails on the picker instead of after the destructive work has begun, and
+only then `StartInstaller`, which starts the screen-less worker. Progress arrives
+as `InstallProgress` / `InstallComplete` / `InstallError` events relayed by init;
+the shell never talks to the worker, and no second fullscreen app appears - the
+old handoff (blanking the VT, stopping the shell) remains only for installs with
+no shell to draw progress.
+
 ## Responsibilities
 
 | Owns | Does NOT own |
