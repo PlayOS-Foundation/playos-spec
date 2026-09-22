@@ -124,10 +124,10 @@ sdk-reference/                  # reference game built entirely via the SDK; exe
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S15-T1 | Package the musl toolchain tarball/base image | `playos-tools` | not started | |
-| S15-T2 | Ship `libplayos` headers and musl static/shared libs | `playos-platform-api`, `playos-tools` | not started | |
-| S15-T3 | Ship musl `libraylib` with the `PLATFORM_PLAYOS` backend | `playos-shell`, `playos-refdistro`, `playos-tools` | not started | |
-| S15-T4 | Provide CMake toolchain and `pkg-config` for `device` | `playos-tools` | not started | |
+| S15-T1 | Package the musl toolchain tarball/base image | `playos-tools` | done |  Done and verified 2026-09-22. `scripts/export-sdk.sh` produced a 409 MB relocatable toolchain. The first attempt could not run at all - the `bin/<prefix>-*` entries are symlinks to `bin/toolchain-wrapper`, which the export never copied, and the compiler proper lives in `libexec/gcc` + `lib/gcc`; all three now move together. Verified by relocating the SDK and compiling: `-print-sysroot` resolves to the new path and the output links against `ld-musl-x86_64.so.1`. |
+| S15-T2 | Ship `libplayos` headers and musl static/shared libs | `playos-platform-api`, `playos-tools` | done |  Done and verified: a sample built with the SDK links `libplayos.so.0` and runs on the Ally. |
+| S15-T3 | Ship musl `libraylib` with the `PLATFORM_PLAYOS` backend | `playos-shell`, `playos-refdistro`, `playos-tools` | done |  Done and verified: the SDK-built sample starts raylib with `Platform backend: PLAYOS (Wayland + EGL/GLES2)` on the device. |
+| S15-T4 | Provide CMake toolchain and `pkg-config` for `device` | `playos-tools` | done |  Done and verified: the cmake toolchain + `playos.pc`/`raylib-playos.pc` built `playos-samples/bunnymark` from a relocated SDK with no Buildroot tree. Script now reports the binary and its device ABI. |
 | S15-T5 | Build the `desktop` host shim seeded from `PLAYOS_BACKEND=stub` | `playos-platform-api`, `playos-tools` | not started | |
 | S15-T6 | Implement the `desktop` build profile | `playos-tools` | not started | |
 | S15-T7 | Implement the `emulator` build profile | `playos-refdistro`, `playos-tools` | not started | |
