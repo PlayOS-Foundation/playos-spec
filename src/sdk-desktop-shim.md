@@ -106,11 +106,24 @@ A headless CI host can therefore prove the first three; the window check is the 
 that needs a machine with a display — and it is the check a developer performs on
 their own laptop anyway.
 
+## Decisions
+
+- **raylib for the desktop profile: the SDK builds it from the vendored source.**
+  Decided 2026-09-22, and measured rather than assumed: the raylib already in the
+  tree (`playos-shell/external/raylib`, the same source the device builds with
+  `PLATFORM_PLAYOS`) configures and builds against the host's default desktop backend
+  in **31 seconds** (`-DBUILD_EXAMPLES=OFF -DBUILD_SHARED_LIBS=ON`, no system raylib
+  present or needed). So the SDK ships both raylib builds - the device one and the
+  desktop one - from one source of truth, and a developer needs no raylib package at
+  all. A system raylib would have been faster to start but unreproducible, and it
+  would have quietly diverged from the version games run on.
+
 ## Open questions
 
-- **raylib for the desktop profile:** require a system-installed raylib, or have the
-  SDK fetch/build upstream raylib once? (T6 has to answer this; a vendored build is
-  more reproducible, a system package is faster to start.)
+- **Where the shim's storage root lives on Windows** when the emulator profile is
+  used from WSL - inside WSL, or on the Windows side so saves move between the two?
+- **Audio:** do we drive the host's mixer, or leave it entirely to the host? The
+  current design leaves it to the host.
 - **Where the shim's storage root lives on Windows** when the emulator profile is
   used from WSL — inside WSL, or on the Windows side so saves move between the two?
 - **Audio:** do we drive the host's mixer, or leave it entirely to the host? The
