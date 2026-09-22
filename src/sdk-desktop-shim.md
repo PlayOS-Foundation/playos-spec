@@ -67,10 +67,10 @@ best-effort:
 - **Linux:** read the host's evdev devices. `backend_evdev.c` already does exactly
   this for the device, including the gamepad database, so the shim reuses it rather
   than reimplementing it. A developer in the `input` group gets their real gamepad.
-- **Keyboard as a controller:** map the usual keys to controller state (arrows/WASD
-  to the d-pad, Z/X/C/V or J/K/L to the face buttons, Enter to Start, Backspace to
-  Select) so a game is playable on a laptop with no pad attached. This is a
-  development affordance, and is documented as such, not as a device feature.
+- **Keyboard as a controller:** **WASD → left stick** (what games actually read),
+  **arrows → d-pad** (menus), **Z/X/C/V → South/East/West/North** (A/B/X/Y),
+  **Q/E → L1/R1**, **Enter/Backspace → Start/Select**. A development affordance,
+  documented as such — not a device feature.
 - **Not Linux (Windows via the emulator or a native build):** report "no
   controller". The game uses raylib input, which works everywhere. No fake input is
   synthesised — a shim that invents button presses is worse than one that reports
