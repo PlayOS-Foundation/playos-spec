@@ -4,7 +4,7 @@
 
 **Primary Outcome:** pressing confirm on the installer screen leaves the shell's own UI (same fonts, colours, layout) on screen for the whole install; progress advances step by step with a percentage; completion offers **Reboot now**; a failed install shows an error card in the shell and the session stays usable. The standalone installer still works unchanged for `playos.mode=install`, `playos.install.auto=1` and recovery.
 
-**Status:** not started. Recorded 2026-09-13 from the S14-T10 close-out (see the "Installer progress ownership" follow-up in `playos-memorymap/09-next-steps.md`).
+**Status:** **4 of 5 tasks done** (T1–T4 complete; T5's happy path verified on hardware). Two verification checks are deliberately parked — see "Parked" below. Recorded 2026-09-13 from the S14-T10 close-out; verified on device 2026-09-22.
 
 **Prerequisites:** S14-T10 complete and verified on hardware (install 8/8 steps on the ROG Ally, seamless handoff, failure returns to the shell); S13.7 live-USB/installer images in place.
 
@@ -68,6 +68,39 @@ playos-shell/src/screen_installer.c ← progress / complete / error stages
 ```
 
 ## Agent Task Breakdown
+
+## Parked (revisit later)
+
+Decided 2026-09-22: the shell-driven install works end to end on hardware, so these
+two checks are parked rather than blocking Sprint 15. Neither is expected to fail —
+both exercise paths already proven in other forms — but neither has been run on the
+device, and this sprint's acceptance line names the first one explicitly.
+
+**P1 — forced failure (killed worker → error card).** Needs the USB stick booted
+live and an install started (a couple of button presses). Then, over SSH:
+
+```
+kill $(pgrep -f playos-install-worker)
+```
+
+Expect the shell to show the **error card** with init's reason
+(`install worker exited (code=… signal=…)`), holding on screen for at least
+`INSTALL_CARD_HOLD_OFF`, instead of a progress bar that never advances or a silent
+return to the shell. Evidence to collect: `/data/log/shell-stderr.log`
+(`install error: …`), `/data/log/init.log` (`install worker exited`), and a
+screenshot of the card (tap COMMAND).
+
+**P2 — standalone installer rerun.** Needs the stick live (its `playos-a` carries
+the payload). Then:
+
+```
+PLAYOS_INSTALL_TARGET=/dev/nvme0n1 /usr/bin/playos-installer
+```
+
+The picker is skipped when the target is set. Expect the same eight steps and the
+same log lines as the worker produces (`installer step N/8 …`), proving the engine
+extraction did not change that front-end's behaviour, and its own UI on screen. It
+reboots on success, so the SSH session ends — that is expected.
 
 ### Task Status Grid
 
