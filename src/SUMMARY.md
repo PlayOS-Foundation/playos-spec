@@ -102,6 +102,7 @@
 - [ADR-0009 — Gamepad Identifier Database](adr/ADR-0009-gamepad-mapping-database.md)
 - [ADR-0010 — Live USB Is The Installer](adr/ADR-0010-live-usb-installer-consolidation.md)
 - [ADR-0011 — Recovery Mode UI](adr/ADR-0011-recovery-ui.md)
+- [ADR-0012 — Wi-Fi Stack (wpa_supplicant + dhcpcd, No D-Bus)](adr/ADR-0012-wifi-stack.md)
 
 ---
 

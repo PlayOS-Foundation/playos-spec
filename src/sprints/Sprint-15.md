@@ -131,7 +131,7 @@ sdk-reference/                  # reference game built entirely via the SDK; exe
 | S15-T5 | Build the `desktop` host shim seeded from `PLAYOS_BACKEND=stub` | `playos-platform-api`, `playos-tools` | done |  Done and verified 2026-09-22. backend_stub.c is the host input backend (delegates to evdev for a real gamepad, else maps the keyboard, else reports "no controller" rather than inventing input); the storage root moved into one place (/data on the device, XDG on the host), and tests/test_desktop_shim.c asserts the lifecycle calls cannot block, that storage points at the host, and that the key mapping is correct - all without hardware. `--watch N` prints live controller state for the hardware check. Design: playos-spec/src/sdk-desktop-shim.md. |
 | S15-T6 | Implement the `desktop` build profile | `playos-tools` | done |  Done and verified 2026-09-22. export-sdk.sh now builds and ships the desktop raylib (from the same vendored source the device uses) and the host libplayos; build-desktop.sh points the sample's existing CMakeLists at them and sets the rpath. Verified: playos-samples/bunnymark built through the SDK as a glibc binary linking libplayos.so.0 + libraylib.so.6, and ran with "DISPLAY: Device initialized successfully" on a real display. Known gap: the desktop raylib is X11-only until libdecor-0-dev is present (GLFW drops Wayland silently); the export now detects and reports that. |
 | S15-T7 | Implement the `emulator` build profile | `playos-refdistro`, `playos-tools` | done | Done and verified 2026-09-22. Design: [`sdk-emulator-profile.md`](../sdk-emulator-profile.md). init `4f9c599` adds `playos.autostart=<game-id>` (waits for the compositor control connection + shell listener, then mirrors LaunchGame); `playos_emulator_defconfig` + `make emulator-build`; `scripts/emulator-run.sh` installs a device game on a `playos-data` disk and boots with the token. Verified: the SDK-built bunnymark (musl) is spawned under the S12 sandbox and the compositor logs `game surface added to scene (role 3)` + `fps shell=0 game=1`, with zero DRM atomic errors. The QEMU kernel config gains evdev/virtio-input so the guest has input nodes; `--gamepad` passes a host device through. |
-| S15-T8 | Build the reference sample entirely via the SDK and validate all profiles | `playos-samples`, `playos-tools` | in progress | `playos-samples/sdk-reference/` added (one `main.c` for all profiles; exercises system/lifecycle/input/storage/logging). Device + emulator validated through the SDK; the desktop build compiles but its windowed run needs a session with a display. Results in the sample's `README.md`. |
+| S15-T8 | Build the reference sample entirely via the SDK and validate all profiles | `playos-samples`, `playos-tools` | done (1 parked check) | `playos-samples/sdk-reference/` added (one `main.c` for all profiles; exercises system/lifecycle/input/storage/logging). `device` (musl) and `emulator` (QEMU) verified end to end; `desktop` builds but its windowed run is **parked** (needs a display — see Parked verification). Results in the sample's `README.md`. |
 
 Update the **Status** column as work progresses: `not started` → `in progress` → `blocked` or `done`.
 
@@ -237,6 +237,29 @@ Build a reference sample in `playos-samples/sdk-reference/` entirely through the
 - [ ] The reference sample is built entirely via the SDK and validated across all three profiles.
 - [ ] The `device` binary is confirmed musl-linked, not glibc-linked.
 - [ ] SDK usage, profile matrix, and artifact layout are documented in `playos-tools/docs/sdk.md`.
+
+---
+
+## Parked verification (2026-09-22)
+
+One check is parked, by agreement, so Sprint 16 can start. It is the only
+remaining item from the Sprint 15 exit gate; everything else is verified.
+
+**Desktop windowed run.** The `desktop` profile builds (glibc, links the SDK's
+`libraylib.so.6` + `libplayos.so.0`) but the session that built T8 had no
+`DISPLAY`/`WAYLAND_DISPLAY`, so the game was never run in a window. Repro:
+
+```sh
+export PLAYOS_SDK=/path/to/playos-tools/sdk
+sdk/scripts/build-desktop.sh playos-samples/sdk-reference
+build-desktop/bin/game        # expect a window, a HUD, and B to exit
+```
+
+If the desktop raylib built X11-only (`export-sdk.sh` prints a `WARN`), install
+`libdecor-0-dev libxkbcommon-dev wayland-protocols` first or run under X11.
+Required evidence: the window opens, the HUD shows the API/device strings, and
+the game exits on B — matching the `device`/`emulator` results in
+`playos-samples/sdk-reference/README.md`.
 
 ---
 

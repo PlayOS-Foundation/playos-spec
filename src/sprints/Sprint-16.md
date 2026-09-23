@@ -4,7 +4,7 @@
 
 **Primary Outcome:** The ROG Ally scans for networks, connects to a WPA2/WPA3 network, obtains an IP via DHCP, and the shell shows a working Wi-Fi settings screen (scan → connect → connected status). The whole path is driven through `control.sock`, exactly like `LaunchGame`.
 
-**Status:** 🟡 Post-MVP — not started. Stack decision recorded in [`network-options.md`](network-options.md) §10 (Option B).
+**Status:** 🟡 Not started — **reviewed and realigned 2026-09-22** against the current repos (see Realignment notes at the end). Stack decision recorded in [`network-options.md`](network-options.md) §10 (Option B) and formalised as **ADR-0012** ([`adr/ADR-0012-wifi-stack.md`](../adr/ADR-0012-wifi-stack.md)). On-device Wi-Fi acceptance is hardware-gated (it needs the ROG Ally's MediaTek MT7921e radio).
 
 **Prerequisites:** MVP complete (Sprint 15) and Sprint 12 security hardening (Landlock/seccomp, `playos-trusted` group) in place.
 
@@ -20,17 +20,18 @@ See [`network-options.md`](network-options.md) for the full options analysis (iw
 
 ## Start Condition Checklist
 
-- Sprint 15 complete; MVP (19 criteria in `roadmap.md`) verified on hardware.
-- Sprint 12 hardening merged: `playos-trusted` group, Landlock, seccomp, production image has no BusyBox.
-- `network-options.md` §10 decision accepted (Option B — `wpa_supplicant` + `dhcpcd`).
-- Kernel currently defers `CFG80211`/`MAC80211`/`MT7921E` (`kernel-config.md` §Networking).
+- Sprint 15 complete **except one parked check** — the desktop windowed run (see `Sprint-15.md` → Parked verification). Everything else in the S15 exit gate is verified: T1–T7 done, and T8's `device` + `emulator` runs pass.
+- MVP verified on hardware (Sprint 14). Sprint 12 hardening merged: `playos-trusted` group, Landlock, seccomp, production image has no BusyBox.
+- `network-options.md` §10 decision accepted (Option B — `wpa_supplicant` + `dhcpcd`); formalised as ADR-0012.
+- Kernel currently defers wireless entirely: `br2-external/board/ally/linux.config` has `# CONFIG_WIRELESS is not set` (`kernel-config.md` §Networking already documents the intended options).
+- **Hardware gate:** T8's real scan/connect/DHCP/WPA3 and the trust-boundary checks need the Ally's MT7921e. Host/QEMU can complete T1–T7 and the QEMU half of T8.
 
 ---
 
 ## Decisions Locked for This Sprint
 
-- **`wpa_supplicant`, not `iwd`** — built D-Bus-free: `CONFIG_CTRL_IFACE=unix`, `CONFIG_CTRL_IFACE_DBUS=n`. Talks to the kernel over `nl80211`.
-- **`dhcpcd`, not BusyBox `udhcpc`** — standalone DHCPv4/DHCPv6 + IPv4LL client (`BR2_PACKAGE_DHCPCD`). Production has no BusyBox.
+- **`wpa_supplicant`, not `iwd`** — D-Bus-free by *not selecting* Buildroot's `BR2_PACKAGE_WPA_SUPPLICANT_DBUS`; enable `BR2_PACKAGE_WPA_SUPPLICANT_NL80211`, `_CTRL_IFACE` (unix socket) and `_WPA3` (SAE). Buildroot owns the upstream `CONFIG_CTRL_IFACE*` flags; do not hand-edit them.
+- **`dhcpcd`, not BusyBox `udhcpc`** — standalone DHCPv4/DHCPv6 + IPv4LL client (`BR2_PACKAGE_DHCPCD`; **already enabled** in `playos_ally_defconfig`). Production has no BusyBox.
 - **No D-Bus.** This is the entire point of the chosen stack.
 - **`playos-net` bridge daemon** — links `libwpa_client` (`wpa_ctrl`), translates wpa_supplicant's control protocol ↔ `playos-runtime` JSON frames.
 - **Control plane = `control.sock`** — new network messages ride the existing trusted socket; the shell is the only UI.
@@ -68,12 +69,12 @@ See [`network-options.md`](network-options.md) for the full options analysis (iw
 
 | Repo | Required work |
 |---|---|
-| `playos-net` (new) | Bridge daemon: `wpa_ctrl` ↔ `playos-runtime` JSON; profile management |
-| `playos-runtime` | Network control messages + framing docs |
+| `playos-net` (new) | Bridge daemon: `wpa_ctrl` ↔ `playos-runtime` JSON; profile management. Start in-repo at `playos-refdistro/src/playos-net/` |
+| `playos-runtime` | Network control messages in the trusted-control client (`src/trusted_control.c`) + the canonical IPC types (`playos-init/ipc/ipc.h`) |
 | `playos-init` | Supervise `wpa_supplicant`/`dhcpcd`/`playos-net`; network policy |
-| `playos-shell` | Wi-Fi settings screen |
-| `playos-refdistro` | Kernel config, wpa_supplicant + dhcpcd + playos-net packages, firmware overlay |
-| `playos-spec` | This sprint; `runtime-ipc.md` network messages; `kernel-config.md` networking section |
+| `playos-shell` | Wi-Fi UI: extend the Settings `TAB_NETWORK` + a `src/screen_network.c` (the shell has no `src/ui/` tree) |
+| `playos-refdistro` | Kernel config (`board/ally/linux.config`), Buildroot packages (wpa_supplicant, playos-net), MediaTek firmware via the linux-firmware package |
+| `playos-spec` | This sprint; `runtime-ipc.md` network messages; `kernel-config.md` networking section; ADR-0012 |
 
 > `playos-net` is a new small daemon. It may start as `playos-refdistro/src/playos-net/` (as `playos-overlay` did) before promotion to its own repo.
 
@@ -93,21 +94,30 @@ include/playos_net.h          # internal message types (mirrors runtime IPC)
 ### `playos-runtime`
 
 ```text
-proto/network.json            # new message schemas (Scan/Connect/Disconnect/Status)
+src/trusted_control.c         # ScanNetworks/ConnectNetwork/... client helpers
+playos-init/ipc/ipc.h         # canonical message types (in the playos-init repo)
 ```
+
+> `playos-runtime/protocols/playos-v1.xml` is the compositor's private **Wayland**
+> protocol, not the runtime IPC. Network messages are JSON on `control.sock`;
+> they belong with the canonical IPC types and are documented in `runtime-ipc.md`.
 
 ### `playos-refdistro`
 
 ```text
-br2-external/configs/playos_rog_ally_defconfig   # enable CFG80211/MAC80211/MT7921E/RFKILL
-board/playos/rog-ally/rootfs-overlay/lib/firmware/mediatek/   # mt7921/mt7922 blobs
-br2-external/package/playos-net/                 # new package
+br2-external/board/ally/linux.config   # CFG80211/MAC80211/MT7921E/RFKILL (WIRELESS is off today)
+br2-external/configs/playos_ally_defconfig   # wpa_supplicant options; dhcpcd already on
+br2-external/package/playos-net/       # new package
 ```
+
+MediaTek Wi-Fi firmware comes from Buildroot's `linux-firmware` package
+(`BR2_PACKAGE_LINUX_FIRMWARE_MEDIATEK_MT7921` / `_MT7922`) — not an overlay blob.
 
 ### `playos-shell`
 
 ```text
-src/ui/network.c              # Wi-Fi settings screen (scan/connect/status)
+src/screen_settings.c         # TAB_NETWORK (exists as a 4-line placeholder today)
+src/screen_network.c          # scan list / connect / live status, screen_*.c conventions
 ```
 
 ---
@@ -118,16 +128,19 @@ src/ui/network.c              # Wi-Fi settings screen (scan/connect/status)
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S16-T1 | Enable Wi-Fi kernel config + firmware | `playos-refdistro` | not started | `CFG80211`/`MAC80211`/`MT7921E` currently deferred |
-| S16-T2 | Package wpa_supplicant (D-Bus-free) + dhcpcd | `playos-refdistro` | not started | `CONFIG_CTRL_IFACE_DBUS=n` |
-| S16-T3 | Implement `playos-net` bridge daemon | `playos-net` | not started | wpa_ctrl ↔ control.sock |
-| S16-T4 | Add network messages to `playos-runtime` | `playos-runtime` | not started | additive; keep `v: 1` |
+| S16-T1 | Enable Wi-Fi kernel config + firmware | `playos-refdistro` | not started | `board/ally/linux.config` has `# CONFIG_WIRELESS is not set`; MediaTek firmware via `BR2_PACKAGE_LINUX_FIRMWARE_MEDIATEK_MT7921` / `_MT7922` |
+| S16-T2 | Package wpa_supplicant (D-Bus-free) + dhcpcd | `playos-refdistro` | not started | enable `BR2_PACKAGE_WPA_SUPPLICANT_{NL80211,CTRL_IFACE,WPA3,WPA_CLIENT_SO}`; **do not** select `_DBUS`. `dhcpcd` is already enabled |
+| S16-T3 | Implement `playos-net` bridge daemon | `playos-net` | not started | wpa_ctrl ↔ control.sock; start in `playos-refdistro/src/playos-net/` |
+| S16-T4 | Add network messages to `playos-runtime` | `playos-runtime` | not started | additive; keep `v: 1`; canonical types in `playos-init/ipc/ipc.h`, documented in `runtime-ipc.md` |
 | S16-T5 | Supervise network daemons in `playos-init` | `playos-init` | not started | |
-| S16-T6 | Wi-Fi settings screen in `playos-shell` | `playos-shell` | not started | |
+| S16-T6 | Wi-Fi settings screen in `playos-shell` | `playos-shell` | not started | extend Settings `TAB_NETWORK` (a placeholder today) + add `src/screen_network.c` |
 | S16-T7 | Network profile persistence | `playos-net` | not started | `/data/config/network/` |
-| S16-T8 | End-to-end validation (Ally + QEMU) | `playos-refdistro` | not started | |
+| S16-T8 | End-to-end validation (Ally + QEMU) | `playos-refdistro` | not started | **Hardware-gated** — real scan/connect/DHCP/WPA3 need the Ally's MT7921e. QEMU covers the kernel build, daemon start, and graceful scan failure |
 
 ### S16-T1 — Enable Wi-Fi kernel config + firmware
+
+Add to `br2-external/board/ally/linux.config` (which today says
+`# CONFIG_WIRELESS is not set`):
 
 ```kconfig
 CONFIG_CFG80211=y
@@ -136,13 +149,20 @@ CONFIG_MT7921E=y            # AMD RZ616 (MediaTek MT7922) on ROG Ally
 CONFIG_RFKILL=y
 ```
 
-- Add the MediaTek `mt7921`/`mt7922` Wi-Fi firmware to `board/playos/rog-ally/rootfs-overlay/lib/firmware/mediatek/` (redistributable via `linux-firmware`, unlike AMD GPU blobs).
+- Enable Buildroot's `BR2_PACKAGE_LINUX_FIRMWARE_MEDIATEK_MT7921` and
+  `_MT7922` (Buildroot ships both; the Ally's radio is MT7922) in
+  `playos_ally_defconfig`. `BR2_PACKAGE_LINUX_FIRMWARE` is already enabled.
+  No overlay blobs — this firmware is redistributable.
 - **Done when:** the Ally's `mt7921e` interface appears (`ip link` shows `wlan0`/`mlan0` after firmware load).
 
 ### S16-T2 — Package `wpa_supplicant` (D-Bus-free) + `dhcpcd`
 
-- Build `wpa_supplicant` with `CONFIG_CTRL_IFACE=unix`, `CONFIG_CTRL_IFACE_DBUS=n`; internal crypto (no kernel-crypto dependency).
-- Build `dhcpcd` (`BR2_PACKAGE_DHCPCD`).
+- In `playos_ally_defconfig`: `BR2_PACKAGE_WPA_SUPPLICANT=y` with `_NL80211=y`,
+  `_CTRL_IFACE=y`, `_WPA3=y` and `_WPA_CLIENT_SO=y` (the bridge links
+  `libwpa_client`). **Leave `BR2_PACKAGE_WPA_SUPPLICANT_DBUS` unset** — that is
+  what keeps D-Bus out; Buildroot generates the upstream `CONFIG_CTRL_IFACE_*`
+  flags from these options.
+- `dhcpcd` (`BR2_PACKAGE_DHCPCD`) is already enabled.
 - Control sockets: `/run/playos/net/wpa.sock` and `/run/playos/net/dhcpcd.sock`, owned `root:playos-trusted` `0660`.
 - **Done when:** both binaries link and their control sockets are restricted to the trusted group.
 
@@ -196,6 +216,11 @@ New additive messages on `control.sock` (keep `"v": 1`; framing unchanged):
 
 ### S16-T8 — End-to-end validation (Ally + QEMU)
 
+> **Hardware gate:** the real connection and trust-boundary checks below need
+> the ROG Ally's MT7921e radio. Host/QEMU can only prove the kernel build, that
+> the daemons start, and that a scan fails gracefully without a radio — mark
+> the on-device checks separately, as Sprints 11.5–13 did.
+
 - Real connection: scan → connect (WPA2-PSK and WPA3-SAE) → DHCP lease → reach the gateway.
 - Lifecycle: airplane/off state, disconnect, reconnect, reboot persistence.
 - Trust boundary: as `playos-game`, `connect()` to `/run/playos/net/wpa.sock` returns `EACCES`.
@@ -230,6 +255,29 @@ New additive messages on `control.sock` (keep `"v": 1`; framing unchanged):
 - [ ] No D-Bus, BusyBox, or `iwd` present in the production image
 - [ ] All network operations flow through `control.sock` (no direct wpa_supplicant access from the shell)
 - [ ] CI passes (kernel config builds; daemons start; scan fails gracefully in QEMU)
+
+---
+
+## Realignment notes (2026-09-22 review)
+
+The sprint was authored before Sprints 13.7/14/14.5/15 changed the distro and
+the repos. This review corrected the spec against the current tree; **no
+implementation was started.**
+
+| Original assumption | Reality (verified) | Fix |
+|---|---|---|
+| `playos_rog_ally_defconfig` | `playos_ally_defconfig` | renamed |
+| `board/playos/rog-ally/rootfs-overlay/lib/firmware/mediatek/` blobs | Buildroot ships `BR2_PACKAGE_LINUX_FIRMWARE_MEDIATEK_MT7921` / `_MT7922`; `BR2_PACKAGE_LINUX_FIRMWARE` already on | firmware via the package, no overlay |
+| `wpa_supplicant` hand-tuned `CONFIG_CTRL_IFACE_DBUS=n` | Buildroot exposes `BR2_PACKAGE_WPA_SUPPLICANT_{NL80211,CTRL_IFACE,WPA3,WPA_CLIENT_SO,DBUS}` | select the options, leave `_DBUS` off |
+| `dhcpcd` to be added | already `BR2_PACKAGE_DHCPCD=y` in `playos_ally_defconfig` | T2 is partly pre-done |
+| `playos-runtime/proto/network.json` | repo dir is `protocols/`, and `playos-v1.xml` is the compositor's Wayland protocol; the runtime IPC is JSON in `playos-init/ipc/ipc.h` + `runtime-ipc.md` | schema pointer corrected |
+| `playos-shell/src/ui/network.c` | shell has no `src/ui/`; `screen_settings.c` already has a `TAB_NETWORK` placeholder | extend the tab + add `src/screen_network.c` |
+| ADR suggested as "ADR-0009" | ADR-0009 is the gamepad database; ADRs run through 0011 | Wi-Fi stack authored as **ADR-0012** |
+
+Ground truth checked: `board/ally/linux.config` has `# CONFIG_WIRELESS is not
+set` (T1 is real work); no `playos-net` repo exists (start in
+`playos-refdistro/src/playos-net/`); Sprint 12's `playos-trusted` group and
+hardening are in place.
 
 ---
 
