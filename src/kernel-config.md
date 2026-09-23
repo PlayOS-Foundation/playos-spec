@@ -150,8 +150,11 @@ CONFIG_E1000E=y
 # Wi-Fi deferred to post-MVP / Sprint 16:
 # CONFIG_CFG80211=y
 # CONFIG_MAC80211=y
-# CONFIG_IWLWIFI=y               # Intel Wi-Fi
-# CONFIG_ATH11K=y / CONFIG_MT7921E=y  # AMD/Mediatek (Ally has AMD Wi-Fi)
+# CONFIG_RFKILL=y
+# CONFIG_MT7921E=y   # MediaTek MT7921/MT7922 PCIe. Ally: AMD RZ616 = MT7922,
+#                    # PCI 14c3:0616; one driver covers both chips.
+#                    # Firmware: linux-firmware MEDIATEK_MT7922 (not _MT7921).
+# CONFIG_IWLWIFI=y   # Intel Wi-Fi (other targets, not the Ally)
 ```
 
 ### Power Management

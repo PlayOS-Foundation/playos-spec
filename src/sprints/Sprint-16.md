@@ -128,7 +128,7 @@ src/screen_network.c          # scan list / connect / live status, screen_*.c co
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S16-T1 | Enable Wi-Fi kernel config + firmware | `playos-refdistro` | not started | `board/ally/linux.config` has `# CONFIG_WIRELESS is not set`; MediaTek firmware via `BR2_PACKAGE_LINUX_FIRMWARE_MEDIATEK_MT7921` / `_MT7922` |
+| S16-T1 | Enable Wi-Fi kernel config + firmware | `playos-refdistro` | not started | `board/ally/linux.config` has `# CONFIG_WIRELESS is not set`; firmware is `BR2_PACKAGE_LINUX_FIRMWARE_MEDIATEK_MT7922` (the Ally's internal AMD RZ616 = MT7922, `mt7921e` driver). `_MT7921` is a sibling chip, not required |
 | S16-T2 | Package wpa_supplicant (D-Bus-free) + dhcpcd | `playos-refdistro` | not started | enable `BR2_PACKAGE_WPA_SUPPLICANT_{NL80211,CTRL_IFACE,WPA3,WPA_CLIENT_SO}`; **do not** select `_DBUS`. `dhcpcd` is already enabled |
 | S16-T3 | Implement `playos-net` bridge daemon | `playos-net` | not started | wpa_ctrl ↔ control.sock; start in `playos-refdistro/src/playos-net/` |
 | S16-T4 | Add network messages to `playos-runtime` | `playos-runtime` | not started | additive; keep `v: 1`; canonical types in `playos-init/ipc/ipc.h`, documented in `runtime-ipc.md` |
@@ -149,10 +149,10 @@ CONFIG_MT7921E=y            # AMD RZ616 (MediaTek MT7922) on ROG Ally
 CONFIG_RFKILL=y
 ```
 
-- Enable Buildroot's `BR2_PACKAGE_LINUX_FIRMWARE_MEDIATEK_MT7921` and
-  `_MT7922` (Buildroot ships both; the Ally's radio is MT7922) in
-  `playos_ally_defconfig`. `BR2_PACKAGE_LINUX_FIRMWARE` is already enabled.
-  No overlay blobs — this firmware is redistributable.
+- Enable `BR2_PACKAGE_LINUX_FIRMWARE_MEDIATEK_MT7922`. The Ally's **internal** Wi-Fi module is the AMD RZ616, a rebranded **MediaTek MT7922** (PCI `14c3:0616`, Wi-Fi 6E + BT 5.2, soldered), driven by `mt7921e`. `_MT7922` installs `WIFI_MT7922_patch_mcu_1_1_hdr.bin` + `WIFI_RAM_CODE_MT7922_1.bin`, which is exactly what the driver requests for `0616`.
+  - `_MT7921` is a **sibling chip**, not the Ally's — not required (the `mt7921e` driver covers both, but the firmware differs).
+  - `_MT7922_BT` / `_MT7921_BT` are **Bluetooth-only** firmware; Bluetooth is out of scope for this sprint.
+  - `BR2_PACKAGE_LINUX_FIRMWARE` is already enabled. No overlay blobs — this firmware is redistributable.
 - **Done when:** the Ally's `mt7921e` interface appears (`ip link` shows `wlan0`/`mlan0` after firmware load).
 
 ### S16-T2 — Package `wpa_supplicant` (D-Bus-free) + `dhcpcd`
@@ -267,7 +267,7 @@ implementation was started.**
 | Original assumption | Reality (verified) | Fix |
 |---|---|---|
 | `playos_rog_ally_defconfig` | `playos_ally_defconfig` | renamed |
-| `board/playos/rog-ally/rootfs-overlay/lib/firmware/mediatek/` blobs | Buildroot ships `BR2_PACKAGE_LINUX_FIRMWARE_MEDIATEK_MT7921` / `_MT7922`; `BR2_PACKAGE_LINUX_FIRMWARE` already on | firmware via the package, no overlay |
+| `board/playos/rog-ally/rootfs-overlay/lib/firmware/mediatek/` blobs | Buildroot ships `BR2_PACKAGE_LINUX_FIRMWARE_MEDIATEK_MT7922` (the Ally's internal RZ616 = MT7922) and `_MT7921` (sibling chip); `BR2_PACKAGE_LINUX_FIRMWARE` already on | firmware via the package, no overlay; **only `_MT7922` is required** |
 | `wpa_supplicant` hand-tuned `CONFIG_CTRL_IFACE_DBUS=n` | Buildroot exposes `BR2_PACKAGE_WPA_SUPPLICANT_{NL80211,CTRL_IFACE,WPA3,WPA_CLIENT_SO,DBUS}` | select the options, leave `_DBUS` off |
 | `dhcpcd` to be added | already `BR2_PACKAGE_DHCPCD=y` in `playos_ally_defconfig` | T2 is partly pre-done |
 | `playos-runtime/proto/network.json` | repo dir is `protocols/`, and `playos-v1.xml` is the compositor's Wayland protocol; the runtime IPC is JSON in `playos-init/ipc/ipc.h` + `runtime-ipc.md` | schema pointer corrected |
