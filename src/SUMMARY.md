@@ -110,3 +110,4 @@
 - [Original Design Notes](ideas.md)
 - [PlayOS Installer](playos-installer-spec.md)
 - [The Desktop Shim (SDK design)](sdk-desktop-shim.md)
+- [The Emulator Profile (SDK design)](sdk-emulator-profile.md)

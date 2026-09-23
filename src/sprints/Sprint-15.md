@@ -130,7 +130,7 @@ sdk-reference/                  # reference game built entirely via the SDK; exe
 | S15-T4 | Provide CMake toolchain and `pkg-config` for `device` | `playos-tools` | done |  Done and verified: the cmake toolchain + `playos.pc`/`raylib-playos.pc` built `playos-samples/bunnymark` from a relocated SDK with no Buildroot tree. Script now reports the binary and its device ABI. |
 | S15-T5 | Build the `desktop` host shim seeded from `PLAYOS_BACKEND=stub` | `playos-platform-api`, `playos-tools` | done |  Done and verified 2026-09-22. backend_stub.c is the host input backend (delegates to evdev for a real gamepad, else maps the keyboard, else reports "no controller" rather than inventing input); the storage root moved into one place (/data on the device, XDG on the host), and tests/test_desktop_shim.c asserts the lifecycle calls cannot block, that storage points at the host, and that the key mapping is correct - all without hardware. `--watch N` prints live controller state for the hardware check. Design: playos-spec/src/sdk-desktop-shim.md. |
 | S15-T6 | Implement the `desktop` build profile | `playos-tools` | done |  Done and verified 2026-09-22. export-sdk.sh now builds and ships the desktop raylib (from the same vendored source the device uses) and the host libplayos; build-desktop.sh points the sample's existing CMakeLists at them and sets the rpath. Verified: playos-samples/bunnymark built through the SDK as a glibc binary linking libplayos.so.0 + libraylib.so.6, and ran with "DISPLAY: Device initialized successfully" on a real display. Known gap: the desktop raylib is X11-only until libdecor-0-dev is present (GLFW drops Wayland silently); the export now detects and reports that. |
-| S15-T7 | Implement the `emulator` build profile | `playos-refdistro`, `playos-tools` | not started | |
+| S15-T7 | Implement the `emulator` build profile | `playos-refdistro`, `playos-tools` | in progress | Design agreed 2026-09-22: [`sdk-emulator-profile.md`](../sdk-emulator-profile.md). `playos.autostart=<game-id>` in init; `playos_emulator_defconfig` + `make emulator-build` + `scripts/emulator-run.sh`; SDK `build-emulator.sh`. |
 | S15-T8 | Build the reference sample entirely via the SDK and validate all profiles | `playos-samples`, `playos-tools` | not started | |
 
 Update the **Status** column as work progresses: `not started` → `in progress` → `blocked` or `done`.
@@ -174,6 +174,14 @@ Add a `desktop` build profile that uses native `gcc`, Raylib's default desktop b
 ### S15-T7 — Implement the `emulator` build profile
 
 Add an `emulator` profile that runs the `device` build inside the PlayOS QEMU/container image for high-fidelity testing without hardware. Wire the profile through `scripts/build-emulator.sh` and a QEMU/container image suitable for booting the device artifact.
+
+The launch mechanism is `playos.autostart=<game-id>` on the kernel command line:
+init mirrors its `LaunchGame` path once the compositor is up, so the device
+artifact runs without a person driving the shell's library. Design and
+verification plan: [`../sdk-emulator-profile.md`](../sdk-emulator-profile.md).
+Files: `br2-external/configs/playos_emulator_defconfig`,
+`scripts/emulator-run.sh` + `make emulator-build` (refdistro), and
+`sdk/scripts/build-emulator.sh` (tools).
 
 **Done when:** `scripts/build-emulator.sh` boots the `device` artifact in QEMU/container and the game renders and accepts input in the emulated environment.
 
