@@ -1,6 +1,6 @@
 # The Emulator Profile — design (Sprint 15, T7)
 
-Status: design, agreed 2026-09-22. Implementation: S15-T7. Related:
+Status: implemented and verified 2026-09-22 (S15-T7). Related:
 `sprints/Sprint-15.md`, `sdk-desktop-shim.md`, `dev-environment.md`.
 
 ## The problem
@@ -90,6 +90,28 @@ input-linux`). The automated check asserts only that the artifact launched and
 that the compositor rendered it — controller fidelity through QEMU's synthetic
 devices is a human check, because the device path expects a real gamepad rather
 than a keyboard.
+
+## Measured (2026-09-22)
+
+A device-profile build of `playos-samples/bunnymark` (musl, `ld-musl-x86_64.so.1`)
+through the SDK, booted with `make emulator-build`'s image:
+
+- init: `autostart requested - launching game com.playos.sample-bunnymark`,
+  then `spawning game: … (/data/games/…/bin/game)`; the S12 sandbox ran
+  (Landlock is unsupported on the QEMU kernel, so it warned and continued, as
+  designed).
+- game: raylib `Platform backend: PLAYOS (Wayland + EGL/GLES2)`,
+  `DISPLAY: Device initialized successfully`, softpipe GLES 3.1.
+- compositor: `game surface added to scene (role 3)` and `fps shell=0 game=1`,
+  with **zero** DRM atomic errors (`-vga none` + virtio-gpu; the default bochs
+  card failed every atomic commit with "Out of memory").
+- runner exit 0 with all three checks `[ok]`.
+
+Two defects were found and fixed on the way: autostart used to fire before the
+compositor control connection and the shell listener were registered (so
+`SetExpectedGame` was dropped and the game rendered as an unclaimed surface), and
+the guest's `playos-data` logs need their ext4 journal replayed (the runner now
+does that on a private copy) because QEMU is killed rather than shut down.
 
 ## Decisions
 
