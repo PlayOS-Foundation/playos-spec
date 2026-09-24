@@ -128,7 +128,7 @@ src/screen_network.c          # scan list / connect / live status, screen_*.c co
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S16-T1 | Enable Wi-Fi kernel config + firmware | `playos-refdistro` | **done** | `WIRELESS/CFG80211/MAC80211/RFKILL/WLAN/MT7921E=y` in `board/ally/linux.config`; `MT7921E` selects `MT76_CORE`+`MT7921_COMMON` (checked with `olddefconfig`). Firmware from `BR2_PACKAGE_LINUX_FIRMWARE_MEDIATEK_MT7922` — the Ally's internal AMD RZ616 = MT7922, `mt7921e` driver. Verified in the shipped `rootfs.squashfs`: `lib/firmware/mediatek/WIFI_{MT7922_patch_mcu_1_1_hdr,RAM_CODE_MT7922_1}.bin`. On-device interface check belongs to T8 |
+| S16-T1 | Enable Wi-Fi kernel config + firmware | `playos-refdistro` | **done** | `WIRELESS/CFG80211/MAC80211/RFKILL/WLAN/MT7921E=y` in `board/ally/linux.config`; `MT7921E` selects `MT76_CORE`+`MT7921_COMMON` (checked with `olddefconfig`). Firmware from `BR2_PACKAGE_LINUX_FIRMWARE_MEDIATEK_MT7922` — the Ally's internal AMD RZ616 = MT7922, `mt7921e` driver. Verified in the shipped `rootfs.squashfs` and **on the Ally after a fresh install**: `mt7921e 0000:06:00.0: ASIC revision: 79220010`, `WM Firmware Version` logged, interface **`wlp6s0`** present with a `wireless/` dir, `rfkill0 phy0 wlan soft=0 hard=0` (unblocked). Note: the interface is **`wlp6s0`**, not `wlan0`/`mlan0` — anything downstream must discover it, not hardcode |
 | S16-T2 | Package wpa_supplicant (D-Bus-free) + dhcpcd | `playos-refdistro` | **done** | `BR2_PACKAGE_WPA_SUPPLICANT_{NL80211,CTRL_IFACE,WPA3,WPA_CLIENT_SO}=y` with `_DBUS` unset, plus `BR2_PACKAGE_WIRELESS_REGDB`. Verified in the shipped image: `usr/sbin/wpa_supplicant`, `usr/lib/libwpa_client.so`, `lib/firmware/regulatory.db(.p7s)`, `etc/wpa_supplicant.conf`; **0 dbus entries**. Note `_WPA3=y` selects OpenSSL (~3 MB, ~10 min build). Socket hardening under `/run/playos/net/` lands with T3 |
 | S16-T3 | Implement `playos-net` bridge daemon | `playos-net` | not started | wpa_ctrl ↔ control.sock; start in `playos-refdistro/src/playos-net/` |
 | S16-T4 | Add network messages to `playos-runtime` | `playos-runtime` | not started | additive; keep `v: 1`; canonical types in `playos-init/ipc/ipc.h`, documented in `runtime-ipc.md` |
@@ -153,7 +153,13 @@ CONFIG_RFKILL=y
   - `_MT7921` is a **sibling chip**, not the Ally's — not required (the `mt7921e` driver covers both, but the firmware differs).
   - `_MT7922_BT` / `_MT7921_BT` are **Bluetooth-only** firmware; Bluetooth is out of scope for this sprint.
   - `BR2_PACKAGE_LINUX_FIRMWARE` is already enabled. No overlay blobs — this firmware is redistributable.
-- **Done when:** the Ally's `mt7921e` interface appears (`ip link` shows `wlan0`/`mlan0` after firmware load).
+- **Done when:** the Ally's `mt7921e` interface appears after firmware load.
+  **Verified 2026-09-24** on the installed system: the interface is **`wlp6s0`**
+  (predictable-name rename of `wlan0`), MAC `00:41:0e:f6:33:23`, `operstate=down`,
+  `rfkill` unblocked. `wlan0`/`mlan0` from earlier drafts do not exist — the
+  interface name comes from `mt7921e 0000:06:00.0` plus systemd/udev naming, so
+  `wpa_supplicant`, `dhcpcd` and `playos-net` must take it as a parameter
+  (discover by `wireless/` in `/sys/class/net/*/`), never hardcode it.
 - **Buildroot trap (cost us a build):** `linux-firmware` bakes the selected files into
   `br-firmware.tar` at **build** time and the install step only extracts it, so
   enabling `_MT7922` and re-running the image build produced an image *without* the
