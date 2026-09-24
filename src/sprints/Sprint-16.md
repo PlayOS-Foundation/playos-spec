@@ -4,7 +4,7 @@
 
 **Primary Outcome:** The ROG Ally scans for networks, connects to a WPA2/WPA3 network, obtains an IP via DHCP, and the shell shows a working Wi-Fi settings screen (scan → connect → connected status). The whole path is driven through `control.sock`, exactly like `LaunchGame`.
 
-**Status:** 🟡 Not started — **reviewed and realigned 2026-09-22** against the current repos (see Realignment notes at the end). Stack decision recorded in [`network-options.md`](network-options.md) §10 (Option B) and formalised as **ADR-0012** ([`adr/ADR-0012-wifi-stack.md`](../adr/ADR-0012-wifi-stack.md)). On-device Wi-Fi acceptance is hardware-gated (it needs the ROG Ally's MediaTek MT7921e radio).
+**Status:** 🟡 In progress — **T1 + T2 done** (kernel + packages; dev USB image built and verified to carry the MT7922 firmware, `wpa_supplicant`, `libwpa_client` and the regdb, with **zero D-Bus**). T3–T8 remain: the `playos-net` bridge, the IPC messages, supervision, the shell screen, profiles, and on-device validation. **Reviewed and realigned 2026-09-22** against the current repos (see Realignment notes at the end). Stack decision recorded in [`network-options.md`](network-options.md) §10 (Option B) and formalised as **ADR-0012** ([`adr/ADR-0012-wifi-stack.md`](../adr/ADR-0012-wifi-stack.md)). On-device Wi-Fi acceptance is hardware-gated (it needs the ROG Ally's MediaTek MT7921e radio).
 
 **Prerequisites:** MVP complete (Sprint 15) and Sprint 12 security hardening (Landlock/seccomp, `playos-trusted` group) in place.
 
@@ -23,7 +23,7 @@ See [`network-options.md`](network-options.md) for the full options analysis (iw
 - Sprint 15 complete **except one parked check** — the desktop windowed run (see `Sprint-15.md` → Parked verification). Everything else in the S15 exit gate is verified: T1–T7 done, and T8's `device` + `emulator` runs pass.
 - MVP verified on hardware (Sprint 14). Sprint 12 hardening merged: `playos-trusted` group, Landlock, seccomp, production image has no BusyBox.
 - `network-options.md` §10 decision accepted (Option B — `wpa_supplicant` + `dhcpcd`); formalised as ADR-0012.
-- Kernel currently defers wireless entirely: `br2-external/board/ally/linux.config` has `# CONFIG_WIRELESS is not set` (`kernel-config.md` §Networking already documents the intended options).
+- ~~Kernel defers wireless entirely~~ — **done in S16-T1**: `br2-external/board/ally/linux.config` now enables `CONFIG_WIRELESS/CFG80211/MAC80211/RFKILL/WLAN/MT7921E` (`kernel-config.md` §Networking documents the same set).
 - **Hardware gate:** T8's real scan/connect/DHCP/WPA3 and the trust-boundary checks need the Ally's MT7921e. Host/QEMU can complete T1–T7 and the QEMU half of T8.
 
 ---
@@ -128,8 +128,8 @@ src/screen_network.c          # scan list / connect / live status, screen_*.c co
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S16-T1 | Enable Wi-Fi kernel config + firmware | `playos-refdistro` | not started | `board/ally/linux.config` has `# CONFIG_WIRELESS is not set`; firmware is `BR2_PACKAGE_LINUX_FIRMWARE_MEDIATEK_MT7922` (the Ally's internal AMD RZ616 = MT7922, `mt7921e` driver). `_MT7921` is a sibling chip, not required |
-| S16-T2 | Package wpa_supplicant (D-Bus-free) + dhcpcd | `playos-refdistro` | not started | enable `BR2_PACKAGE_WPA_SUPPLICANT_{NL80211,CTRL_IFACE,WPA3,WPA_CLIENT_SO}`; **do not** select `_DBUS`. `dhcpcd` is already enabled |
+| S16-T1 | Enable Wi-Fi kernel config + firmware | `playos-refdistro` | **done** | `WIRELESS/CFG80211/MAC80211/RFKILL/WLAN/MT7921E=y` in `board/ally/linux.config`; `MT7921E` selects `MT76_CORE`+`MT7921_COMMON` (checked with `olddefconfig`). Firmware from `BR2_PACKAGE_LINUX_FIRMWARE_MEDIATEK_MT7922` — the Ally's internal AMD RZ616 = MT7922, `mt7921e` driver. Verified in the shipped `rootfs.squashfs`: `lib/firmware/mediatek/WIFI_{MT7922_patch_mcu_1_1_hdr,RAM_CODE_MT7922_1}.bin`. On-device interface check belongs to T8 |
+| S16-T2 | Package wpa_supplicant (D-Bus-free) + dhcpcd | `playos-refdistro` | **done** | `BR2_PACKAGE_WPA_SUPPLICANT_{NL80211,CTRL_IFACE,WPA3,WPA_CLIENT_SO}=y` with `_DBUS` unset, plus `BR2_PACKAGE_WIRELESS_REGDB`. Verified in the shipped image: `usr/sbin/wpa_supplicant`, `usr/lib/libwpa_client.so`, `lib/firmware/regulatory.db(.p7s)`, `etc/wpa_supplicant.conf`; **0 dbus entries**. Note `_WPA3=y` selects OpenSSL (~3 MB, ~10 min build). Socket hardening under `/run/playos/net/` lands with T3 |
 | S16-T3 | Implement `playos-net` bridge daemon | `playos-net` | not started | wpa_ctrl ↔ control.sock; start in `playos-refdistro/src/playos-net/` |
 | S16-T4 | Add network messages to `playos-runtime` | `playos-runtime` | not started | additive; keep `v: 1`; canonical types in `playos-init/ipc/ipc.h`, documented in `runtime-ipc.md` |
 | S16-T5 | Supervise network daemons in `playos-init` | `playos-init` | not started | |
@@ -154,6 +154,12 @@ CONFIG_RFKILL=y
   - `_MT7922_BT` / `_MT7921_BT` are **Bluetooth-only** firmware; Bluetooth is out of scope for this sprint.
   - `BR2_PACKAGE_LINUX_FIRMWARE` is already enabled. No overlay blobs — this firmware is redistributable.
 - **Done when:** the Ally's `mt7921e` interface appears (`ip link` shows `wlan0`/`mlan0` after firmware load).
+- **Buildroot trap (cost us a build):** `linux-firmware` bakes the selected files into
+  `br-firmware.tar` at **build** time and the install step only extracts it, so
+  enabling `_MT7922` and re-running the image build produced an image *without* the
+  firmware, and `linux-firmware-reinstall` re-extracted the stale tarball.
+  Use `make linux-firmware-rebuild` (or `-dirclean`) and verify the files inside
+  the produced `rootfs.squashfs` before flashing.
 
 ### S16-T2 — Package `wpa_supplicant` (D-Bus-free) + `dhcpcd`
 
