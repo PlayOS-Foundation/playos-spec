@@ -130,8 +130,8 @@ src/screen_network.c          # scan list / connect / live status, screen_*.c co
 |---|---|---|---|---|
 | S16-T1 | Enable Wi-Fi kernel config + firmware | `playos-refdistro` | **done** | `WIRELESS/CFG80211/MAC80211/RFKILL/WLAN/MT7921E=y` in `board/ally/linux.config`; `MT7921E` selects `MT76_CORE`+`MT7921_COMMON` (checked with `olddefconfig`). Firmware from `BR2_PACKAGE_LINUX_FIRMWARE_MEDIATEK_MT7922` — the Ally's internal AMD RZ616 = MT7922, `mt7921e` driver. Verified in the shipped `rootfs.squashfs` and **on the Ally after a fresh install**: `mt7921e 0000:06:00.0: ASIC revision: 79220010`, `WM Firmware Version` logged, interface **`wlp6s0`** present with a `wireless/` dir, `rfkill0 phy0 wlan soft=0 hard=0` (unblocked). Note: the interface is **`wlp6s0`**, not `wlan0`/`mlan0` — anything downstream must discover it, not hardcode |
 | S16-T2 | Package wpa_supplicant (D-Bus-free) + dhcpcd | `playos-refdistro` | **done** | `BR2_PACKAGE_WPA_SUPPLICANT_{NL80211,CTRL_IFACE,WPA3,WPA_CLIENT_SO}=y` with `_DBUS` unset, plus `BR2_PACKAGE_WIRELESS_REGDB`. Verified in the shipped image: `usr/sbin/wpa_supplicant`, `usr/lib/libwpa_client.so`, `lib/firmware/regulatory.db(.p7s)`, `etc/wpa_supplicant.conf`; **0 dbus entries**. Note `_WPA3=y` selects OpenSSL (~3 MB, ~10 min build). Socket hardening under `/run/playos/net/` lands with T3 |
-| S16-T3 | Implement `playos-net` bridge daemon | `playos-net` | not started | wpa_ctrl ↔ control.sock; start in `playos-refdistro/src/playos-net/` |
-| S16-T4 | Add network messages to `playos-runtime` | `playos-runtime` | not started | additive; keep `v: 1`; canonical types in `playos-init/ipc/ipc.h`, documented in `runtime-ipc.md` |
+| S16-T3 | Implement `playos-net` bridge daemon | `playos-net` | **done** | `src/playos-net/` (in-repo, like `playos-overlay`): `main.c` (listener + poll loop), `wpa_bridge.c` (wpa_ctrl: SCAN/STATUS/ADD_NETWORK/SELECT_NETWORK, `CTRL-EVENT-*` → `NetworkStateChanged`), `profiles.c`. Reuses `ipc_framing/ipc_client/ipc_server`; socket `/run/playos/net/bridge.sock` `root:playos-trusted` 0660 with `SO_PEERCRED` peer checks (root or GID 1000). Interface discovered from `/sys/class/net/*/wireless`. **Verified on the Ally: `ScanNetworks` → 10 live networks** |
+| S16-T4 | Add network messages to `playos-runtime` | `playos-runtime` | **done** | Message strings in `playos-init/ipc/ipc.h` (`ScanNetworks`, `ScanResults`, `ConnectNetwork(Ack\|Error)`, `DisconnectNetwork`, `NetworkStatus(Report)`, `NetworkStateChanged`), documented in `runtime-ipc.md` §Network control. Client helpers land with the shell screen (T6) since that is the only caller |
 | S16-T5 | Supervise network daemons in `playos-init` | `playos-init` | not started | |
 | S16-T6 | Wi-Fi settings screen in `playos-shell` | `playos-shell` | not started | extend Settings `TAB_NETWORK` (a placeholder today) + add `src/screen_network.c` |
 | S16-T7 | Network profile persistence | `playos-net` | not started | `/data/config/network/` |
@@ -175,7 +175,11 @@ CONFIG_RFKILL=y
   what keeps D-Bus out; Buildroot generates the upstream `CONFIG_CTRL_IFACE_*`
   flags from these options.
 - `dhcpcd` (`BR2_PACKAGE_DHCPCD`) is already enabled.
-- Control sockets: `/run/playos/net/wpa.sock` and `/run/playos/net/dhcpcd.sock`, owned `root:playos-trusted` `0660`.
+- Control sockets live under `/run/playos/net/` (`root:playos-trusted`, `0770`
+  for the directory). wpa_supplicant's own socket is **`/run/playos/net/<ifname>`**
+  — on the Ally that is `/run/playos/net/wlp6s0`, verified on hardware, not
+  `wpa.sock`; the bridge daemon serves the control plane on
+  `/run/playos/net/bridge.sock`.
 - **Done when:** both binaries link and their control sockets are restricted to the trusted group.
 
 ### S16-T3 — Implement `playos-net` bridge daemon

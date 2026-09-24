@@ -443,3 +443,43 @@ All request messages may receive a generic error response:
 **Connection loss:** If `playos-init` loses a trusted client connection unexpectedly, it logs the event. This does not affect system operation. Clients should reconnect with exponential backoff.
 
 **Rate limiting:** `playos-init` may reject rapid repeated requests (e.g., rapid `LaunchGame` calls) with `reason: "rate_limited"`.
+
+---
+
+## Network control (Sprint 16)
+
+Wi-Fi rides the same control plane as everything else: the shell sends a request
+to `control.sock`, `playos-init` relays it to the trusted **`playos-net`** bridge
+(`/run/playos/net/bridge.sock`, `root:playos-trusted` 0660), and the bridge
+answers on the same connection. The shell never talks to wpa_supplicant, and
+games are not in `playos-trusted`, so they cannot reach either socket.
+
+`playos-net` is the only process that speaks wpa_supplicant's control protocol.
+It discovers the wireless interface from `/sys/class/net/*/wireless` — the Ally's
+is **`wlp6s0`** (predictable naming), not `wlan0` — and wpa_supplicant's own
+control socket is `/run/playos/net/<ifname>`.
+
+| Direction | Message | Fields |
+|---|---|---|
+| shell → init → net | `ScanNetworks` | — |
+| net → shell | `ScanResults` | `networks[]` of `{ssid, security, signal_dbm}` |
+| shell → init → net | `ConnectNetwork` | `ssid`, `psk`, `security` (`open`\|`wpa2`\|`wpa3`) |
+| net → shell | `ConnectNetworkAck` | `ssid` |
+| net → shell | `ConnectNetworkError` | `ssid`, `reason` (`auth_failed`, `no_wpa`, …) |
+| shell → init → net | `DisconnectNetwork` | — |
+| shell → init → net | `NetworkStatus` | — |
+| net → shell | `NetworkStatusReport` | `state`, `ssid`, `ip`, `signal_dbm` |
+| net → shell (async) | `NetworkStateChanged` | `state` (`connecting`\|`connected`\|`disconnected`) |
+
+`state` is derived from wpa_supplicant's `wpa_state` (`COMPLETED` → connected;
+`SCANNING`/`ASSOCIATING`/`4WAY_HANDSHAKE`/… → connecting; otherwise
+disconnected). Known networks persist as `/data/config/network/<slug>.json`
+(0600 — the PSK is never logged) with a `last` pointer that `playos-net` uses to
+auto-connect on boot.
+
+Verified on the ROG Ally against the real radio:
+
+    → {"v":1,"type":"ScanNetworks"}
+    ← {"v":1,"type":"ScanResults","networks":[
+         {"ssid":"messaritisnikhouse","security":"wpa2","signal_dbm":-25},
+         {"ssid":"ARRIS-2468_EXT","security":"wpa2","signal_dbm":-77}, … ]}
