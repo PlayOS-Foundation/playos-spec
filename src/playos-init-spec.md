@@ -122,11 +122,17 @@ PLAYOS_API_VERSION=1
 Before `execve()`, `playos-init`:
 1. Sets `PLAYOS_GAME_ID`, paths, and lifecycle environment
 2. Applies `PR_SET_NO_NEW_PRIVS = 1`
-3. Drops all capabilities
-4. Applies seccomp filter (Sprint 12 — not yet implemented)
-5. Applies Landlock rules (Sprint 12 — not yet implemented)
-6. Drops `CAP_SETUID` / `CAP_SETGID`
-7. `execve()` the game executable
+3. Applies Landlock rules (`src/security/landlock.c`)
+4. Drops `CAP_SETUID` / `CAP_SETGID` and the rest of the capability set
+5. Applies the seccomp filter (`src/security/seccomp_filter.c`)
+6. `execve()` the game executable
+
+Both filters are **implemented** (Sprint 12) — call site in `supervisor.c`, policy in
+§6 and §7 of [`security-model.md`](security-model.md). The ordering above is
+load-bearing rather than incidental: `no_new_privs` must be set before
+`landlock_restrict_self()` will succeed, and the credential drop has to happen
+**before** seccomp, because the filter denies `setuid`/`setgid`/`capset` — dropping
+privileges afterwards would be refused by our own policy.
 
 ---
 

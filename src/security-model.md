@@ -255,11 +255,17 @@ mount(device, "/", "ext4", MS_RDONLY, NULL);
 ```
 Any write to the system partition returns `EROFS`.
 
-### Post-Sprint 12 (production): dm-verity
+### Post-Sprint 12 (production): dm-verity — **planned, not implemented**
 ```bash
 # At build time (in playos-refdistro release pipeline):
 veritysetup format system.img system.img.verity > system.verity.superblock
 ```
+
+> **Status (2026-09-24): not implemented.** What exists today is the read-only
+> mount above: writes are refused with `EROFS`, but nothing detects tampering
+> with the image itself, so a modified partition is only caught if it fails to
+> boot. dm-verity is item 1 of §12; `veritysetup` is in the Buildroot tree, but
+> no build step produces a hash tree and no boot step mounts a verity device.
 
 At boot, `playos-init`:
 1. Sets up a dm-verity device over the system partition
