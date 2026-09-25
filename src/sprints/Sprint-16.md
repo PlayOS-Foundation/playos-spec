@@ -313,3 +313,29 @@ After this sprint, post-MVP features may assume:
 The ROG Ally connects to Wi-Fi and reaches the network end-to-end, driven entirely through the existing `playos-runtime` control IPC, with no D-Bus and no BusyBox in the production image.
 
 *Previous: [Sprint 15](Sprint-15.md) | Next: [Sprint 17](Sprint-17.md)*
+
+---
+
+## Parked (revisit later)
+
+One item, parked deliberately rather than left implicit.
+
+**Wi-Fi passphrase hardening (secrets at rest).** `playos-net` persists known
+networks as `/data/config/network/<slug>.json`, mode `0600 root:root`, with the
+PSK in plaintext — that is what `wpa_supplicant` needs, and what lets the profile
+auto-connect with no human present (T7). The posture as **verified on the Ally**:
+
+- a game cannot read it: the file is `0600 root`, and a `uid=gid=1001` probe is
+  refused by every trusted socket
+- it is never logged — no `psk` appears anywhere under `/data/log/`
+- it is not copied into `/run/playos/net/wpa.conf`, which holds only
+  `ctrl_interface`, `ctrl_interface_group`, `ap_scan` and `update_config`
+- **but** `/data` is an unencrypted ext4 partition, so the passphrase is
+  readable by anyone who has the disk or mounts it on another machine
+
+Hardening options, cheapest first: encrypt the profile with a per-device key
+already present in `boot.json`; seal it with the fTPM via `/dev/tpmrm0`; or
+prompt per boot and store nothing — which T7's auto-connect requirement rules
+out for a console device. Not done here because it is a cross-cutting
+secrets-at-rest decision affecting anything else that stores credentials, not a
+Wi-Fi feature. Tracked in [`security-model.md`](../security-model.md) §12.

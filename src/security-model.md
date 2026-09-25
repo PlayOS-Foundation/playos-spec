@@ -118,6 +118,8 @@ A normal game **must not** be able to:
 - Mounted read-write, owned by `root`
 - Per-game directories: `chown playos-game:playos-game /data/saves/<id>` and `cache/<id>`
 - Other directories (`config/`, `games/`, `logs/`) owned by `playos-system`, not writable by games
+- Network profiles: `/data/config/network/<slug>.json` plus a `last` pointer,
+  `0600 root:root`. **The Wi-Fi passphrase is stored in plaintext** — see §12.
 
 ### Device nodes
 | Device | Owner | Mode | Game access |
@@ -342,3 +344,12 @@ In priority order after v0.1.0:
 6. **Audit logging** for privileged IPC commands
 7. **Network namespace** for games (when networking is introduced)
 8. **Mandatory access control** (SELinux or AppArmor) if seccomp + Landlock proves insufficient
+9. **Secrets at rest on `/data`** (parked from Sprint 16) — Wi-Fi passphrases sit
+   in plaintext in `/data/config/network/<slug>.json` (`0600 root:root`). They are
+   invisible to games and never written to a log, but `/data` is an unencrypted
+   ext4 partition, so anyone holding the disk (or mounting it elsewhere) can read
+   them. Options, cheapest first: encrypt the profile with a per-device key
+   already present in `boot.json`, seal it with the fTPM via `/dev/tpmrm0`, or
+   prompt per boot and store nothing (which would break the auto-connect that
+   T7 requires for a console). Parked as a cross-cutting secrets-at-rest design
+   decision, not a Wi-Fi feature — recorded in `sprints/Sprint-16.md` → Parked.
