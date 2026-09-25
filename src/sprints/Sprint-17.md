@@ -4,7 +4,7 @@
 
 **Primary Outcome:** A finger tap on the ROG Ally touchscreen reaches the focused surface as a raylib `GetTouchPosition()` point, and a system OSK can be raised from either a shell text field (e.g. Wi-Fi passphrase) or a game text field, delivering the typed string back to the invoking client via a standard text-input protocol.
 
-**Status:** 🟡 Post-MVP — not started. Design follows the gamepad-input precedent (Sprint 8) and reuses the Sprint 7 overlay architecture.
+**Status:** 🟡 Post-MVP — not started. Design follows the gamepad-input precedent (Sprint 8) and reuses the Sprint 7 overlay architecture. **Reviewed and realigned 2026-09-25** against the live tree — see Realignment notes at the end. Headline: the Ally kernel has **no touchscreen driver today**, so T1 gained a kernel half.
 
 **Prerequisites:** MVP complete (Sprint 15); Sprint 16 networking (the Wi-Fi passphrase field is the shell's first real text-input consumer); the `rcore_playos.c` gamepad translation landed (raylib `CORE.Input.Gamepad.*` fed from `playos_input_get_controller_state`).
 
@@ -20,11 +20,12 @@ Crucially, the OSK is **not** a shell-only widget. It is a system service that a
 
 ## Start Condition Checklist
 
-- MVP verified on hardware; Sprint 16 Wi-Fi screen exists (its passphrase entry is currently blank/stubbed).
+- MVP verified on hardware; **Sprint 16 is done**. Its Wi-Fi passphrase field is a working text-entry consumer — but with a hand-rolled keyboard inside `screen_network.c` (CAPS / 123-symbols / SHOW·HIDE). Sprint 17 replaces that keyboard with the system OSK; the field, the masking and the commit logic already exist and work.
+- **The Ally has no touchscreen driver in the kernel config today.** `board/ally/linux.config` enables `INPUT_EVDEV`, `INPUT_JOYSTICK`, `HID_GENERIC`/`HID_ASUS`/`HID_PLAYSTATION`/`HID_XBOX` and the Designware I2C controller, but **no** `TOUCHSCREEN_*`, no `I2C_HID`, no `HID_MULTITOUCH` (checked 2026-09-25). Touch cannot work until that stack is enabled — this is the first half of T1.
 - Sprint 8 gamepad wiring merged: `rcore_playos.c` translates `playos_input_get_controller_state()` into `CORE.Input.Gamepad.*`.
 - Sprint 7 overlay architecture live: `playos-overlay` is a separate trusted raylib process that maps above any surface (`playos_overlay_v1`), owns "Virtual keyboard (future)" per `playos-overlay-spec.md`.
 - Compositor uses `wlr_scene` (shell/game/overlay trees) + `wlr_seat "seat0"`, but forwards **no** pointer/touch today (`system_button.c` intercepts keyboard `BTN_MODE` only).
-- wlroots 0.20 pinned (provides `wlr_text_input_v3` and `wlr_seat_touch_notify_*`).
+- wlroots 0.20 pinned (provides `wlr_text_input_v3` and `wlr_seat_touch_notify_*`). Verified: `output/ally/build/wlroots-0.20.0/include/wlr/types/` carries both `wlr_text_input_v3.h` and `wlr_cursor.h`.
 
 ---
 
@@ -76,6 +77,7 @@ Crucially, the OSK is **not** a shell-only widget. It is a system service that a
 | `playos-overlay` (`playos-refdistro/src/playos-overlay/`) | OSK UI component + layout engine + touch tap-to-type + commit requests |
 | `playos-runtime` | `playos-v1.xml` overlay protocol extension (OSK visibility/commit) + regenerated headers |
 | `playos-samples` | `com.playos.sample-osk` game |
+| `playos-refdistro` | `board/ally/linux.config`: touchscreen input stack (T1, first half). `package/playos-samples/playos-samples.mk`: build/install rules for the new sample — that list is **explicit per sample, it does not glob**, so adding a directory alone ships nothing |
 | `playos-spec` | This sprint; `wayland-protocol.md` (text-input + touch sections); `playos-overlay-spec.md` (OSK screen); `post-mvp.md` entry |
 
 ---
@@ -102,8 +104,17 @@ external/raylib/src/raylib.h                    # ShowOnScreenKeyboard / HideOnS
 ### `playos-overlay` (`playos-refdistro/src/playos-overlay/`)
 
 ```text
-src/osk.c                       # NEW: OSK screen + layout + tap-to-type
-src/osk_layouts.c               # NEW: qwerty/numeric/password layout tables
+playos-overlay/osk.c            # NEW: OSK screen + layout + tap-to-type
+playos-overlay/osk_layouts.c    # NEW: qwerty/numeric/password layout tables
+```
+
+The overlay is a single `main.c` plus `CMakeLists.txt` and `protocols/` today — there is **no** `src/` subdirectory, and no `core_keyboard_testbed.c`.
+
+### `playos-refdistro`
+
+```text
+br2-external/board/ally/linux.config                      # touchscreen input stack (T1)
+br2-external/package/playos-samples/playos-samples.mk      # new sample's build/install rules
 ```
 
 ### `playos-runtime`
@@ -127,7 +138,7 @@ osk-demo/manifest.json          # com.playos.sample-osk
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S17-T1 | Pointer + touch seat forwarding in compositor | `playos-compositor` | not started | `wlr_cursor` + `wlr_scene_node_at` |
+| S17-T1 | Touchscreen input stack **+** pointer/touch seat forwarding | `playos-refdistro`, `playos-compositor` | not started | kernel: i2c-hid + hid-multitouch in `board/ally/linux.config` (none today); compositor: `wlr_cursor` + `wlr_scene_node_at` |
 | S17-T2 | `zwp_text_input_v3` manager + focus routing | `playos-compositor` | not started | `wlr_text_input_v3` |
 | S17-T3 | Raylib backend touch/pointer → `CORE.Input.Touch.*`/mouse | `playos-shell` | not started | `wl_touch`/`wl_pointer` listeners |
 | S17-T4 | Raylib backend text-input client + `ShowOnScreenKeyboard()` | `playos-shell` | not started | `zwp_text_input_v3` client |
@@ -138,7 +149,9 @@ osk-demo/manifest.json          # com.playos.sample-osk
 
 ### S17-T1 — Pointer + touch seat forwarding in compositor
 
-The compositor creates `seat0` but forwards nothing except the keyboard `BTN_MODE` intercept. Add:
+**First, the device has to produce touch events at all.** `board/ally/linux.config` carries no touchscreen driver, so this half has the same shape as Sprint 16's T1 did for Wi-Fi: enable the I2C-HID + HID-multitouch stack, rebuild, and confirm the panel shows up as an evdev node with `ABS_MT_*` axes. The panel is an I2C HID device; read its ACPI HID from `dmesg` / `/sys/bus/i2c/devices` **on the hardware** before choosing a driver rather than guessing one.
+
+Then the compositor half — it creates `seat0` but forwards nothing except the keyboard `BTN_MODE` intercept. Add:
 
 - Create a `wlr_cursor` bound to the output layout; create an `wlr_xcursor_manager` (or use `wlr_cursor_set_image`) for the pointer sprite.
 - Handle backend pointer events (`wlr_backend.events.new_pointer`, axis/motion/button/frame) and touch events (`new_touch`, down/up/motion/cancel).
@@ -185,7 +198,7 @@ RLAPI void HideOnScreenKeyboard(void);   // disable text input → compositor hi
 
 ### S17-T5 — Overlay OSK UI + layout + tap-to-type
 
-- Implement the OSK as a raylib UI component in `playos-overlay`. Use `core_keyboard_testbed.c` as the *visual* starting point (key rectangles + labels), but extend it from "visualize" to "input": on touch, hit-test `GetTouchPosition()` against each key `Rectangle` and emit the corresponding key/char via the S17-T6 commit request.
+- Implement the OSK as a raylib UI component in `playos-overlay`. The draft cited `core_keyboard_testbed.c` as the starting point; that file does not exist. The real precedent to lift is the Sprint 16 passphrase keyboard in `playos-shell/src/screen_network.c` — key rectangles with centred glyphs, CAPS and a digits/symbols layer, a show/hide password toggle, and a layout sized from the panel dimensions so it fits rather than overflows.
 - Layouts: a compact qwerty (rows: numbers, qwerty, asdf, zxcv + modifiers), plus numeric and password variants selected by content-hint from the compositor (see S17-T6).
 - Modifiers: shift (capitalizes + swaps symbol layer), backspace, enter (commit), space, dismiss (hide OSK). Highlight the pressed key; repeat on hold is optional.
 - Render above the game at the bottom of the panel; respect `output_info` dimensions/scale from the existing overlay protocol.
@@ -235,7 +248,7 @@ Extend `playos_overlay_v1` (in `playos-v1.xml`) with a minimal OSK channel. The 
   - Shell invokes the same OSK for Wi-Fi passphrase; text is masked; Enter commits.
   - Background game receives **no** text while shell/overlay is focused.
   - Dismiss (B/system button) hides the OSK and returns focus to the game.
-- QEMU/CI: compositor + raylib backend compile with `wlr_text_input_v3` and touch symbols; no touch device present → touch path is inert without crashing; text-input round-trip can be unit-tested with a mock `wlr_text_input_v3` client.
+- QEMU/CI: the compositor and raylib backend compile with `wlr_text_input_v3` and touch symbols. True touch needs a panel, but the **pointer** half is testable headlessly: `board/qemu-x86_64/linux.config` already sets `CONFIG_VIRTIO_INPUT=y` (added in Sprint 16), so `-device virtio-tablet-pci` (absolute) or `virtio-mouse-pci` (relative) feeds `wl_pointer`. A boot with no input device at all must leave the touch path inert rather than crashing.
 
 **Done when:** the sample echoes typed text on the Ally, and the shell Wi-Fi passphrase flow works end-to-end.
 
@@ -287,3 +300,25 @@ After this sprint, post-MVP features may assume:
 A finger tap lands in the focused surface, and the same system on-screen keyboard serves both the shell and games — invoked by the client, rendered by the overlay, and delivering committed text to the focused client through the standard `zwp_text_input_v3` protocol.
 
 *Previous: [Sprint 16](Sprint-16.md) | Next: [Sprint 19](Sprint-19.md)*
+
+---
+
+## Realignment notes (2026-09-25)
+
+Reviewed against the live tree before starting, the way Sprint 16 was.
+
+| Claim in the draft | Reality | Action |
+|---|---|---|
+| "passphrase entry is currently blank/stubbed" | Sprint 16 shipped a working passphrase field **with** a hand-rolled keyboard (CAPS / 123-symbols / SHOW·HIDE), verified on the Ally | start conditions corrected; T7 becomes *replacing* that keyboard, not building text entry from nothing |
+| touch "reaches the compositor" is assumed | **no touchscreen driver in `board/ally/linux.config`** — no `TOUCHSCREEN_*`, `I2C_HID` or `HID_MULTITOUCH` | T1 gained a kernel half; its primary repo and done-when updated |
+| wlroots 0.20 provides `wlr_text_input_v3` / `wlr_cursor` | confirmed — both headers are in the pinned 0.20.0 tree | recorded in the start conditions |
+| the compositor forwards no pointer/touch today | confirmed — no `wlr_cursor`, `wl_touch`, `wl_pointer` or `text_input` anywhere in `playos-compositor/src/` | T1 unchanged |
+| the raylib backend needs touch/text-input work | confirmed — `rcore_playos.c` has no touch, pointer or text-input code | T3/T4 unchanged |
+| OSK UI goes in `playos-overlay` under `src/` | the overlay is a single `main.c` + `CMakeLists.txt` + `protocols/`; **no `src/`**, and no `core_keyboard_testbed.c` | expected-files corrected; T5's starting point changed to the Sprint 16 keyboard |
+| extend `playos_overlay_v1` in `playos-runtime/protocols/playos-v1.xml` | confirmed — the file exists and declares `playos_overlay_v1 version="1"` | T6 unchanged |
+| adding a sample under `playos-samples` is enough | the package builds from an **explicit list** in `playos-samples.mk`; no glob | `playos-refdistro` added to required changes and expected files |
+| "no touch device present → path is inert" in CI | virtio-input is already enabled in the emulator kernel, so the **pointer** half is testable via `virtio-tablet`/`virtio-mouse` | CI line corrected so the sprint does not under-test |
+
+The sprint's shape is unchanged: three layers (compositor → raylib backend →
+overlay OSK) plus two consumers. What changed is T1's starting point — **until the
+kernel can see the panel, no amount of compositor work is verifiable on hardware.**
