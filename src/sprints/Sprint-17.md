@@ -138,7 +138,7 @@ osk-demo/manifest.json          # com.playos.sample-osk
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S17-T1 | Touchscreen input stack **+** pointer/touch seat forwarding | `playos-refdistro`, `playos-compositor` | not started | kernel: i2c-hid + hid-multitouch in `board/ally/linux.config` (none today); compositor: `wlr_cursor` + `wlr_scene_node_at` |
+| S17-T1 | Touchscreen input stack **+** pointer/touch seat forwarding | `playos-refdistro`, `playos-compositor` | **in progress** (kernel half done 2026-09-25) | panel identified on hardware as an I2C-HID device: ACPI enumerates `NVTK0603` with HID-over-I2C companion **`PNP0C50`** (`/sys/bus/i2c/devices/i2c-NVTK0603:00`, `driver=NONE`). Enabled `I2C_HID_ACPI` + `HID_MULTITOUCH`, both verified **in the built kernel** (`CONFIG_*` set, 16 `i2c_hid_acpi` symbols, `PNP0C50` present in `vmlinux`). Awaits a flash, then the on-device check for an evdev node with `ABS_MT_*`. Compositor half not started |
 | S17-T2 | `zwp_text_input_v3` manager + focus routing | `playos-compositor` | not started | `wlr_text_input_v3` |
 | S17-T3 | Raylib backend touch/pointer → `CORE.Input.Touch.*`/mouse | `playos-shell` | not started | `wl_touch`/`wl_pointer` listeners |
 | S17-T4 | Raylib backend text-input client + `ShowOnScreenKeyboard()` | `playos-shell` | not started | `zwp_text_input_v3` client |
