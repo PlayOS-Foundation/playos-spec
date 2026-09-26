@@ -98,3 +98,21 @@ That resolves the open question above, and settles this ADR's choice:
   platform API.
 - **Sequencing consequence:** make the LVGL decision (Sprint 22) *before* building more
   hand-drawn shell UI or a hand-rolled OSK — it supplies the widget layer and the keyboard.
+
+---
+
+## Follow-ups accepted (2026-09-26)
+
+**Path 1 is chosen for the shell's UI: LVGL as the widget layer, rendering through raylib.**
+Raylib stays the single rendering backend (ADR-0006) — `rcore_playos.c` keeps owning
+Wayland/EGL/GLES2 and vsync — and the game ABI is untouched. LVGL supplies layout, widgets,
+resolution adaptivity and a keyboard/textarea, which is where the system OSK comes from
+instead of a hand-rolled one. Path 3 (LVGL replacing the rendering backend) is revisited only
+through an ADR if raylib measurably limits LVGL.
+
+The **overlay uses the same UI layer** as the shell: it is the trusted UI that can render above
+a running game, which is where the OSK has to live.
+
+**Flagged, not yet specified:** app packaging, signing and updating for the marketplace. The
+A/B `.playosb` engine updates the system, not individual apps, so this needs its own ADR before
+marketplace implementation.

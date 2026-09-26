@@ -226,3 +226,17 @@ These are explicitly out of scope for PlayOS, even post-MVP:
 - Running multiple games simultaneously
 - Cloud gaming (streaming from remote server)
 - Custom GPU driver or OpenGL implementation
+
+---
+
+## Flags raised 2026-09-26
+
+- **Marketplace app packaging/signing/update — an ADR is required before implementation.** The
+  A/B `.playosb` engine (Sprint 11) updates the *system*; per-app install, update, integrity and
+  signatures are a separate design with their own trust questions.
+- **`playos-input` scope grows** (see its entry above): with keyboard and mouse first-class on PC,
+  and text entry as a platform API, this service becomes the home for cross-client input policy
+  rather than only devices.
+- **TLS availability to verify** before the marketplace relies on it: OpenSSL should already be in
+  the image because `wpa_supplicant`'s WPA3 support pulls it in, but that is an inference, not a
+  measurement.

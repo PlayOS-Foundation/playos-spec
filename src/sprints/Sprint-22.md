@@ -2,9 +2,9 @@
 
 **Goal:** Prove that [LVGL](https://lvgl.io/) v9 can render a resolution-adaptive, controller-navigated shell UI *inside* the existing PlayOS shell, starting with a raylib-managed texture as a **smoke-test backend** — without replacing `rcore_playos.c`, the Wayland/EGL lifecycle, or the game ABI. This is a **bounded spike**, not a product-direction port. The final rendering path (CPU blit vs. GPU draw unit vs. `LV_USE_WAYLAND` full port) is decided at implementation time.
 
-**Primary Outcome:** A working experimental LVGL screen navigated with the controller in the dev environment, plus a written **go/no-go** recommendation for a full LVGL shell port — including an explicit rendering-path decision (Path 1 / 2 / 3).
+**Primary Outcome:** A working experimental LVGL screen navigated with the controller in the dev environment, plus a written recommendation that **confirms Path 1 with evidence** (60 fps, correctness, partial-upload headroom) or reports what blocks it — see ADR-0013.
 
-**Status:** 🟡 Post-MVP — spike defined; not started. No implementation work is approved until this sprint is scheduled.
+**Status:** 🟡 Post-MVP — **direction decided (2026-09-26): Path 1**, LVGL as a UI layer over raylib (ADR-0013, and the ADR-0006 amendment). The spike still runs: its job is now to *validate* that direction — 60 fps, correctness, partial uploads — before a full port rather than to choose among the three paths.
 
 **Prerequisites:** MVP stable (Sprint 15–16); the Raylib 6.0 shell landed (Sprint 5.5); `rcore_playos.c` is the single shell rendering backend (ADR-0006); the musl-only constraint is in force (ADR-0003); the nested-Wayland dev environment works (`playos-spec/src/dev-environment.md`).
 

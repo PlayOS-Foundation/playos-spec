@@ -58,3 +58,13 @@ links the vendored static library when `PLAYOS_SHELL_USE_RAYLIB=ON`; the
 raw-GLES2 path was retired. Raylib remains rendering-only — controller input
 is still read directly from evdev by `src/input.c` so SYSTEM/QUICK_MENU
 reserved buttons survive.
+
+---
+
+## Amendment (2026-09-26) — LVGL as the widget layer
+
+Raylib remains the shell's single rendering backend; that part of this ADR is unchanged.
+[ADR-0013](ADR-0013-input-delivery.md) and [Sprint 22](../sprints/Sprint-22.md) place **LVGL v9
+on top of it** as the UI/widget layer, rendering into a raylib-managed texture (`flush_cb` →
+texture upload). One rendering backend, one Wayland/EGL lifecycle, no change to the game ABI.
+An LVGL-owned rendering backend (Sprint 22's Path 3) would require a new decision here first.

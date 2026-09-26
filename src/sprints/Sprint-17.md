@@ -322,3 +322,26 @@ Reviewed against the live tree before starting, the way Sprint 16 was.
 The sprint's shape is unchanged: three layers (compositor → raylib backend →
 overlay OSK) plus two consumers. What changed is T1's starting point — **until the
 kernel can see the panel, no amount of compositor work is verifiable on hardware.**
+
+---
+
+## Re-scope (2026-09-26) — after the confirmed product direction
+
+Every game and app is SDK-built, so there are no foreign Wayland clients and path 2 is not
+planned. Where this differs from the task framing above, this is the work that is actually
+required:
+
+1. **Touch in the platform API** (`playos-platform-api/src/backends/backend_evdev.c`): read the
+   panel's `ABS_MT_*` events and expose them the way the gamepad already is. The kernel half is
+   done and verified on hardware (`i2c_hid_acpi` + `hid-multitouch`, `/dev/input/event5`).
+2. **Keyboard and mouse in the platform API** — PlayOS targets PC hardware, where browsing and
+   searching a marketplace makes them first-class rather than optional.
+3. **Text entry as a PlayOS API**: a client requests text, an OSK is raised, committed text
+   returns. The OSK is **overlay-rendered** (the shell stops drawing while a game is foreground)
+   and built from LVGL's keyboard/textarea widgets (Sprint 22 / ADR-0013) rather than hand-drawn.
+4. **Consumers**: the shell's and apps' own fields, plus the sample that echoes typed text (T8
+   stands as the acceptance test).
+
+Retained but inert: the seat forwarding in `playos-compositor/src/input.c` (T1's second half,
+which is correct and needs no further work now) and `zwp_text_input_v3` (T2/T4) — the
+implementation for a future client class that does not exist today.
