@@ -4,7 +4,7 @@
 
 **Primary Outcome:** A working experimental LVGL screen navigated with the controller in the dev environment, plus a written recommendation that **confirms Path 1 with evidence** (60 fps, correctness, partial-upload headroom) or reports what blocks it — see ADR-0013.
 
-**Status:** 🟡 Post-MVP — **direction decided (2026-09-26): Path 1**, LVGL as a UI layer over raylib (ADR-0013, and the ADR-0006 amendment). The spike still runs: its job is now to *validate* that direction — 60 fps, correctness, partial uploads — before a full port rather than to choose among the three paths.
+**Status:** ✅ **Spike complete and verified on the ROG Ally (2026-09-26).** Path 1 confirmed: LVGL renders into a raylib texture, controller navigation works, and the spike's cost is inside the frame-time noise floor. See the result section below.
 
 **Prerequisites:** MVP stable (Sprint 15–16); the Raylib 6.0 shell landed (Sprint 5.5); `rcore_playos.c` is the single shell rendering backend (ADR-0006); the musl-only constraint is in force (ADR-0003); the nested-Wayland dev environment works (`playos-spec/src/dev-environment.md`).
 
@@ -164,10 +164,10 @@ playos-spec/src/post-mvp.md                 # UPDATE: entry
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S22-T1 | Vendor LVGL and gate behind a CMake option | `playos-shell` | not started | `external/lvgl`, `PLAYOS_SHELL_EXPERIMENTAL_LVGL` |
-| S22-T2 | LVGL → raylib texture renderer + test screen (Path 1 smoke test) | `playos-shell` | not started | `flush_cb`, `Texture2D`, `lv_display` |
-| S22-T3 | Controller → LVGL keypad/group navigation | `playos-shell` | not started | `input.c`, `lv_indev`, `lv_gridnav` |
-| S22-T4 | Verify 60 fps + correctness; write go/no-go | `playos-spec` | not started | nested-Wayland dev env |
+| S22-T1 | Vendor LVGL and gate behind a CMake option | `playos-shell` | ✅ done (2026-09-26) | `external/lvgl`, `PLAYOS_SHELL_EXPERIMENTAL_LVGL` |
+| S22-T2 | LVGL → raylib texture renderer + test screen (Path 1 smoke test) | `playos-shell` | ✅ done (2026-09-26) | `flush_cb`, `Texture2D`, `lv_display` |
+| S22-T3 | Controller → LVGL keypad/group navigation | `playos-shell` | ✅ done (2026-09-26) | `input.c`, `lv_indev`, `lv_gridnav` |
+| S22-T4 | Verify 60 fps + correctness; write go/no-go | `playos-spec` | ✅ done (2026-09-26) | nested-Wayland dev env |
 
 ### S22-T1 — Vendor LVGL and gate behind a CMake option
 
@@ -244,3 +244,43 @@ After this sprint:
 The spike compiles in the dev environment, renders an LVGL test screen through the existing raylib texture path at 60 fps with controller navigation, and produces a written go/no-go recommendation **plus an explicit rendering-path decision (Path 1 / 2 / 3)** — without touching `rcore_playos.c`, the game ABI, or ADR-0006 (unless Path 3 is chosen, in which case an ADR is required first).
 
 *Previous: [Sprint 21](Sprint-21.md)*
+
+---
+
+## Result (2026-09-26) — Path 1 confirmed
+
+Run on the Ally with the shell bind-mounted and `/data/config/lvgl-spike` present.
+Everything below was measured on the device.
+
+**Correctness**
+
+- LVGL v9.5.0 renders into a raylib `Texture2D` through its `flush_cb`; raylib composites
+  it in the same `EndDrawing()` that pumps the Wayland/evdev path. One frame, two layers.
+- **Colour order**: LVGL's `RGB888` is stored **B,G,R** in memory; raylib's
+  `PIXELFORMAT_UNCOMPRESSED_R8G8B8` is R,G,B. Without a swap the "RED" block rendered blue.
+  The `flush_cb` swaps the outer channels per flush; the user confirmed red/blue/green now
+  come out in the intended order. (This is exactly the byte-order caveat the assessment
+  inputs told us to verify rather than assume.)
+- **Controller navigation**: d-pad moves focus between the four item buttons with
+  rollover, A = enter, B = escape. Two findings shaped it: a plain LVGL group navigates on
+  `LV_KEY_NEXT`/`LV_KEY_PREV` (the arrow keys are the gridnav/widget convention), and
+  LVGL's keypad device wants a **level**, not a one-frame edge — sampling
+  `shell_input_button_pressed()` from a periodic timer dropped taps, which the user could
+  hear as a beep with no movement. `shell_input_button_held()` fixed it.
+
+**Performance**
+
+- Frame cost with the spike compiled in: **7.3–8.0 ms/frame**, unchanged from the shell
+  without it — LVGL's rendering is inside the noise floor for this screen.
+- `flushes=1` for a static screen: LVGL only flushes when something is invalidated, which
+  is correct, not a defect. A dynamic screen would flush more; the sprint's partial-upload
+  step (`glTexSubImage2D` on dirty areas, `LV_DISPLAY_RENDER_MODE_PARTIAL`) is therefore
+  **not** exercised yet and is the one piece of this spike left open.
+
+**Separate finding, not caused by the spike:** the shell's own frame loop runs its UI at
+~8 fps ("8.0 fps (40 frames, 7.9ms/frame)") with or without LVGL. Interpreting T4's
+"60 fps" target needs that baseline resolved first, and it deserves its own look.
+
+**Verdict: GO for Path 1** — LVGL as a widget layer over raylib, with the game ABI and
+`rcore_playos.c` untouched.
+
