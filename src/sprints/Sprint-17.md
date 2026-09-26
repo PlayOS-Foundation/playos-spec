@@ -4,7 +4,7 @@
 
 **Primary Outcome:** A finger tap on the ROG Ally touchscreen reaches the focused surface as a raylib `GetTouchPosition()` point, and a system OSK can be raised from either a shell text field (e.g. Wi-Fi passphrase) or a game text field, delivering the typed string back to the invoking client via a standard text-input protocol.
 
-**Status:** 🟡 Post-MVP — in progress, **re-scoped by ADR-0013 (2026-09-26)**. T1's kernel half is done and verified on hardware (the Ally's panel is an I2C-HID device, `NVTK0603`, now bound by `i2c_hid_acpi` + `hid-multitouch` as `/dev/input/event5`). Its forwarding half is written and running but is the wrong layer for today's clients: measurement showed PlayOS clients do not present as Wayland surfaces, so input reaches them via `libplayos` → evdev. Read ADR-0013 before starting any task here.
+**Status:** 🟡 Post-MVP — **re-scoped by ADR-0013 (2026-09-26) following confirmed product direction**: every game and app is SDK-built, so there are no foreign Wayland clients and path 2 is not planned. What this sprint actually needs: (a) touch in `playos-platform-api`'s evdev backend (the kernel half is already done and verified on hardware); (b) an OSK rendered by the **overlay** and driven by a PlayOS text-entry API; (c) the shell/app consumers. The seat forwarding written in T1 is retained as the implementation for a future client class but is inert today, and `zwp_text_input_v3`/T2/T4 are not on the product's path.
 
 **Prerequisites:** MVP complete (Sprint 15); Sprint 16 networking (the Wi-Fi passphrase field is the shell's first real text-input consumer); the `rcore_playos.c` gamepad translation landed (raylib `CORE.Input.Gamepad.*` fed from `playos_input_get_controller_state`).
 

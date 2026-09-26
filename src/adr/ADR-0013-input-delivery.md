@@ -67,3 +67,34 @@ libinput backend.
 the compositor's own renderer never references a client surface. That answer decides whether first-party
 clients could *become* Wayland surfaces cheaply — making path 2 universal — or are deliberately outside
 Wayland, in which case path 1 is the only sane route.
+
+---
+
+## Direction confirmed (2026-09-26)
+
+Product intent, stated by the maintainer: an **unparalleled console experience on handheld and
+PC**; **every game and application is compiled against the PlayOS SDK**; the shell is a
+**first-class UI** (LVGL, rendering through raylib) whose job is browsing and launching games
+and apps and managing the **PlayOS Marketplace** — from the shell or a separate SDK app.
+
+That resolves the open question above, and settles this ADR's choice:
+
+- **Path 2 is not planned.** There are no foreign Wayland clients by design, so seat forwarding
+  and `zwp_text_input_v3` are not on the product's path. They stay correct for a hypothetical
+  future client class, and `playos-compositor/src/input.c` is kept as that implementation —
+  inert today and documented as such. The seat keeps its **policy** role (reserved-button
+  intercept), which is its day-job here.
+- **Input belongs to the platform API for every client class**: gamepad (shipped), touch
+  (handheld), and **keyboard and mouse** — because PlayOS targets PC hardware too, where a
+  marketplace to browse and search makes them first-class rather than optional.
+- **Text entry is a shell/overlay concern, not a protocol.** The OSK must be rendered by the
+  **overlay**, since the shell stops rendering while a game is foreground (a locked shell
+  invariant), and it is driven by a PlayOS API. LVGL's keyboard/textarea widgets are the
+  pragmatic implementation (see [Sprint 22](sprints/Sprint-22.md)) instead of a hand-rolled
+  keyboard.
+- **The marketplace needs no new platform surface**: networking landed in Sprint 16, TLS should
+  come with the OpenSSL that `wpa_supplicant`'s WPA3 support already pulls in (verify before
+  relying on it), storage and the A/B update engine exist, and browsing/search is shell plus
+  platform API.
+- **Sequencing consequence:** make the LVGL decision (Sprint 22) *before* building more
+  hand-drawn shell UI or a hand-rolled OSK — it supplies the widget layer and the keyboard.
