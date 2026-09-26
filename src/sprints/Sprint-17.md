@@ -369,7 +369,10 @@ Ordered, and each step leaves something runnable:
    trust boundary: the OSK is overlay-rendered so a game cannot fake it, and a game receives only the
    committed string. Short spec, before code.  **Done 2026-09-26:** see `runtime-ipc.md` §Text entry / OSK.
 2. **`playos-lvgl` package.** The spike builds LVGL inside the shell; the overlay needs it too, so this
-   becomes a shared library package mirroring `playos-raylib`, and the shell's gate switches to it.
+   becomes a shared library package mirroring `playos-raylib`, and the shell's gate switches to it.  **Done 2026-09-26** (`refdistro 447baf9`, `shell 505866c`): built as a shared library with
+   headers, the shell links it, and the package-built shell was verified running on the Ally with
+   `liblvgl.so` loaded from the package. Note for deployment: the image is what carries the library -
+   a hand-staged shell needs its whole dependency closure, `liblvgl_thorvg.so.9` included.
 3. **The API itself**: `libplayos` entry points plus the IPC types, brokered through `control.sock`.
 4. **The overlay OSK**: LVGL keyboard + textarea in `playos-overlay`, shown and hidden on request.
    Note: the shell's idle policy redraws at a low rate unless something is busy, so the OSK
