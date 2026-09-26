@@ -493,12 +493,25 @@ keyboard itself is rendered by `playos-overlay`, so an untrusted game cannot pre
 (ADR-0013). This replaces the earlier plan of `zwp_text_input_v3` and compositor-driven visibility,
 which assumed Wayland surfaces that first-party clients do not have.
 
-**Flow.** requester → `playos-init` (broker) → compositor (raises the overlay) → overlay renders the
-keyboard and owns the edit buffer → `playos-init` → requester.
+**Flow.** requester → compositor (broker) → overlay renders the keyboard and owns the edit buffer →
+compositor → requester.
 
-**Transport: the existing trusted channels, no new sockets.** Trusted clients use `control.sock`;
-games use the lifecycle fd they already own (it is pre-authenticated and already carries their
-control traffic). `playos-init` brokers both, as it does for the network control plane.
+**Transport (corrected 2026-09-26 after reading the code).** The first draft said games would
+request over their lifecycle fd. They cannot: that fd is a one-byte, init-to-game channel
+(`FOREGROUND/BACKGROUND/SUSPEND/RESUME/TERMINATE`) with no way back. A game's only outbound channel
+is its Wayland connection, carrying the **`playos-v1`** PlayOS protocol - which is exactly the
+"explicit PlayOS API" ADR-0013 calls for, and is our own protocol rather than a foreign one.
+
+So the two paths converge on the **compositor**, which owns the overlay and already tracks which
+client is foreground:
+
+- **trusted clients** (shell) -> `control.sock` -> `playos-init` -> compositor
+- **games** -> `playos-v1` on their existing Wayland connection -> compositor
+- **compositor** -> overlay (`ShowKeyboard`, via the existing overlay coordination) -> OSK
+- text back: overlay -> compositor -> the requester, and nowhere else
+
+`playos-init` therefore relays for trusted clients only (as it does for the network control plane);
+it is not in the game path at all.
 
 | type | direction | body |
 |---|---|---|
