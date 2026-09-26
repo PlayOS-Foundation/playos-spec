@@ -29,7 +29,7 @@ These features are most commonly requested and have direct dependencies on shipp
 
 ### Touch + On-Screen Keyboard (OSK)
 **Motivation:** The ROG Ally touchscreen is currently inert (no `wl_touch` forwarding), and every text-entry flow (Wi-Fi passphrase, search, save naming, profiles) needs a keyboard.  
-**Stack:** Touch/pointer via the Wayland seat (`wl_pointer`/`wl_touch` + `wlr_scene` hit-testing); text input via upstream `zwp_text_input_v3` (`wlr_text_input_v3`); OSK UI rendered by `playos-overlay` as a raylib component.  
+**Stack:** Touch for first-party clients through `playos-platform-api`'s evdev backend; touch/pointer via the Wayland seat (`wl_pointer`/`wl_touch` + `wlr_scene` hit-testing) and `zwp_text_input_v3` for foreign Wayland clients. The OSK is rendered by the overlay and driven over `playos_overlay_v1`. See ADR-0013.
 **Scope:** Touch reaches the focused surface (`GetTouchPosition`); a single system OSK is invokable by both the shell and games and delivers `commit_string` to the focused client.  
 **Depends on:** MVP input API stable; Sprint 7 overlay architecture; Sprint 8 gamepad-input precedent.  
 **Sprint:** [Sprint 17](sprints/Sprint-17.md)

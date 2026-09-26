@@ -1,10 +1,10 @@
 # Sprint 17 — Touch Input + On-Screen Keyboard (OSK)
 
-**Goal:** Wire touch input end-to-end (compositor → raylib backend) and ship a reusable on-screen keyboard (OSK) that any foreground client — the shell *or* a game — can invoke and receive committed text from.
+**Goal:** Deliver touch input to PlayOS applications — through the platform API that already carries the controller, not through the compositor (see [ADR-0013](../adr/ADR-0013-input-delivery.md)) — and ship a reusable on-screen keyboard that any foreground client can invoke and receive committed text from. The compositor's seat forwarding is retained for *foreign* Wayland clients, which do not exist yet.
 
 **Primary Outcome:** A finger tap on the ROG Ally touchscreen reaches the focused surface as a raylib `GetTouchPosition()` point, and a system OSK can be raised from either a shell text field (e.g. Wi-Fi passphrase) or a game text field, delivering the typed string back to the invoking client via a standard text-input protocol.
 
-**Status:** 🟡 Post-MVP — not started. Design follows the gamepad-input precedent (Sprint 8) and reuses the Sprint 7 overlay architecture. **Reviewed and realigned 2026-09-25** against the live tree — see Realignment notes at the end. Headline: the Ally kernel has **no touchscreen driver today**, so T1 gained a kernel half.
+**Status:** 🟡 Post-MVP — in progress, **re-scoped by ADR-0013 (2026-09-26)**. T1's kernel half is done and verified on hardware (the Ally's panel is an I2C-HID device, `NVTK0603`, now bound by `i2c_hid_acpi` + `hid-multitouch` as `/dev/input/event5`). Its forwarding half is written and running but is the wrong layer for today's clients: measurement showed PlayOS clients do not present as Wayland surfaces, so input reaches them via `libplayos` → evdev. Read ADR-0013 before starting any task here.
 
 **Prerequisites:** MVP complete (Sprint 15); Sprint 16 networking (the Wi-Fi passphrase field is the shell's first real text-input consumer); the `rcore_playos.c` gamepad translation landed (raylib `CORE.Input.Gamepad.*` fed from `playos_input_get_controller_state`).
 
@@ -31,9 +31,9 @@ Crucially, the OSK is **not** a shell-only widget. It is a system service that a
 
 ## Decisions Locked for This Sprint
 
-- **Touch via the Wayland seat (`wl_touch`), not evdev.** Touch is absolute surface-relative input: it must be hit-tested against the focused surface and coordinate-transformed per output/scale. Reimplementing that in `playos-platform-api` would duplicate the compositor. Contrast with the gamepad (Sprint 8), which stays evdev/platform-API because a gamepad is a surface-independent *logical* device whose reserved buttons must be stripped at the source.
+- **Touch delivery depends on the client class (ADR-0013).** First-party clients (shell, overlay, SDK games) get touch through `playos-platform-api`'s evdev backend, like the gamepad. Foreign Wayland clients get it through the seat: `wl_touch`, hit-tested in the scene.
 - **Pointer via `wl_pointer`** alongside touch (the same seat plumbing); this also makes raylib `GetMousePosition()`/`IsMouseButton*()` work for USB mice and touch-as-mouse.
-- **Text input via upstream `zwp_text_input_v3`**, implemented server-side with wlroots' `wlr_text_input_v3`. Do **not** invent a custom PlayOS text protocol — the standard one is stable, wlroots-native, and understood by other engines (non-raylib games can implement the same client).
+- **Text input: an explicit PlayOS API for first-party clients**, driven over `playos_overlay_v1` (T5/T6). `zwp_text_input_v3` remains the route for foreign Wayland clients, and is worth implementing when those arrive — not before, since nothing on the current path can bind it.
 - **The OSK UI lives in `playos-overlay`** (already owns "Virtual keyboard (future)"), rendered as a raylib component. It is *one* system keyboard, not a per-game widget.
 - **OSK visibility is compositor-driven:** when the focused client *enables* text input, the compositor signals the overlay to show the OSK; on disable/hide it unmaps. The game does not render or size the OSK.
 - **Committed text flows compositor → focused client** via `zwp_text_input_v3::commit_string`. Text never crosses `control.sock`; the OSK only produces Wayland protocol events.
