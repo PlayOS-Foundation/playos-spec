@@ -35,8 +35,8 @@ Crucially, the OSK is **not** a shell-only widget. It is a system service that a
 - **Pointer via `wl_pointer`** alongside touch (the same seat plumbing); this also makes raylib `GetMousePosition()`/`IsMouseButton*()` work for USB mice and touch-as-mouse.
 - **Text input: an explicit PlayOS API for first-party clients**, driven over `playos_overlay_v1` (T5/T6). `zwp_text_input_v3` remains the route for foreign Wayland clients, and is worth implementing when those arrive — not before, since nothing on the current path can bind it.
 - **The OSK UI lives in `playos-overlay`** (already owns "Virtual keyboard (future)"), rendered as a raylib component. It is *one* system keyboard, not a per-game widget.
-- **OSK visibility is compositor-driven:** when the focused client *enables* text input, the compositor signals the overlay to show the OSK; on disable/hide it unmaps. The game does not render or size the OSK.
-- **Committed text flows compositor → focused client** via `zwp_text_input_v3::commit_string`. Text never crosses `control.sock`; the OSK only produces Wayland protocol events.
+- **OSK visibility is request-driven, not compositor-driven (ADR-0013).** A client asks for text through the PlayOS API; the request is brokered to the overlay, which owns the keyboard. The overlay rendering it is what stops an untrusted game drawing a *fake* OSK.
+- **Only the committed string crosses back**, to the client that asked, over the PlayOS API. `zwp_text_input_v3` is not on this path: there are no foreign Wayland clients (ADR-0013).
 - **Overlay ↔ compositor OSK coordination** is a small additive extension to `playos_overlay_v1` (see S17-T6). The overlay renders and hit-tests keys; the compositor is the only party that talks to the focused client.
 - **Game-facing API is a raylib extension**, not a new `libplayos` ABI: `rcore_playos.c` owns the game's Wayland connection, so it implements the `zwp_text_input_v3` client and exposes `ShowOnScreenKeyboard()` / `HideOnScreenKeyboard()` plus `GetCharPressed()` (which "just works" for the committing client). Non-raylib engines implement `zwp_text_input_v3` directly.
 - **No keyboard input forwarding change in this sprint.** The OSK produces text through the text-input protocol; physical keyboard forwarding (`system_button.c` currently withholds non-reserved keys) remains a separate, later concern.
@@ -191,7 +191,7 @@ RLAPI void ShowOnScreenKeyboard(void);   // enable text input → compositor rai
 RLAPI void HideOnScreenKeyboard(void);   // disable text input → compositor hides OSK
 ```
 
-- On `zwp_text_input_v3::commit_string`, push the UTF-8 string into raylib's `CORE.Input.Keyboard.charPressedQueue` (and optionally map a synthetic `Enter` keycode into `keyPressedQueue` for the "commit" key). `GetCharPressed()` then returns the typed characters exactly as if they came from a physical keyboard.
+- On the PlayOS text-commit message, push the UTF-8 string into raylib's `CORE.Input.Keyboard.charPressedQueue` so an SDK client reads it with `GetCharPressed()`.
 - Keep the existing "keyboard input is intentionally unhandled" stance for *physical* keyboards; only the text-input (OSK) path feeds the char queue.
 
 **Done when:** a raylib game calling `ShowOnScreenKeyboard()` gets typed characters back through `GetCharPressed()`.
@@ -358,4 +358,23 @@ That last check was made on a freshly installed image: the compositor attached t
 copied from the read-only seed, and launching it and touching the screen drew circles under every
 finger. So the kernel driver, the compositor's input stack, the platform API's touch API, the
 raylib mapping and the sample all shipped together - nothing depended on a developer workaround.
+
+---
+
+## OSK work list (2026-09-26) — the half still to do
+
+Ordered, and each step leaves something runnable:
+
+1. **Text-entry API design.** The messages (request text, commit, cancel), who may request, and the
+   trust boundary: the OSK is overlay-rendered so a game cannot fake it, and a game receives only the
+   committed string. Short spec, before code.
+2. **`playos-lvgl` package.** The spike builds LVGL inside the shell; the overlay needs it too, so this
+   becomes a shared library package mirroring `playos-raylib`, and the shell's gate switches to it.
+3. **The API itself**: `libplayos` entry points plus the IPC types, brokered through `control.sock`.
+4. **The overlay OSK**: LVGL keyboard + textarea in `playos-overlay`, shown and hidden on request.
+5. **Consumers**: the shell's Wi-Fi passphrase field first — it replaces the hand-rolled keyboard from
+   Sprint 16 with the widget layer the spike validated — then a sample that echoes typed text.
+
+Open items recorded elsewhere: partial-upload rendering (Sprint 22 result), and the shell's own ~8 fps
+UI pacing, which is pre-existing and should be resolved before judging anything against 60 fps.
 
