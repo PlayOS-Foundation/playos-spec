@@ -345,3 +345,11 @@ required:
 Retained but inert: the seat forwarding in `playos-compositor/src/input.c` (T1's second half,
 which is correct and needs no further work now) and `zwp_text_input_v3` (T2/T4) — the
 implementation for a future client class that does not exist today.
+
+**Verified end to end (2026-09-26):** touch reaches an SDK application on hardware. The platform
+API found the panel (`NVTK0603:00 0603:F200`, multitouch) and a probe recorded 17 finger-downs
+including 7 two-finger contacts; then a raylib game launched normally from the library (sandboxed
+as `playos-game`) drew a circle under every finger and reported up to **7-8 simultaneous points**
+- raylib's `MAX_TOUCH_POINTS` ceiling, reached on real hardware. The path is `GetTouchPosition()`
+-> `libplayos` -> evdev, with no compositor and no Wayland involvement (ADR-0013).
+
