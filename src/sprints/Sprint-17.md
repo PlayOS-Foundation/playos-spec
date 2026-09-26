@@ -367,7 +367,7 @@ Ordered, and each step leaves something runnable:
 
 1. **Text-entry API design.** The messages (request text, commit, cancel), who may request, and the
    trust boundary: the OSK is overlay-rendered so a game cannot fake it, and a game receives only the
-   committed string. Short spec, before code.
+   committed string. Short spec, before code.  **Done 2026-09-26:** see `runtime-ipc.md` §Text entry / OSK.
 2. **`playos-lvgl` package.** The spike builds LVGL inside the shell; the overlay needs it too, so this
    becomes a shared library package mirroring `playos-raylib`, and the shell's gate switches to it.
 3. **The API itself**: `libplayos` entry points plus the IPC types, brokered through `control.sock`.

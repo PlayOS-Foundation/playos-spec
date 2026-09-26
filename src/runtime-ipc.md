@@ -483,3 +483,47 @@ Verified on the ROG Ally against the real radio:
     ← {"v":1,"type":"ScanResults","networks":[
          {"ssid":"messaritisnikhouse","security":"wpa2","signal_dbm":-25},
          {"ssid":"ARRIS-2468_EXT","security":"wpa2","signal_dbm":-77}, … ]}
+
+---
+
+## Text entry / OSK (designed 2026-09-26)
+
+The OSK is a system service, not a shell widget: any **foreground** client can ask for text, and the
+keyboard itself is rendered by `playos-overlay`, so an untrusted game cannot present a fake one
+(ADR-0013). This replaces the earlier plan of `zwp_text_input_v3` and compositor-driven visibility,
+which assumed Wayland surfaces that first-party clients do not have.
+
+**Flow.** requester → `playos-init` (broker) → compositor (raises the overlay) → overlay renders the
+keyboard and owns the edit buffer → `playos-init` → requester.
+
+**Transport: the existing trusted channels, no new sockets.** Trusted clients use `control.sock`;
+games use the lifecycle fd they already own (it is pre-authenticated and already carries their
+control traffic). `playos-init` brokers both, as it does for the network control plane.
+
+| type | direction | body |
+|---|---|---|
+| `RequestText` | client → init | `{prompt, max_len, masked}` |
+| `TextRequestState` | init → client | `{state: "open" \| "closed"}` |
+| `TextChanged` | init → client | `{text}` — the requester mirrors what is typed |
+| `TextCommitted` | init → client | `{text}` |
+| `TextCancelled` | init → client | `{}` |
+| `ShowKeyboard` | init → compositor | `{prompt, max_len, masked}` — the compositor raises the overlay, which is how the OSK appears above a running game |
+
+**Rules**
+
+- **Only the foreground client may hold a request.** `playos-init` checks it against the state
+  machine, so a background game cannot steal the keyboard or the focus.
+- **The text goes to the requester and nowhere else.** With `masked` set the requester still receives
+  the characters — it is the one who asked — but the overlay renders them masked and no other client
+  sees them. That is what makes the Wi-Fi passphrase field safe to serve with the same mechanism.
+- **The overlay owns the edit buffer**; the requester sees updates and the final commit, so its own
+  field shows characters as they are typed.
+- **Input suppression is cooperative.** Games read evdev directly (ADR-0013), so a game keeps seeing
+  the d-pad while the OSK is up. The SDK reports text-entry-active and gameplay input is expected to
+  be suspended; a game that ignores this only sabotages its own input handling, and nothing else
+  depends on its restraint.
+- **The OSK must keep the shell/overlay marked busy while visible**, since idle redraw is ~8 fps.
+
+**`libplayos` surface (to implement):** `playos_input_request_text(const PlayOSTextRequest *)` and
+`playos_input_poll_text(PlayOSTextEvent *)`, following the existing poll-based lifecycle pattern.
+
