@@ -372,6 +372,8 @@ Ordered, and each step leaves something runnable:
    becomes a shared library package mirroring `playos-raylib`, and the shell's gate switches to it.
 3. **The API itself**: `libplayos` entry points plus the IPC types, brokered through `control.sock`.
 4. **The overlay OSK**: LVGL keyboard + textarea in `playos-overlay`, shown and hidden on request.
+   Note: the shell's idle policy redraws at a low rate unless something is busy, so the OSK
+   must mark itself busy while visible (or the overlay must, if the OSK lives there) - otherwise typing looks like stutter.
 5. **Consumers**: the shell's Wi-Fi passphrase field first — it replaces the hand-rolled keyboard from
    Sprint 16 with the widget layer the spike validated — then a sample that echoes typed text.
 

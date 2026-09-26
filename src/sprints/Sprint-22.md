@@ -277,9 +277,17 @@ Everything below was measured on the device.
   step (`glTexSubImage2D` on dirty areas, `LV_DISPLAY_RENDER_MODE_PARTIAL`) is therefore
   **not** exercised yet and is the one piece of this spike left open.
 
-**Separate finding, not caused by the spike:** the shell's own frame loop runs its UI at
-~8 fps ("8.0 fps (40 frames, 7.9ms/frame)") with or without LVGL. Interpreting T4's
-"60 fps" target needs that baseline resolved first, and it deserves its own look.
+**Resolved, and not a defect (2026-09-26):** the shell's ~8 fps is its **idle policy**, not a
+rendering problem and not caused by the spike. `main.c` tracks whether anything is happening
+(recent input, a screen change, a toast, a live diagnostic) and, when nothing is, skips frames and
+redraws only every `PLAYOS_IDLE_FRAME_INTERVAL` — deliberately, to save power on a handheld. It
+draws at full rate while busy. So the frame cost measured here (7.3-8.0 ms/frame, unchanged with
+LVGL compiled in) is the number that matters, and T4's "60 fps" needs reading as "60 fps while
+busy".
+
+**Consequence for anything animated:** while the shell is idle it only redraws at the idle
+interval, so an animated UI - including the OSK - must mark the shell busy while it is visible, or
+it will appear to stutter. Recorded in Sprint 17's work list.
 
 **Verdict: GO for Path 1** — LVGL as a widget layer over raylib, with the game ABI and
 `rcore_playos.c` untouched.
