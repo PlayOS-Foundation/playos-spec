@@ -138,7 +138,7 @@ osk-demo/manifest.json          # com.playos.sample-osk
 
 | Task ID | Task | Primary repo | Status | Notes / evidence |
 |---|---|---|---|---|
-| S17-T1 | Touchscreen input stack **+** pointer/touch seat forwarding | `playos-refdistro`, `playos-compositor` | **in progress** (kernel half done 2026-09-25) | panel identified on hardware as an I2C-HID device: ACPI enumerates `NVTK0603` with HID-over-I2C companion **`PNP0C50`** (`/sys/bus/i2c/devices/i2c-NVTK0603:00`, `driver=NONE`). Enabled `I2C_HID_ACPI` + `HID_MULTITOUCH`, both verified **in the built kernel** (`CONFIG_*` set, 16 `i2c_hid_acpi` symbols, `PNP0C50` present in `vmlinux`). Awaits a flash, then the on-device check for an evdev node with `ABS_MT_*`. Compositor half not started |
+| S17-T1 | Touchscreen input stack **+** pointer/touch seat forwarding | `playos-refdistro`, `playos-compositor` | **compositor half written, device path unverified** | `src/input.c` (wlr_cursor + scene hit-test + pointer/touch notify + seat capabilities POINTER|TOUCH + listener teardown) compiles clean in all three targets and is confirmed running in the guest (`input.c:389: pointer/touch forwarding enabled`). Kernel half done earlier. **Not yet verified:** attach and delivery — the emulator image delivers no input devices (see the CI note), so this needs the hardware flash |
 | S17-T2 | `zwp_text_input_v3` manager + focus routing | `playos-compositor` | not started | `wlr_text_input_v3` |
 | S17-T3 | Raylib backend touch/pointer → `CORE.Input.Touch.*`/mouse | `playos-shell` | not started | `wl_touch`/`wl_pointer` listeners |
 | S17-T4 | Raylib backend text-input client + `ShowOnScreenKeyboard()` | `playos-shell` | not started | `zwp_text_input_v3` client |
@@ -248,7 +248,7 @@ Extend `playos_overlay_v1` (in `playos-v1.xml`) with a minimal OSK channel. The 
   - Shell invokes the same OSK for Wi-Fi passphrase; text is masked; Enter commits.
   - Background game receives **no** text while shell/overlay is focused.
   - Dismiss (B/system button) hides the OSK and returns focus to the game.
-- QEMU/CI: the compositor and raylib backend compile with `wlr_text_input_v3` and touch symbols. True touch needs a panel, but the **pointer** half is testable headlessly: `board/qemu-x86_64/linux.config` already sets `CONFIG_VIRTIO_INPUT=y` (added in Sprint 16), so `-device virtio-tablet-pci` (absolute) or `virtio-mouse-pci` (relative) feeds `wl_pointer`. A boot with no input device at all must leave the touch path inert rather than crashing.
+  - QEMU/CI: the compositor and raylib backend compile with `wlr_text_input_v3` and touch symbols. **Correction (2026-09-25, measured):** the emulator image's compositor receives **no input devices at all** — booting it with `virtio-keyboard-pci`, `virtio-mouse-pci` and `virtio-tablet-pci` produced neither a pointer nor even the pre-existing keyboard attach line. The minimal emulator image has no session for wlr's libinput backend, so QEMU cannot exercise this path as the image stands; an earlier note here claimed the pointer half was testable headlessly via `virtio-tablet`, and that was wrong. Either give the emulator image a session (seatd) or verify on hardware.
 
 **Done when:** the sample echoes typed text on the Ally, and the shell Wi-Fi passphrase flow works end-to-end.
 
